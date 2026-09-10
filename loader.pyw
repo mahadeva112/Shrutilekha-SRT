@@ -3072,8 +3072,7 @@ class GroupCard(tk.Canvas):
     RADIUS = 4
     HEAD_H = 28
 
-    def __init__(self, parent, title, glyph=None, icon=None,
-                 summary_var=None, bg_parent=BG):
+    def __init__(self, parent, title, summary_var=None, bg_parent=BG):
         # width=80 for the same reason as RoundedField: a card always packs
         # fill="x", so Tk's 378px Canvas default would only ever overstate what
         # the card needs — and in a two-column page that overstatement is what
@@ -3091,15 +3090,15 @@ class GroupCard(tk.Canvas):
         self.head = tk.Frame(self.inner, bg=BG_PANEL2, height=self.HEAD_H)
         self.head.pack(fill="x")
         self.head.pack_propagate(False)
-        RoundedIconTile(self.head, icon_name=icon,
-                        text=(None if icon else (glyph or "•")),
-                        size=24, radius=7, bg_parent=BG_PANEL2,
-                        fill=BG_TILE, border=BORDER_TILE).pack(
-            side="left", padx=(8, 9))
+        # The header used to open with a 24px tile holding either a canvas
+        # glyph or a two-letter stand-in. Neither earned its space: Tk does
+        # not antialias, so the drawn glyphs smudged, and "Sc" / "Cu" / "Rv"
+        # only restated the title beside them. The title starts at the same
+        # x as the row labels below it now, so the card reads as one column.
         self._title_lbl = tk.Label(self.head, text=title, bg=BG_PANEL2,
                                    fg=FG, font=(UI_FONT, 10, "bold"),
                                    anchor="w")
-        self._title_lbl.pack(side="left")
+        self._title_lbl.pack(side="left", padx=(10, 0))
         # The summary is bound by hand rather than by textvariable, because it
         # has to be shortened to whatever room the title leaves it. A card is
         # a column wide now, not a tab wide, and a value that no longer fits
@@ -4224,10 +4223,9 @@ class App:
     CHIP_W = 92         # width of a numeric chip
     SLIDER_W = 96       # slider that shares its row with a chip
 
-    def _card(self, parent, title, glyph=None, icon=None, summary_var=None):
+    def _card(self, parent, title, summary_var=None):
         """Add a group card to a tab and register it for the activity rail."""
-        c = GroupCard(parent, title, glyph=glyph, icon=icon,
-                      summary_var=summary_var, bg_parent=BG)
+        c = GroupCard(parent, title, summary_var=summary_var, bg_parent=BG)
         c.pack(fill="x", pady=(0, 9))
         self._cards.append(c)
         return c
@@ -4458,10 +4456,7 @@ class App:
             self.ref_script_var.set(os.path.normpath(path))
 
     def _col_source(self, pad, defaults, items):
-        # mic / volume are the two glyphs RoundedIconTile can actually draw,
-        # so the source and detect groups use real icons rather than a text
-        # stand-in.
-        c = self._card(pad, "Where it comes from", icon=ICO_MIC,
+        c = self._card(pad, "Where it comes from",
                        summary_var=self.src_sum_var)
         self._source_first_card = c
 
@@ -4493,7 +4488,7 @@ class App:
         # guessed; a script settles it. It has to be the script in the SPOKEN
         # language — for a dubbed reel that is the translated one, not the
         # English source, which matches nothing and is reported as such.
-        c = self._card(pad, "Match my script", glyph="Sc",
+        c = self._card(pad, "Match my script",
                        summary_var=self.script_sum_var)
         slot = self._row_full(
             c, "Script file",
@@ -4508,7 +4503,7 @@ class App:
                       bg_parent=BG_CARD, height=30).pack(side="left",
                                                          padx=(7, 0))
 
-        c = self._card(pad, "Detect while transcribing", icon=ICO_VOLUME,
+        c = self._card(pad, "Detect while transcribing",
                        summary_var=self.detect_sum_var)
         self._toggle_card_row(c, "Punctuation", self.punct_var,
                               "Adds commas and full stops to the transcript")
@@ -4519,7 +4514,7 @@ class App:
 
     # ── Column: Timing ────────────────────────────────────────────────────
     def _col_timing(self, pad, defaults, items):
-        c = self._card(pad, "How cues are split", glyph="Cu",
+        c = self._card(pad, "How cues are split",
                        summary_var=self.split_sum_var)
         # Limits match the review screen's sliders, so a value means the same
         # thing on both screens.
@@ -4535,7 +4530,7 @@ class App:
         ComfortMeter(pad, self.cps_var, self.settings_vars[0],
                      bg_parent=BG).pack(fill="x", pady=(0, 10))
 
-        c = self._card(pad, "Before it reaches the timeline", glyph="Rv",
+        c = self._card(pad, "Before it reaches the timeline",
                        summary_var=self.review_sum_var)
         self._toggle_card_row(
             c, "Review captions first", self.review_var,
@@ -4548,7 +4543,7 @@ class App:
         Deliberately excludes the timeline track choices: a preset should
         survive being loaded on a different timeline.
         """
-        c = self._card(parent, "Presets", glyph="Pr",
+        c = self._card(parent, "Presets",
                        summary_var=self.preset_sum_var)
         presets_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "presets")
