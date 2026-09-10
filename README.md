@@ -100,7 +100,7 @@ state in which the updater is simply invisible:
 | It shows | Meaning |
 | --- | --- |
 | `v1.0.0` | Up to date. Click it to check again right now. |
-| `Checking…` | A check is in flight. |
+| `Checking…` | A check you asked for is in flight. The one at startup is silent — it can take a few seconds, and a chip that said this on every launch would read as stuck. |
 | **Update** (blue) | A release is waiting. Click to see what changed and install it. |
 | `Restart to finish` | Installed. Close the window and start the script again. |
 

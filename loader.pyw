@@ -427,6 +427,24 @@ def _round_rect(canvas, x1, y1, x2, y2, r, **kw):
     return canvas.create_polygon(pts, smooth=True, **kw)
 
 
+def _round_rect_framed(canvas, w, h, r, border, fill, **kw):
+    """Border + fill pair covering a whole ``w`` x ``h`` canvas.
+
+    Note the right and bottom edges land on w-1 / h-1, not on w / h. A canvas
+    of width w owns pixels 0..w-1, so a shape whose boundary sits exactly on
+    w puts its right-hand hairline one pixel past the last column it is
+    allowed to paint and the border is simply dropped — the control comes out
+    framed on three sides. Every rounded control in this file is drawn as an
+    outer border shape with an inner fill laid on top, so getting this
+    convention wrong once cost all of them the same edge.
+    """
+    outer = _round_rect(canvas, 0, 0, w - 1, h - 1, r,
+                        fill=border, outline=border, **kw)
+    inner = _round_rect(canvas, 1, 1, w - 2, h - 2, max(1, r - 1),
+                        fill=fill, outline=fill, **kw)
+    return outer, inner
+
+
 class IconCanvas(tk.Canvas):
     """Monochrome icon drawn directly on a Canvas — no icon-font dependency."""
 
@@ -564,23 +582,22 @@ class RoundedButton(tk.Canvas):
                 col = _mix(self._bg_parent, ACCENT_GLOW, 0.25 - off * 0.03)
                 _round_rect(self, off, off + 4, w - off, h + off + 4,
                             self._R + off, fill=col, outline=col)
-            _round_rect(self, 0, 0, w, h, self._R, fill=border, outline=border)
+            _round_rect(self, 0, 0, w - 1, h - 1, self._R,
+                        fill=border, outline=border)
             # Vertical ramp instead of a flat fill. Tk has no gradient brush,
             # so the face is drawn a scanline at a time and each line is inset
             # by the corner arc it crosses — which is what keeps the rounded
             # shape a flat fill would have given for free.
-            self._ramp(1, 1, w - 1, h - 1, max(1, self._R - 1),
+            self._ramp(1, 1, w - 2, h - 2, max(1, self._R - 1),
                        _mix(fill, "#ffffff", 0.16), _mix(fill, ACCENT_DARK, 0.55))
             # Top inner highlight
-            self.create_line(self._R, 1, w - self._R, 1,
+            self.create_line(self._R, 1, w - 1 - self._R, 1,
                              fill=_mix(fill, "#ffffff", 0.42))
         else:
             fill   = BG_HOVER if self._hover else BG
             border = BORDER_BRIGHT if self._hover else BORDER
             tcol   = FG_DIM
-            _round_rect(self, 0, 0, w, h, self._R, fill=border, outline=border)
-            _round_rect(self, 1, 1, w - 1, h - 1, max(1, self._R - 1),
-                        fill=fill, outline=fill)
+            _round_rect_framed(self, w, h, self._R, border, fill)
 
         cy = h // 2
         if self._icon:
@@ -689,12 +706,8 @@ class RoundedField(tk.Canvas):
         self.delete("bg")
         w = self.winfo_width()
         h = self._h
-        # Outer (border) rounded rect
-        _round_rect(self, 0, 0, w, h, self._r,
-                    fill=self._border, outline=self._border, tags=("bg",))
-        # Inner fill
-        _round_rect(self, 1, 1, w - 1, h - 1, max(1, self._r - 1),
-                    fill=self._fill, outline=self._fill, tags=("bg",))
+        _round_rect_framed(self, w, h, self._r, self._border, self._fill,
+                           tags=("bg",))
         # Keep background polygons below the hosted child widgets
         self.tag_lower("bg")
 
@@ -1908,16 +1921,22 @@ class UpdatePill(tk.Canvas):
 
     def set_state(self, state, text):
         """Move to a new state and relabel. Resizes the canvas, because every
-        state has a different width and Tk will not do that for a Canvas."""
+        state has a different width and Tk will not do that for a Canvas.
+
+        The whole body is guarded, not just the configure: an update check
+        can land in the moment the window is closing, and _measure touches a
+        font object, which throws "application has been destroyed" just as
+        readily as the widget calls do. That would surface as a traceback out
+        of a Tk callback while the user is only shutting the window."""
         if (state, text) == (self._state, self._text):
             return
-        self._state, self._text = state, text
-        self._measure()
         try:
+            self._state, self._text = state, text
+            self._measure()
             self.configure(width=self._bw)
+            self._draw()
         except tk.TclError:
-            return                       # widget already destroyed
-        self._draw()
+            pass                         # window already gone
 
     def state(self):
         return self._state
@@ -1932,18 +1951,19 @@ class UpdatePill(tk.Canvas):
 
         if self._loud():
             face = SELECT_HOVER if self._hover else SELECT
-            _round_rect(self, 0, 0, w, h, r, fill=face, outline=face)
+            _round_rect(self, 0, 0, w - 1, h - 1, r, fill=face, outline=face)
             # Vertical ramp, a scanline at a time, each line inset by the
             # corner arc it crosses. Tk has no gradient brush;
             # RoundedButton._ramp does the same for the primary button and
             # this matches it on purpose.
-            self._ramp(1, 1, w - 1, h - 1, max(1, r - 1),
+            self._ramp(1, 1, w - 2, h - 2, max(1, r - 1),
                        _mix(face, "#ffffff", 0.18),
                        _mix(face, SELECT_DARK, 0.60))
             # Inner top highlight: one bright line under the edge is what
             # makes a flat fill read as a raised surface rather than a
             # coloured rectangle.
-            self.create_line(r, 1, w - r, 1, fill=_mix(face, "#ffffff", 0.45))
+            self.create_line(r, 1, w - 1 - r, 1,
+                             fill=_mix(face, "#ffffff", 0.45))
             self._arrow(self.PAD_L, h // 2, self.GLYPH, SELECT_INK)
             tx, tcol = self.PAD_L + self.GLYPH + self.GAP, SELECT_INK
         else:
@@ -1954,9 +1974,7 @@ class UpdatePill(tk.Canvas):
             # which is the whole complaint the resting state exists to answer.
             edge = BORDER_BRIGHT if self._hover else DIVIDER_MID
             fill = BG_HOVER if self._hover else self._bg_parent
-            _round_rect(self, 0, 0, w, h, r, fill=edge, outline=edge)
-            _round_rect(self, 1, 1, w - 1, h - 1, max(1, r - 1),
-                        fill=fill, outline=fill)
+            _round_rect_framed(self, w, h, r, edge, fill)
             tx = self.PAD_L
             tcol = FG if self._hover else FG_DIM
 
@@ -3377,6 +3395,8 @@ class App:
         # Guards a second check while one is in flight — the chip is clickable
         # the whole time it says "Checking…".
         self._update_checking = False
+        # Where the check thread leaves (info, manual) for the Tk-side poller.
+        self._update_result = None
 
         # Rounded-corner bookkeeping. _corner_job coalesces the Windows 10
         # re-cut; _corner_size skips the Configure events that did not
@@ -3541,8 +3561,13 @@ class App:
 
     def _set_pill(self, state, text):
         pill = self._update_pill
-        if pill is not None and pill.winfo_exists():
-            pill.set_state(state, text)
+        if pill is None:
+            return
+        try:
+            if pill.winfo_exists():
+                pill.set_state(state, text)
+        except tk.TclError:
+            pass                         # window already gone
 
     def _start_update_check(self, manual=False):
         """Ask GitHub whether a newer release exists, off the UI thread.
@@ -3555,22 +3580,55 @@ class App:
         ``manual`` is a click on the chip rather than the check at startup.
         The difference is only in what a *negative* answer does: silence at
         startup, and a visible "Up to date" when someone asked.
+
+        The thread touches no Tk at all. It leaves its answer in
+        ``_update_result`` and a poller on the Tk thread picks it up. The
+        obvious version — ``root.after(0, ...)`` from the thread — is what
+        this replaces: tkinter refuses a call from a foreign thread with
+        "main thread is not in main loop" whenever the Tk thread is not
+        sitting in the event loop, which is exactly the case while
+        App.__init__ is still building the window. The refusal is an
+        exception in a daemon thread nobody reads, so a check that came back
+        quickly was silently thrown away and the window claimed to be up to
+        date. Handing the value over a plain attribute cannot fail that way.
         """
         if self._update_checking:
             return
         self._update_checking = True
-        self._set_pill("checking", "Checking…")
+        if manual:
+            # Only a check someone asked for says so. The one at startup runs
+            # silent: it can take several seconds against a slow network (two
+            # or three GitHub calls, 12s timeout each), and a chip that reads
+            # "Checking…" for that long on every single launch looks stuck
+            # rather than busy. Nothing is waiting on it, so nothing needs to
+            # be told about it.
+            self._set_pill("checking", "Checking…")
 
         def work():
             try:
                 info = updater.check()
             except Exception:
                 info = None                # check() already swallows; belt and braces
-            try:
-                self.root.after(0, self._on_update_checked, info, manual)
-            except Exception:
-                pass                       # window already gone
+            # A single attribute store, which is atomic under the GIL, so the
+            # poller either sees the previous value or this one.
+            self._update_result = (info, manual)
+
+        self._update_result = None
         threading.Thread(target=work, daemon=True).start()
+        self._poll_update_result()
+
+    def _poll_update_result(self):
+        """Wait on the Tk thread for the check thread to leave its answer."""
+        pending = self._update_result
+        if pending is None:
+            try:
+                self.root.after(150, self._poll_update_result)
+            except tk.TclError:
+                pass                       # window gone; nothing to update
+            return
+        self._update_result = None
+        info, manual = pending
+        self._on_update_checked(info, manual)
 
     def _on_update_checked(self, info, manual):
         self._update_checking = False
