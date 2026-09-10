@@ -20,7 +20,7 @@ logs/
 
 # Self-update bookkeeping (per install, never committed)
 .update_state.json
-_backup/
+.update-backup/
 
 # Per-machine runtime files
 subtitle_style.json
