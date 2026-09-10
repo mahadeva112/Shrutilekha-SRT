@@ -17,3 +17,11 @@ desktop.ini
 
 # Runtime logs
 logs/
+
+# Self-update bookkeeping (per install, never committed)
+.update_state.json
+_backup/
+
+# Per-machine runtime files
+subtitle_style.json
+certs.pem

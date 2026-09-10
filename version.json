@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "notes": [
+    "Srutilekha can now update itself: the title bar shows an Update chip when a newer version is on GitHub."
+  ],
+  "mandatory": false,
+  "min_version": ""
+}

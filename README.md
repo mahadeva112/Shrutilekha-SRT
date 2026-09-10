@@ -96,15 +96,19 @@ opens it asks GitHub, on a background thread, whether a newer release exists.
 If one does, an **Update** chip appears in the title bar; clicking it shows
 what changed and installs it. Offline, or already current, and nothing appears.
 
-Installing downloads the repo zip, copies the previous files into
-`.update-backup\<old version>\`, writes the new ones, and re-deploys
-`audio_to_srt.py` into Resolve's `Scripts\Utility` folder as `Srutilekha.py` —
-Resolve runs that copy, so skipping it would leave the two halves at different
-versions. `.env`, `.cache/` and `logs/` are never touched. Close the window and
-start the script again to pick up the new version.
+Installing downloads the branch zip, checks it really is a Srutilekha release,
+zips the version it is about to replace into `.update-backup\` (the last three
+are kept), writes the new files, and re-deploys `audio_to_srt.py` into Resolve's
+`Scripts\Utility` folder as `Srutilekha.py` — Resolve runs that copy, so
+skipping it would leave the two halves at different versions. Nothing in the
+install is touched until the download has been validated, so a failed or
+truncated one leaves the working version exactly as it was. `.env`,
+`subtitle_style.json`, `.cache/`, `presets/` and `logs/` are never replaced.
+Close the window and start the script again to pick up the new version.
 
-To publish one, bump `VERSION` in [updater.py](updater.py) and `version.json`
-in the same commit, and push to `main`:
+To publish a release, bump `version` in `version.json` and push to `main`. That
+file is the single source of truth — `updater.VERSION` reads it, so there is no
+second number to keep in step:
 
 ```json
 { "version": "1.1.0", "released": "2026-08-02", "notes": ["What changed."] }
@@ -115,6 +119,20 @@ for about five minutes). Add `"min_version": "1.1.0"` to make it required —
 useful when a release changes the handshake file format between the Resolve-side
 script and the loader, since an older half would otherwise break the run rather
 than fail cleanly.
+
+Pushing **without** bumping `version.json` still reaches everyone: the check
+also compares the branch's head commit against the one each install recorded,
+and offers the update with the commit subjects in place of release notes. So an
+ordinary `git push` is enough to ship a fix; bumping the version is what earns
+it a real version number and notes worth reading.
+
+If the window will not open on some machine — the one case where an update is
+both most needed and least reachable through the button — the same code runs
+from a terminal in the project folder:
+
+```bash
+python updater.py --install
+```
 
 ## Using it
 
@@ -153,8 +171,8 @@ becomes the progress view.
 | [tools/translit_exceptions.py](tools/translit_exceptions.py) | Hand-verified spellings that override the engine. |
 
 Generated at runtime, all gitignored: `.env` (your key), `.cache/` (transcript
-cache), `logs/`, `presets/`, `.update-backup/` (the version the last update
-replaced).
+cache), `logs/`, `presets/`, `.update-backup/` (zips of the versions the last
+few updates replaced), `.update_state.json` (which commit this copy is on).
 
 ## Styling a subtitle track
 
