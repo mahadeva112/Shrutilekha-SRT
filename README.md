@@ -93,8 +93,20 @@ Then, in Resolve: **Workspace → Scripts → Srutilekha**.
 
 Setup is a one-time thing. After that the window updates itself: each time it
 opens it asks GitHub, on a background thread, whether a newer release exists.
-If one does, an **Update** chip appears in the title bar; clicking it shows
-what changed and installs it. Offline, or already current, and nothing appears.
+
+The right-hand end of the title bar always carries the answer, so there is no
+state in which the updater is simply invisible:
+
+| It shows | Meaning |
+| --- | --- |
+| `v1.0.0` | Up to date. Click it to check again right now. |
+| `Checking…` | A check is in flight. |
+| **Update** (blue) | A release is waiting. Click to see what changed and install it. |
+| `Restart to finish` | Installed. Close the window and start the script again. |
+
+Offline or rate-limited reads as "up to date" — the check fails silently
+rather than putting an error in front of someone who opened the window to
+make subtitles. Click the chip to retry.
 
 Installing downloads the branch zip, checks it really is a Srutilekha release,
 zips the version it is about to replace into `.update-backup\` (the last three
