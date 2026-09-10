@@ -14,3 +14,6 @@ venv/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Runtime logs
+logs/

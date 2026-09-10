@@ -1176,13 +1176,23 @@ class Dropdown(RoundedField):
     CARD_R  = 8
     PILL_R  = 6
 
+    # How many rows the menu shows before it starts scrolling. A 16-language
+    # list rendered in full is a column of text taller than the card that
+    # opened it; four rows is enough to read the neighbours of the current
+    # pick and still look like a control rather than a page.
+    MAX_ROWS = 8
+    SB_W     = 4        # scrollbar thumb width
+    SB_GAP   = 5        # gutter between the rows and the thumb
+
     def __init__(self, parent, values, variable, on_pick=None, icon_name=None,
-                 display_prefix="", bg_parent=BG, height=48, radius=12):
+                 display_prefix="", bg_parent=BG, height=48, radius=12,
+                 max_rows=None):
         super().__init__(parent, height=height, radius=radius, padx=10,
                          bg_parent=bg_parent, fill=BG_INPUT, border=BORDER)
         self.values = list(values)
         self.variable = variable
         self.on_pick = on_pick
+        self.max_rows = max(1, int(max_rows or self.MAX_ROWS))
         self._popup = None
         self._shadow = None
         self._outside_bind = None
@@ -1253,7 +1263,13 @@ class Dropdown(RoundedField):
         y = self.winfo_rooty() + self.winfo_height() + 4
         w = self.winfo_width()
         n = max(1, len(self.values))
-        h = self.PAD * 2 + n * self.ROW_H + (n - 1) * self.ROW_GAP
+        # Only `max_rows` rows are on screen at once; the rest are scrolled to.
+        vis = min(n, self.max_rows)
+        self._vis = vis
+        self._n = n
+        self._step = self.ROW_H + self.ROW_GAP
+        self._max_top = n - vis                  # largest first-visible index
+        h = self.PAD * 2 + vis * self.ROW_H + (vis - 1) * self.ROW_GAP
 
         # A long list (11 caption styles) opened from a field low in the window
         # ran straight off the bottom of the screen, with the last entries
@@ -1280,25 +1296,78 @@ class Dropdown(RoundedField):
         c = tk.Canvas(self._popup, bg=TRANSPARENT_KEY,
                       highlightthickness=0, bd=0, width=w, height=h)
         c.pack(fill="both", expand=True)
+        self._canvas = c
+        self._menu_w = w
+        self._menu_h = h
 
         # Card backdrop — flat fill, no visible border
         _round_rect(c, 0, 0, w, h, self.CARD_R,
                     fill=BG_INPUT, outline=BG_INPUT)
 
+        # Open with the current pick in view, roughly centred in the window so
+        # the neighbours above and below it are both readable.
+        try:
+            cur_i = self.values.index(self.variable.get())
+        except ValueError:
+            cur_i = 0
+        self._top = max(0, min(self._max_top, cur_i - vis // 2))
+        self._hl = cur_i
+        self._render_rows()
+
+        if self._max_top:
+            c.bind("<MouseWheel>", self._on_wheel)
+            self._popup.bind("<MouseWheel>", self._on_wheel)
+            c.tag_bind("sbar", "<Button-1>", self._on_sb_press)
+            c.tag_bind("sbar", "<B1-Motion>", self._on_sb_drag)
+
+        c.configure(cursor="hand2")
+        self._popup.bind("<Escape>", lambda e: self._close())
+        self._popup.bind("<Up>", lambda e: self._move_hl(-1))
+        self._popup.bind("<Down>", lambda e: self._move_hl(1))
+        self._popup.bind("<Prior>", lambda e: self._move_hl(-self._vis))
+        self._popup.bind("<Next>", lambda e: self._move_hl(self._vis))
+        self._popup.bind("<Home>", lambda e: self._move_hl(-self._n))
+        self._popup.bind("<End>", lambda e: self._move_hl(self._n))
+        self._popup.bind("<Return>",
+                         lambda e: self._pick(self.values[self._hl]))
+
+        # Click-outside-to-close
+        root = self.winfo_toplevel()
+        self._outside_bind = root.bind("<Button-1>",
+                                       self._maybe_close_outside, add="+")
+        self._popup.focus_set()
+
+    # ── Menu rendering ──────────────────────────────────────────────────────
+    def _render_rows(self):
+        """Draw the `_vis` rows starting at `_top`, plus the scroll thumb.
+
+        Only the visible window is drawn, and scrolling snaps to whole rows,
+        so nothing ever needs clipping: a half row bleeding into the card's
+        6px padding would clip badly against the transparent rounded corners.
+        """
+        c = self._canvas
+        if not c.winfo_exists():
+            return
+        c.delete("rows")
+        w, h = self._menu_w, self._menu_h
+        gutter = (self.SB_W + self.SB_GAP) if self._max_top else 0
         current = self.variable.get()
         row_font = (UI_FONT, 10)
-        for i, v in enumerate(self.values):
-            ry1 = self.PAD + i * (self.ROW_H + self.ROW_GAP)
+
+        for slot in range(self._vis):
+            i = self._top + slot
+            v = self.values[i]
+            ry1 = self.PAD + slot * self._step
             ry2 = ry1 + self.ROW_H
             rx1 = self.PAD
-            rx2 = w - self.PAD
-            is_cur = (v == current)
+            rx2 = w - self.PAD - gutter
+            is_cur = (v == current) or (i == self._hl)
             fill = BG_HOVER if is_cur else BG_INPUT
             tag = "row%d" % i
             rect = _round_rect(c, rx1, ry1, rx2, ry2, self.PILL_R,
-                               fill=fill, outline=fill, tags=(tag,))
+                               fill=fill, outline=fill, tags=(tag, "rows"))
             c.create_text(rx1 + 16, (ry1 + ry2) // 2, anchor="w",
-                                 text=v, fill=FG, font=row_font, tags=(tag,))
+                          text=v, fill=FG, font=row_font, tags=(tag, "rows"))
 
             def on_enter(_e, r=rect):
                 c.itemconfig(r, fill=BG_HOVER, outline=BG_HOVER)
@@ -1311,14 +1380,61 @@ class Dropdown(RoundedField):
             c.tag_bind(tag, "<Leave>", on_leave)
             c.tag_bind(tag, "<Button-1>", lambda e, val=v: self._pick(val))
 
-        c.configure(cursor="hand2")
-        self._popup.bind("<Escape>", lambda e: self._close())
+        if not self._max_top:
+            return
 
-        # Click-outside-to-close
-        root = self.winfo_toplevel()
-        self._outside_bind = root.bind("<Button-1>",
-                                       self._maybe_close_outside, add="+")
-        self._popup.focus_set()
+        # Slim thumb in the right gutter, sized to the visible fraction.
+        tx2 = w - self.PAD
+        tx1 = tx2 - self.SB_W
+        ty1, ty2 = self.PAD, h - self.PAD
+        track = ty2 - ty1
+        thumb = max(20, int(track * self._vis / float(self._n)))
+        off = int((track - thumb) * self._top / float(self._max_top))
+        _round_rect(c, tx1, ty1, tx2, ty2, self.SB_W // 2,
+                    fill=TRACK_OFF, outline=TRACK_OFF, tags=("rows", "sbar"))
+        _round_rect(c, tx1, ty1 + off, tx2, ty1 + off + thumb,
+                    self.SB_W // 2, fill=FG_MUTE, outline=FG_MUTE,
+                    tags=("rows", "sbar"))
+
+    def _scroll_to(self, top):
+        top = max(0, min(self._max_top, int(top)))
+        if top != self._top:
+            self._top = top
+            self._render_rows()
+
+    def _on_wheel(self, e):
+        self._scroll_to(self._top - int(e.delta / 120))
+        return "break"
+
+    def _on_sb_press(self, e):
+        self._scroll_from_y(e.y)
+        return "break"
+
+    def _on_sb_drag(self, e):
+        self._scroll_from_y(e.y)
+        return "break"
+
+    def _scroll_from_y(self, y):
+        """Map a y inside the scrollbar track to a first-visible index."""
+        ty1, ty2 = self.PAD, self._menu_h - self.PAD
+        track = max(1, ty2 - ty1)
+        thumb = max(20, int(track * self._vis / float(self._n)))
+        span = max(1, track - thumb)
+        frac = (y - ty1 - thumb / 2.0) / span
+        self._scroll_to(round(frac * self._max_top))
+
+    def _move_hl(self, delta):
+        """Keyboard nav: move the highlight and keep it inside the window."""
+        if not self._popup:
+            return "break"
+        self._hl = max(0, min(self._n - 1, self._hl + delta))
+        if self._hl < self._top:
+            self._top = self._hl
+        elif self._hl >= self._top + self._vis:
+            self._top = self._hl - self._vis + 1
+        self._top = max(0, min(self._max_top, self._top))
+        self._render_rows()
+        return "break"
 
     def _maybe_close_outside(self, event):
         if not self._popup:
@@ -3823,10 +3939,12 @@ class App:
             slot.tooltip = tip
         return slot
 
-    def _pick(self, slot, values, var, width=None, prefix="", fill=False):
+    def _pick(self, slot, values, var, width=None, prefix="", fill=False,
+              max_rows=None):
         """A dropdown sized to the row's control column, or to a stacked row."""
         d = Dropdown(slot, values, var, display_prefix=prefix,
-                     bg_parent=BG_CARD, height=28, radius=4)
+                     bg_parent=BG_CARD, height=28, radius=4,
+                     max_rows=max_rows)
         if fill:
             d.pack(fill="x")
         else:
@@ -4001,10 +4119,13 @@ class App:
                   bg_parent=BG_CARD).pack(fill="x")
         self._sync_srt_handle = slot.row_handle
         self._pick(self._row(c, "Audio track"), items, self.combo_var)
+        # 16 languages plus Auto-detect is a menu taller than the window it
+        # opens over, so it shows four rows and scrolls (wheel, thumb drag or
+        # the arrow keys), opening with the current pick already in view.
         self._pick(self._row(c, "Language",
                              "Auto-detect follows the audio; a fixed language "
                              "pins the transcript to its script"),
-                   LANGUAGES, self.lang_var)
+                   LANGUAGES, self.lang_var, max_rows=4)
 
         # The script the voice-over was read from. Scribe writes what it hears,
         # so names and anything carrying a nukta come out however the model
