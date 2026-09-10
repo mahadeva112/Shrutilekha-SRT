@@ -63,6 +63,17 @@ def _enable_dpi_awareness():
         import ctypes
         # Per-Monitor v2 (Windows 10 1703+): best fidelity, matches whichever
         # monitor the window is actually on.
+        #
+        # NOTE: this call does not exist on shcore — it lives in user32 — so
+        # this branch always raises and the process settles for
+        # SYSTEM_DPI_AWARE below. That is currently load-bearing, not a typo
+        # to fix in passing: under Per-Monitor v2 Tk is told the monitor's real
+        # DPI, so its point-sized fonts grow (10pt goes from 17px to ~25px at
+        # 150%) while the window stays pinned to the pixel literals in
+        # App.__init__ (930x740, min 880x560) and every widget size in this
+        # file. The layout overflows. Moving to Per-Monitor v2 means scaling
+        # those constants by dpi/96 first — a separate change, and one that
+        # has to be tested on a scaled display.
         ctypes.windll.shcore.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
         return
     except Exception:
@@ -284,6 +295,81 @@ def _steal_focus(win):
         SWP_NOACTIVATE = 0x0010
         u32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+    except Exception:
+        pass
+
+
+def _dwm_rounds_windows():
+    """True where the compositor can round corners for us (Windows 11+)."""
+    if sys.platform != "win32":
+        return False
+    try:
+        return sys.getwindowsversion().build >= 22000
+    except Exception:
+        return False
+
+
+DWM_ROUNDING = _dwm_rounds_windows()
+
+
+def _win_hwnd(win):
+    """The top-level HWND Windows actually manages for a Tk window.
+
+    ``winfo_id()`` returns Tk's own child window. Passing that to DWM gets
+    E_HANDLE and passing it to SetWindowRgn silently clips nothing, which is
+    why both have to go through GA_ROOT (=2).
+    """
+    import ctypes
+    return ctypes.windll.user32.GetAncestor(int(win.winfo_id()), 2)
+
+
+def round_corners(win, radius=8, square=False):
+    """Round a frameless window's corners. No-op off Windows, or on failure.
+
+    Two implementations, because the good one only exists on Windows 11:
+
+    * Build 22000+: DWMWA_WINDOW_CORNER_PREFERENCE. The compositor does the
+      clipping, so the arc is antialiased and follows every resize by itself.
+    * Older: SetWindowRgn with a round-rect region. Hard-edged — a region is a
+      binary mask, there is no partial coverage — and sized in window
+      coordinates, so the caller must re-apply it whenever the window resizes.
+
+    ``square`` restores hard corners, for a maximized window: Windows unrounds
+    its own maximized windows, and a rounded one shows slivers of desktop in
+    the corners of what is meant to read as edge-to-edge.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        hwnd = _win_hwnd(win)
+        if not hwnd:
+            return
+        if DWM_ROUNDING:
+            # 33 = DWMWA_WINDOW_CORNER_PREFERENCE.
+            # 1 = DONOTROUND, 2 = ROUND (the standard Windows 11 radius),
+            # 3 = ROUNDSMALL. ROUND is what every other Win11 app uses, which
+            # is the point — this window opens inside Resolve and should read
+            # as part of the OS, not as a shape someone chose.
+            pref = ctypes.c_int(1 if square else 2)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                ctypes.c_void_p(hwnd), 33,
+                ctypes.byref(pref), ctypes.sizeof(pref))
+            return
+        if square:
+            ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
+            return
+        win.update_idletasks()
+        w, h = win.winfo_width(), win.winfo_height()
+        if w <= 1 or h <= 1:
+            return
+        # CreateRoundRectRgn's last two arguments are the ellipse's full width
+        # and height, not its radius — hence the doubling. Off-by-two here is
+        # a corner that looks almost but not quite right.
+        rgn = ctypes.windll.gdi32.CreateRoundRectRgn(
+            0, 0, w + 1, h + 1, radius * 2, radius * 2)
+        # Ownership of the region passes to the window; do not delete it.
+        ctypes.windll.user32.SetWindowRgn(hwnd, rgn, True)
     except Exception:
         pass
 
@@ -1754,21 +1840,45 @@ class TitleBarControls(tk.Frame):
 
 
 class UpdatePill(tk.Canvas):
-    """Title-bar chip, shown only when a newer release exists.
+    """Title-bar button, shown only when a newer release exists.
 
-    Small, outline-styled and tinted rather than filled: it has to be findable
-    without competing with Generate for the eye, because installing an update
-    is never what the user opened this window to do.
+    Built exactly like a primary RoundedButton — same radius, same vertical
+    ramp, same inner top highlight — but in Resolve blue rather than subtitle
+    yellow. Three things about that are deliberate:
+
+    * Filled, not outlined. The earlier version was a tinted outline with the
+      accent-coloured label, which on this near-black bar had so little
+      contrast that it read as a hyperlink someone had left in the chrome
+      rather than as a button. A control that only appears when there is
+      something to do has to look pressable the moment it appears.
+    * Blue, not amber. It still must not compete with Generate, and hue does
+      that job better than weight does: amber in this window means subtitles
+      and nothing else, and blue already carries every interactive state.
+    * A download arrow, not a dot. The dot said "notification"; the arrow says
+      what the button will actually do.
     """
     H = 24
+    R = 6
+
+    # Layout, left to right. Named because the width computation and the draw
+    # have to agree — a mismatch shows up as text clipped by a corner arc.
+    PAD_L, GLYPH, GAP, PAD_R = 11, 11, 7, 13
 
     def __init__(self, parent, text, command, bg_parent=BG_CARD):
         self._font = _font(UI_FONT, 9, "bold")
         self._text = text
         self._bg_parent = bg_parent
         self._hover = False
-        self._bw = self._font.measure(text) + 34
-        super().__init__(parent, width=self._bw, height=self.H, bg=bg_parent,
+        self._bw = (self.PAD_L + self.GLYPH + self.GAP
+                    + self._font.measure(text) + self.PAD_R)
+        # Canvas is 8px taller than the button, which is drawn at the top of
+        # it. That is RoundedButton's convention — it reserves the strip for
+        # the primary variant's glow halo — and the Generate / Sync Existing
+        # tabs share this bar. Sizing the canvas to the button instead centres
+        # it 4px lower than they sit, which reads as a chip that missed the
+        # row it belongs to.
+        super().__init__(parent, width=self._bw, height=self.H + 8,
+                         bg=bg_parent,
                          highlightthickness=0, bd=0, cursor="hand2")
         self.bind("<Enter>",    lambda e: self._set_hover(True))
         self.bind("<Leave>",    lambda e: self._set_hover(False))
@@ -1781,15 +1891,56 @@ class UpdatePill(tk.Canvas):
 
     def _draw(self):
         self.delete("all")
-        w, h = self._bw, self.H
-        edge = SELECT if self._hover else _mix(self._bg_parent, SELECT, 0.45)
-        fill = _mix(self._bg_parent, SELECT_GLOW, 0.90 if self._hover else 0.55)
-        _round_rect(self, 0, 0, w, h, h // 2, fill=edge, outline=edge)
-        _round_rect(self, 1, 1, w - 1, h - 1, h // 2 - 1, fill=fill, outline=fill)
-        cy = h // 2
-        self.create_oval(11, cy - 3, 17, cy + 3, fill=SELECT, outline=SELECT)
-        self.create_text(23, cy, anchor="w", text=self._text, font=self._font,
-                         fill=SELECT_HOVER if self._hover else SELECT)
+        w, h, r = self._bw, self.H, self.R
+        face = SELECT_HOVER if self._hover else SELECT
+
+        _round_rect(self, 0, 0, w, h, r, fill=face, outline=face)
+        # Vertical ramp, a scanline at a time, each line inset by the corner
+        # arc it crosses. Tk has no gradient brush; RoundedButton._ramp does
+        # the same thing for the primary button and this matches it on purpose.
+        self._ramp(1, 1, w - 1, h - 1, max(1, r - 1),
+                   _mix(face, "#ffffff", 0.18),
+                   _mix(face, SELECT_DARK, 0.60))
+        # Inner top highlight: one bright line under the edge is what makes a
+        # flat fill read as a raised surface rather than a coloured rectangle.
+        self.create_line(r, 1, w - r, 1, fill=_mix(face, "#ffffff", 0.45))
+
+        self._arrow(self.PAD_L, h // 2, self.GLYPH, SELECT_INK)
+        self.create_text(self.PAD_L + self.GLYPH + self.GAP, h // 2,
+                         anchor="w", text=self._text, font=self._font,
+                         fill=SELECT_INK)
+
+    def _ramp(self, x1, y1, x2, y2, r, top, bottom):
+        h = int(y2 - y1)
+        if h <= 0:
+            return
+        for i in range(h):
+            dy = 0.0
+            if i < r:
+                dy = r - i
+            elif i > h - r:
+                dy = i - (h - r)
+            inset = r - math.sqrt(max(0.0, r * r - dy * dy)) if dy > 0 else 0.0
+            col = _mix(top, bottom, i / float(max(1, h - 1)))
+            self.create_line(x1 + inset, y1 + i, x2 - inset, y1 + i, fill=col)
+
+    def _arrow(self, x, cy, s, color):
+        """Download arrow: stem, chevron head, and a short tray under it.
+
+        Half-pixel centres. A 2px line centred on a whole coordinate straddles
+        two pixel columns and comes out 3px wide and grey at this size, which
+        is exactly the softness that made the old chip look unfinished."""
+        cx = x + s / 2.0 + 0.5
+        top = cy - s / 2.0 - 0.5
+        stem_end = top + s * 0.58
+        self.create_line(cx, top, cx, stem_end,
+                         fill=color, width=2, capstyle="round")
+        for dx in (-s * 0.30, s * 0.30):
+            self.create_line(cx + dx, stem_end - s * 0.30, cx, stem_end,
+                             fill=color, width=2, capstyle="round")
+        self.create_line(cx - s * 0.40, top + s,
+                         cx + s * 0.40, top + s,
+                         fill=color, width=2, capstyle="round")
 
 
 class SlimScrollbar(tk.Canvas):
@@ -2390,6 +2541,7 @@ class Tooltip:
         x = max(0, min(x, sw - w - 4))
         y = max(0, min(y, sh - h - 4))
         tip.geometry("+%d+%d" % (x, y))
+        round_corners(tip, radius=6)
         self._tip = tip
 
     def _hide(self, _e=None):
@@ -3134,6 +3286,10 @@ class StageList(tk.Frame):
 
 
 class App:
+    # Corner radius for the frameless window. 8 is what Windows 11 itself
+    # uses; the Win10 fallback matches it so the two look like one product.
+    CORNER_R = 8
+
     def __init__(self, root, prompt_data, selection_path, args_path,
                  done_path, log_path, python_exe, script_path,
                  result_path, ack_path, run_id=None, run_marker=None):
@@ -3165,6 +3321,12 @@ class App:
         self._update_info = None
         self._update_pill = None
         self._update_win = None
+
+        # Rounded-corner bookkeeping. _corner_job coalesces the Windows 10
+        # re-cut; _corner_size skips the Configure events that did not
+        # actually change the window size.
+        self._corner_job = None
+        self._corner_size = None
 
         self.cancelled = False
         self.exit_code = None
@@ -3247,6 +3409,14 @@ class App:
         self._grip.bind("<Button-1>", self._resize_start)
         self._grip.bind("<B1-Motion>", self._resize_move)
 
+        # Rounded corners. Deferred: the HWND these need does not exist until
+        # the window has been mapped. On Windows 10 the region is sized in
+        # window coordinates, so it has to be re-cut on every resize — the
+        # grip drag and the maximize toggle both change the size.
+        root.after(0, self._apply_corners)
+        if not DWM_ROUNDING:
+            root.bind("<Configure>", self._on_configure_corners, add="+")
+
         root.after(60, lambda: _steal_focus(root))
         root.after(600, lambda: _keep_topmost(root))
         root.protocol("WM_DELETE_WINDOW", self._on_cancel)
@@ -3254,6 +3424,32 @@ class App:
             root.after(1200, self._poll_superseded)
         if updater is not None:
             self._start_update_check()
+
+    # ── Rounded corners ─────────────────────────────────────────────────
+    def _apply_corners(self):
+        # Square while maximized, matching how Windows treats its own
+        # maximized windows.
+        round_corners(self.root, radius=self.CORNER_R,
+                      square=self._maximized)
+
+    def _on_configure_corners(self, event):
+        """Re-cut the Windows 10 region after a resize, coalesced.
+
+        Configure fires for every pixel of a grip drag and for child layout
+        changes too; cutting a region per event is both wasted work and
+        visible as flicker, so only the last one in a burst counts."""
+        if event.widget is not self.root:
+            return
+        size = (self.root.winfo_width(), self.root.winfo_height())
+        if size == getattr(self, "_corner_size", None):
+            return
+        self._corner_size = size
+        if self._corner_job is not None:
+            try:
+                self.root.after_cancel(self._corner_job)
+            except Exception:
+                pass
+        self._corner_job = self.root.after(40, self._apply_corners)
 
     # ── Supersede watchdog (form phase only) ─────────────────────────────
     def _poll_superseded(self):
@@ -3397,6 +3593,10 @@ class App:
             x = self.root.winfo_rootx() + (self.root.winfo_width() - W) // 2
             y = self.root.winfo_rooty() + (self.root.winfo_height() - h) // 3
             win.geometry("%dx%d+%d+%d" % (W, h, max(0, x), max(0, y)))
+            # After the geometry, not before: the Windows 10 region is cut to
+            # the window's current size, and the card grows as notes and the
+            # status line are added.
+            round_corners(win, radius=App.CORNER_R)
 
         def close():
             self._update_win = None
@@ -3513,6 +3713,9 @@ class App:
             try:
                 if self.root.state() == "normal":
                     self.root.overrideredirect(True)
+                    # Toggling overrideredirect re-creates the native frame,
+                    # which drops both the DWM attribute and the region.
+                    self._apply_corners()
                     _steal_focus(self.root)
                 else:
                     self.root.after(200, _check)
@@ -3533,6 +3736,7 @@ class App:
             self.root.geometry("%dx%d+0+0" % (sw, sh))
             self._maximized = True
         self._controls.update_max_icon(self._maximized)
+        self._apply_corners()
 
     def _make_draggable(self, widget):
         widget.bind("<Button-1>", self._drag_start)
