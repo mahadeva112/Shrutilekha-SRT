@@ -1840,22 +1840,27 @@ class TitleBarControls(tk.Frame):
 
 
 class UpdatePill(tk.Canvas):
-    """Title-bar button, shown only when a newer release exists.
+    """Title-bar control for the self-updater. Always present.
 
-    Built exactly like a primary RoundedButton — same radius, same vertical
-    ramp, same inner top highlight — but in Resolve blue rather than subtitle
-    yellow. Three things about that are deliberate:
+    It was previously created hidden and packed only when a check found a
+    newer release, which meant that on an install that was already current —
+    the normal case — the title bar showed nothing at all. There was then no
+    way to tell "no update available" apart from "the updater is broken", and
+    no way to ask it to look again. So the control is always mounted and
+    carries the state instead:
 
-    * Filled, not outlined. The earlier version was a tinted outline with the
-      accent-coloured label, which on this near-black bar had so little
-      contrast that it read as a hyperlink someone had left in the chrome
-      rather than as a button. A control that only appears when there is
-      something to do has to look pressable the moment it appears.
-    * Blue, not amber. It still must not compete with Generate, and hue does
-      that job better than weight does: amber in this window means subtitles
-      and nothing else, and blue already carries every interactive state.
-    * A download arrow, not a dot. The dot said "notification"; the arrow says
-      what the button will actually do.
+      idle       "v1.0.0"     quiet outline. Click to check now.
+      checking   "Checking…"  same outline, while the thread is out.
+      available  "Update"     filled blue with a download arrow.
+      done       "Restart"    after an install, until the window closes.
+
+    Only ``available`` is loud. It is built exactly like a primary
+    RoundedButton — same radius, same vertical ramp, same inner top highlight
+    — but in Resolve blue rather than subtitle yellow. Two reasons for the
+    colour: it must not compete with Generate, and hue separates them better
+    than weight does, since amber in this window means subtitles and nothing
+    else while blue already carries every interactive state. The other states
+    borrow the secondary button's outline treatment so they read as chrome.
     """
     H = 24
     R = 6
@@ -1864,13 +1869,16 @@ class UpdatePill(tk.Canvas):
     # have to agree — a mismatch shows up as text clipped by a corner arc.
     PAD_L, GLYPH, GAP, PAD_R = 11, 11, 7, 13
 
-    def __init__(self, parent, text, command, bg_parent=BG_CARD):
+    LOUD = ("available",)          # states drawn as a filled blue button
+
+    def __init__(self, parent, text, command, bg_parent=BG_CARD,
+                 state="available"):
         self._font = _font(UI_FONT, 9, "bold")
         self._text = text
+        self._state = state
         self._bg_parent = bg_parent
         self._hover = False
-        self._bw = (self.PAD_L + self.GLYPH + self.GAP
-                    + self._font.measure(text) + self.PAD_R)
+        self._measure()
         # Canvas is 8px taller than the button, which is drawn at the top of
         # it. That is RoundedButton's convention — it reserves the strip for
         # the primary variant's glow halo — and the Generate / Sync Existing
@@ -1885,6 +1893,35 @@ class UpdatePill(tk.Canvas):
         self.bind("<Button-1>", lambda e: command())
         self._draw()
 
+    # ── state ───────────────────────────────────────────────────────────
+    def _loud(self):
+        return self._state in self.LOUD
+
+    def _measure(self):
+        """Width for the current text. The glyph only exists in a loud state,
+        so it is only paid for there — otherwise the version label sits in a
+        chip padded like a label, not like a button with a missing icon."""
+        self._font.configure(weight="bold" if self._loud() else "normal")
+        glyph = (self.GLYPH + self.GAP) if self._loud() else 0
+        self._bw = (self.PAD_L + glyph + self._font.measure(self._text)
+                    + self.PAD_R)
+
+    def set_state(self, state, text):
+        """Move to a new state and relabel. Resizes the canvas, because every
+        state has a different width and Tk will not do that for a Canvas."""
+        if (state, text) == (self._state, self._text):
+            return
+        self._state, self._text = state, text
+        self._measure()
+        try:
+            self.configure(width=self._bw)
+        except tk.TclError:
+            return                       # widget already destroyed
+        self._draw()
+
+    def state(self):
+        return self._state
+
     def _set_hover(self, on):
         self._hover = on
         self._draw()
@@ -1892,23 +1929,39 @@ class UpdatePill(tk.Canvas):
     def _draw(self):
         self.delete("all")
         w, h, r = self._bw, self.H, self.R
-        face = SELECT_HOVER if self._hover else SELECT
 
-        _round_rect(self, 0, 0, w, h, r, fill=face, outline=face)
-        # Vertical ramp, a scanline at a time, each line inset by the corner
-        # arc it crosses. Tk has no gradient brush; RoundedButton._ramp does
-        # the same thing for the primary button and this matches it on purpose.
-        self._ramp(1, 1, w - 1, h - 1, max(1, r - 1),
-                   _mix(face, "#ffffff", 0.18),
-                   _mix(face, SELECT_DARK, 0.60))
-        # Inner top highlight: one bright line under the edge is what makes a
-        # flat fill read as a raised surface rather than a coloured rectangle.
-        self.create_line(r, 1, w - r, 1, fill=_mix(face, "#ffffff", 0.45))
+        if self._loud():
+            face = SELECT_HOVER if self._hover else SELECT
+            _round_rect(self, 0, 0, w, h, r, fill=face, outline=face)
+            # Vertical ramp, a scanline at a time, each line inset by the
+            # corner arc it crosses. Tk has no gradient brush;
+            # RoundedButton._ramp does the same for the primary button and
+            # this matches it on purpose.
+            self._ramp(1, 1, w - 1, h - 1, max(1, r - 1),
+                       _mix(face, "#ffffff", 0.18),
+                       _mix(face, SELECT_DARK, 0.60))
+            # Inner top highlight: one bright line under the edge is what
+            # makes a flat fill read as a raised surface rather than a
+            # coloured rectangle.
+            self.create_line(r, 1, w - r, 1, fill=_mix(face, "#ffffff", 0.45))
+            self._arrow(self.PAD_L, h // 2, self.GLYPH, SELECT_INK)
+            tx, tcol = self.PAD_L + self.GLYPH + self.GAP, SELECT_INK
+        else:
+            # Quiet, but still visibly a control. The outline is DIVIDER_MID
+            # rather than the BORDER used on the cards: BORDER is #17171b and
+            # the title bar is #17181a, so on this one surface that hairline
+            # is invisible and the chip collapses into a stray grey word —
+            # which is the whole complaint the resting state exists to answer.
+            edge = BORDER_BRIGHT if self._hover else DIVIDER_MID
+            fill = BG_HOVER if self._hover else self._bg_parent
+            _round_rect(self, 0, 0, w, h, r, fill=edge, outline=edge)
+            _round_rect(self, 1, 1, w - 1, h - 1, max(1, r - 1),
+                        fill=fill, outline=fill)
+            tx = self.PAD_L
+            tcol = FG if self._hover else FG_DIM
 
-        self._arrow(self.PAD_L, h // 2, self.GLYPH, SELECT_INK)
-        self.create_text(self.PAD_L + self.GLYPH + self.GAP, h // 2,
-                         anchor="w", text=self._text, font=self._font,
-                         fill=SELECT_INK)
+        self.create_text(tx, h // 2, anchor="w", text=self._text,
+                         font=self._font, fill=tcol)
 
     def _ramp(self, x1, y1, x2, y2, r, top, bottom):
         h = int(y2 - y1)
@@ -3321,6 +3374,9 @@ class App:
         self._update_info = None
         self._update_pill = None
         self._update_win = None
+        # Guards a second check while one is in flight — the chip is clickable
+        # the whole time it says "Checking…".
+        self._update_checking = False
 
         # Rounded-corner bookkeeping. _corner_job coalesces the Windows 10
         # re-cut; _corner_size skips the Configure events that did not
@@ -3480,40 +3536,75 @@ class App:
         self.root.after(1200, self._poll_superseded)
 
     # ── Self-update ──────────────────────────────────────────────────────
-    def _start_update_check(self):
+    def _idle_pill_text(self):
+        return "v%s" % updater.VERSION
+
+    def _set_pill(self, state, text):
+        pill = self._update_pill
+        if pill is not None and pill.winfo_exists():
+            pill.set_state(state, text)
+
+    def _start_update_check(self, manual=False):
         """Ask GitHub whether a newer release exists, off the UI thread.
 
         Daemon thread: a slow or hanging network must never delay the window
         appearing, and must not keep the process alive after the user closes
         it. The answer comes back through root.after, so every widget touch
         still happens on the Tk thread.
+
+        ``manual`` is a click on the chip rather than the check at startup.
+        The difference is only in what a *negative* answer does: silence at
+        startup, and a visible "Up to date" when someone asked.
         """
+        if self._update_checking:
+            return
+        self._update_checking = True
+        self._set_pill("checking", "Checking…")
+
         def work():
-            info = updater.check()
-            if not info:
-                return
             try:
-                self.root.after(0, self._on_update_found, info)
+                info = updater.check()
+            except Exception:
+                info = None                # check() already swallows; belt and braces
+            try:
+                self.root.after(0, self._on_update_checked, info, manual)
             except Exception:
                 pass                       # window already gone
         threading.Thread(target=work, daemon=True).start()
 
-    def _on_update_found(self, info):
+    def _on_update_checked(self, info, manual):
+        self._update_checking = False
         # Anything past the form has a transcription in flight or finished;
         # replacing transcribe.py underneath either is not worth the chip.
         if self.cancelled or self._submitted:
             return
+        if not info:
+            self._set_pill("idle", self._idle_pill_text())
+            if manual:
+                # Say so, then fall back to the version. Without this a manual
+                # check that finds nothing looks identical to one that never
+                # ran.
+                self._set_pill("idle", "Up to date")
+                self.root.after(2500, self._restore_idle_pill)
+            return
         self._update_info = info
-        self._reveal_update_pill()
+        self._set_pill("available", "Update")
         if info.get("mandatory"):
             self._show_update_dialog()
 
-    def _reveal_update_pill(self):
-        pill = self._update_pill
-        if pill is None or not pill.winfo_exists() or pill.winfo_ismapped():
-            return
-        # Three window buttons sit over the right end of the bar.
-        pill.pack(side="right", padx=(0, TitleBarControls.BTN_W * 3 + 12))
+    def _restore_idle_pill(self):
+        # Only if nothing has happened since — a check that landed in the
+        # meantime, or an install, owns the chip now.
+        if self._update_info is None and not self._update_checking:
+            self._set_pill("idle", self._idle_pill_text())
+
+    def _on_update_click(self):
+        """One control, two jobs: open the dialog when there is something to
+        install, otherwise go and look again."""
+        if self._update_info:
+            self._show_update_dialog()
+        else:
+            self._start_update_check(manual=True)
 
     def _show_update_dialog(self):
         """Modal card: what changed, and a button that applies it."""
@@ -3621,8 +3712,7 @@ class App:
                        "loads the new version on the next run."
                        % info["version"])
             self._update_info = None
-            if self._update_pill is not None and self._update_pill.winfo_exists():
-                self._update_pill.pack_forget()
+            self._set_pill("done", "Restart to finish")
             for w in inner.winfo_children():
                 w.destroy()
             RoundedButton(inner, "Close Srutilekha", self._on_cancel,
@@ -3848,16 +3938,25 @@ class App:
             primary=False, bg_parent=BG_BAR, height=24)
         self._seg_sync.pack(side="left")
 
-        # Update chip. Created here but not packed — _reveal_update_pill packs
-        # it if and when the background check finds something, so a machine
-        # that is up to date or offline never sees it. It is packed clear of
-        # the minimise/maximise/close buttons, which are placed over the right
-        # end of this bar at the root level and so are invisible to pack().
+        # Update chip, always mounted. It used to be created hidden and packed
+        # only once a check found something, which meant an install that was
+        # current — the normal case — showed nothing, and "no update" was
+        # indistinguishable from "the updater is broken". It now shows the
+        # running version, and clicking it checks on demand. It is packed
+        # clear of the minimise/maximise/close buttons, which are placed over
+        # the right end of this bar at the root level and so are invisible to
+        # pack().
         if updater is not None:
-            self._update_pill = UpdatePill(bar, "Update", self._show_update_dialog,
-                                           bg_parent=BG_BAR)
             if self._update_info:
-                self._reveal_update_pill()
+                state, label = "available", "Update"
+            elif self._update_checking:
+                state, label = "checking", "Checking…"
+            else:
+                state, label = "idle", self._idle_pill_text()
+            self._update_pill = UpdatePill(bar, label, self._on_update_click,
+                                           bg_parent=BG_BAR, state=state)
+            self._update_pill.pack(
+                side="right", padx=(0, TitleBarControls.BTN_W * 3 + 12))
 
         # ── Action bar (packed before the middle so it can never be clipped)
         act = tk.Frame(self.body, bg=BG_BAR)
