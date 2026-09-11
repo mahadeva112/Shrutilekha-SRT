@@ -4455,6 +4455,20 @@ class App:
         if path:
             self.ref_script_var.set(os.path.normpath(path))
 
+    def _pick_sync_srt(self):
+        """File picker for the SRT being re-timed. Same best-effort contract as
+        the script picker: if the dialog cannot open the field stays typeable."""
+        try:
+            from tkinter import filedialog
+            path = filedialog.askopenfilename(
+                parent=self.root, title="Choose the SRT to re-time",
+                filetypes=[("Subtitle file", "*.srt"),
+                           ("All files", "*.*")])
+        except Exception:
+            return
+        if path:
+            self.sync_srt_path_var.set(os.path.normpath(path))
+
     def _col_source(self, pad, defaults, items):
         c = self._card(pad, "Where it comes from",
                        summary_var=self.src_sum_var)
@@ -4470,9 +4484,14 @@ class App:
             hint="The file whose text is right but whose timing is wrong. "
                  "Its words are kept; only the timings are rebuilt.",
             stacked=True)
-        PillEntry(slot, self.sync_srt_path_var,
+        row = tk.Frame(slot, bg=BG_CARD)
+        row.pack(fill="x")
+        PillEntry(row, self.sync_srt_path_var,
                   placeholder="Full path to the .srt…",
-                  bg_parent=BG_CARD).pack(fill="x")
+                  bg_parent=BG_CARD).pack(side="left", fill="x", expand=True)
+        RoundedButton(row, "Browse", self._pick_sync_srt,
+                      bg_parent=BG_CARD, height=30).pack(side="left",
+                                                         padx=(7, 0))
         self._sync_srt_handle = slot.row_handle
         self._pick(self._row(c, "Audio track"), items, self.combo_var)
         # 16 languages plus Auto-detect is a menu taller than the window it
