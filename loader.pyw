@@ -2659,18 +2659,6 @@ class TrackedLabel(tk.Canvas):
             x += self._font.measure(ch) + self._tracking
 
 
-class LivePill(tk.Canvas):
-    """Green 'live' dot + word, marking the preview as tracking the controls."""
-
-    def __init__(self, parent, text="live", bg_parent=BG):
-        f = _font(UI_FONT, 8)
-        w = f.measure(text) + 26
-        super().__init__(parent, width=w, height=18, bg=bg_parent,
-                         highlightthickness=0, bd=0)
-        self.create_oval(3, 6, 9, 12, fill=GOOD, outline="")
-        self.create_text(14, 9, anchor="w", text=text, fill=GOOD, font=f)
-
-
 class SegmentedControl(tk.Canvas):
     """A small pill of mutually exclusive choices, bound to a StringVar.
 
@@ -3277,7 +3265,8 @@ class StageList(tk.Frame):
     contains the current percentage is running, the rest are still to come.
     """
 
-    ROW_GAP = 10
+    ROW_H = 28        # one rung of the rail: dot + the gap to the next dot
+    RAIL_X = 7        # centre of the dot column, where the rail runs
 
     def __init__(self, parent, stages, bg_parent=BG):
         super().__init__(parent, bg=bg_parent, bd=0, highlightthickness=0)
@@ -3286,8 +3275,11 @@ class StageList(tk.Frame):
         for i, (label, start) in enumerate(stages):
             end = stages[i + 1][1] if i + 1 < len(stages) else 100
             row = tk.Frame(self, bg=bg_parent)
-            row.pack(fill="x", pady=(0, self.ROW_GAP))
-            dot = tk.Canvas(row, width=16, height=16, bg=bg_parent,
+            row.pack(fill="x")
+            # The dots are strung on a continuous rail rather than floated as
+            # separate glyphs: the run reads as one path with a filled-in part
+            # behind it, which is the thing the list is actually reporting.
+            dot = tk.Canvas(row, width=15, height=self.ROW_H, bg=bg_parent,
                             highlightthickness=0, bd=0)
             dot.pack(side="left", padx=(0, 12))
             lbl = tk.Label(row, text=label, bg=bg_parent, fg=FG_MUTE,
@@ -3302,7 +3294,8 @@ class StageList(tk.Frame):
                             font=(FONT_NUM, 8), anchor="e")
             note.pack(side="right")
             self._rows.append({"dot": dot, "lbl": lbl, "note": note,
-                               "start": start, "end": end,
+                               "start": start, "end": end, "first": i == 0,
+                               "last": i == len(stages) - 1,
                                "began": None, "took": None})
         self.set_pct(0)
 
@@ -3330,29 +3323,49 @@ class StageList(tk.Frame):
             else:
                 state, fg, weight = "todo", FG_MUTE, "normal"
                 note, ncol = "", FG_MUTE
-            self._draw_dot(r["dot"], state)
+            self._draw_dot(r["dot"], state, r["first"], r["last"])
             if r["lbl"].winfo_exists():
                 r["lbl"].configure(fg=fg, font=(UI_FONT, 10, weight))
             if r["note"].winfo_exists():
                 r["note"].configure(text=note, fg=ncol)
 
-    @staticmethod
-    def _draw_dot(dot, state):
+    # Rail colours: the stretch already walked, and the stretch still ahead.
+    RAIL_ON = "#2c5a80"
+    RAIL_OFF = "#34353b"
+    DOT_TODO = "#4a4c53"
+    DOT_HALO = "#1b3d5c"     # solid stand-in for the glow under the running chip
+
+    @classmethod
+    def _draw_dot(cls, dot, state, first=False, last=False):
+        """One rung: the rail through it, then the marker on top.
+
+        Squares, not circles, and drawn on whole pixels. Tk's canvas has no
+        antialiasing, so a small oval comes out ragged and a thin ring on a
+        small oval — which is what the running stage used to be — comes out as
+        a smudge. A rectangle on integer coordinates is exactly the pixels it
+        claims to be at any size, so this list stays sharp whatever the row
+        height becomes.
+
+        The three states are one square at three weights: a small muted chip
+        ahead, a solid accent chip behind, and the running one sat in a halo.
+        """
         if not dot.winfo_exists():
             return
         dot.delete("all")
-        if state == "done":
-            dot.create_oval(1, 1, 15, 15, fill=GOOD, outline=GOOD)
-            dot.create_line(4.5, 8.5, 7, 11, fill=ACCENT_INK, width=2,
-                            capstyle="round")
-            dot.create_line(7, 11, 11.5, 5.0, fill=ACCENT_INK, width=2,
-                            capstyle="round")
-        elif state == "now":
-            dot.create_oval(1, 1, 15, 15, fill=SELECT_GLOW, outline=SELECT,
-                            width=2)
-            dot.create_oval(6, 6, 10, 10, fill=SELECT, outline=SELECT)
-        else:
-            dot.create_oval(1, 1, 15, 15, fill="", outline=BORDER, width=2)
+        x, cy = cls.RAIL_X, cls.ROW_H // 2
+        r, ring = (3, 0) if state == "done" else (3, 7) if state == "now" else (2, 0)
+        gap = max(r, ring) + 3          # where the rail stops short of the marker
+        if not first:
+            dot.create_line(x, 0, x, cy - gap, width=2,
+                            fill=cls.RAIL_OFF if state == "todo" else cls.RAIL_ON)
+        if not last:
+            dot.create_line(x, cy + gap, x, cls.ROW_H, width=2,
+                            fill=cls.RAIL_ON if state == "done" else cls.RAIL_OFF)
+        if ring:
+            dot.create_rectangle(x - ring, cy - ring, x + ring, cy + ring,
+                                 fill=cls.DOT_HALO, outline="")
+        fill = cls.DOT_TODO if state == "todo" else SELECT
+        dot.create_rectangle(x - r, cy - r, x + r, cy + r, fill=fill, outline="")
 
 
 class App:
@@ -4676,7 +4689,6 @@ class App:
         head = tk.Frame(pad, bg=BG_OUTER)
         head.pack(fill="x", pady=(0, 9))
         TrackedLabel(head, "Preview", bg_parent=BG_OUTER).pack(side="left")
-        LivePill(head, bg_parent=BG_OUTER).pack(side="right")
 
         # Which frame the captions are being judged in. Size is a share of
         # frame height and placement is frame-relative, so a preview in the
@@ -5808,7 +5820,7 @@ class App:
         self._resplit_after = None
         self._sel_desc = None
 
-        # ── Header: title + subtitle, with the "live" pill on the right ──────
+        # ── Header: title + subtitle ─────────────────────────────────────────
         # Right padding clears the frameless window's own min/max/close
         # buttons, which sit placed over the root at the top-right corner
         # (TitleBarControls: 3 × 46px wide) — without it the pill runs in
@@ -5823,7 +5835,6 @@ class App:
                  "transcript is reused, nothing is re-transcribed.",
                  bg=BG, fg=FG_MUTE, font=(UI_FONT, 9),
                  wraplength=560, justify="left").pack(anchor="w")
-        self._live_pill(head).pack(side="right", anchor="n", pady=(2, 0))
         for w in (head, htxt, *htxt.winfo_children()):
             self._make_draggable(w)
         GradientDivider(self.body, height=1, bg_parent=BG).pack(
@@ -5930,19 +5941,6 @@ class App:
         for _l, var, *_r in self._split_field_specs():
             var.trace_add("write", lambda *_a: self._schedule_resplit())
         self._start_waveform()
-
-    def _live_pill(self, parent):
-        """Small green 'live' status pill: dot + 're-split · no re-transcribe'."""
-        txt = "re-split · no API"
-        f = _font(UI_FONT, 8)
-        w = f.measure(txt) + 30
-        c = tk.Canvas(parent, width=w, height=22, bg=BG,
-                      highlightthickness=0, bd=0)
-        _round_rect(c, 0, 0, w, 21, 10, fill="#1f4433", outline="#1f4433")
-        _round_rect(c, 1, 1, w - 1, 20, 9, fill="#12251c", outline="#12251c")
-        c.create_oval(10, 8, 16, 14, fill="#39d98a", outline="")
-        c.create_text(22, 11, anchor="w", text=txt, fill="#bfe6cf", font=f)
-        return c
 
     def _build_split_field(self, parent, label, var, lo, hi, step, fmt):
         """One split control: a label with a small number box, and a slider
