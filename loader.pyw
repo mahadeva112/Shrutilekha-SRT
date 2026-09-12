@@ -276,6 +276,7 @@ def resolve_ui_font():
 # Icon names rendered by IconCanvas (Canvas-drawn, font-independent)
 ICO_MIC          = "mic"
 ICO_VOLUME       = "volume"
+ICO_LOCAL        = "local"
 
 
 def _steal_focus(win):
@@ -480,6 +481,8 @@ class IconCanvas(tk.Canvas):
             self._chevron(s, c)
         elif n == "bullet":
             self._bullet(s, c)
+        elif n == "local":
+            self._local(s, c)
 
     def _mic(self, s, c):
         w = s * 0.42
@@ -524,6 +527,16 @@ class IconCanvas(tk.Canvas):
         r = s * 0.18
         cx = cy = s / 2
         self.create_oval(cx - r, cy - r, cx + r, cy + r, fill=c, outline=c)
+
+    def _local(self, s, c):
+        """A clock — "this happens here, now", with nothing to wait for."""
+        w = max(1, int(s * 0.09))
+        self.create_oval(s * 0.10, s * 0.10, s * 0.90, s * 0.90, outline=c,
+                         width=w)
+        self.create_line(s * 0.50, s * 0.30, s * 0.50, s * 0.52, fill=c,
+                         width=w, capstyle="round")
+        self.create_line(s * 0.50, s * 0.52, s * 0.68, s * 0.62, fill=c,
+                         width=w, capstyle="round")
 
 
 class RoundedButton(tk.Canvas):
@@ -2987,6 +3000,164 @@ class WaveformStrip(tk.Canvas):
                        and abs(t - self._span[1]) < 1e-6)
                 self.create_line(bx, tick_y, bx, h - 3,
                                  fill=SELECT if hot else BORDER_BRIGHT)
+
+
+class Chip(tk.Canvas):
+    """A small rounded pill that reads as on or off.
+
+    Used for the review screen's filters and its split-recipe shortcuts. Both
+    are "one of these is in force", which a pill says in less room than a radio
+    row and without looking like a button you press to make something happen.
+    """
+
+    H = 22
+    PAD = 10
+    # The same corner as RoundedField, because a filter chip sits in a row
+    # with the find box and the two have to read as one band. A stadium pill
+    # would need arcs: _round_rect smooths a polygon, and at a radius of half
+    # the height the spline pulls inside its own control points and comes out
+    # a squashed octagon rather than a capsule.
+    R = 4
+
+    def __init__(self, parent, text, command=None, bg_parent=BG, tone="select"):
+        super().__init__(parent, height=self.H, bg=bg_parent,
+                         highlightthickness=0, bd=0, cursor="hand2")
+        self._text = text
+        self._tone = tone
+        self._on = False
+        self._hover = False
+        self._command = command
+        self._font = (UI_FONT, 8)
+        self._measure()
+        # Tk reports width 1 until the pill has actually been laid out, so the
+        # single draw in _measure() lands on the wrong geometry and the text
+        # stays clipped at both ends for the life of the widget.
+        self.bind("<Configure>", lambda e: self._draw())
+        self.bind("<Button-1>", self._click)
+        self.bind("<Enter>", lambda e: self._set_hover(True))
+        self.bind("<Leave>", lambda e: self._set_hover(False))
+
+    def _measure(self):
+        try:
+            w = tkfont.Font(family=self._font[0],
+                            size=self._font[1]).measure(self._text)
+        except Exception:
+            w = len(self._text) * 6
+        self.configure(width=w + self.PAD * 2)
+        self._draw()
+
+    def set_text(self, text):
+        if text == self._text:
+            return
+        self._text = text
+        self._measure()
+
+    def set_on(self, on):
+        on = bool(on)
+        if on == self._on:
+            return
+        self._on = on
+        self._draw()
+
+    def _set_hover(self, on):
+        self._hover = on
+        self._draw()
+
+    def _click(self, _e=None):
+        if self._command:
+            self._command()
+
+    def _draw(self):
+        if not self.winfo_exists():
+            return
+        self.delete("all")
+        w = max(self.winfo_width(), 2)
+        h = self.H
+        if self._on:
+            fill, edge, ink = ((SELECT_GLOW, SELECT_DARK, "#9fd0f7")
+                               if self._tone == "select"
+                               else (_mix(BG, BAD, 0.18), _mix(BG, BAD, 0.45),
+                                     _mix(FG, BAD, 0.55)))
+        else:
+            fill = BG_HOVER if self._hover else BG_INPUT
+            edge = BORDER_BRIGHT if self._hover else BORDER
+            ink = FG if self._hover else FG_MUTE
+        # Border and fill as a pair, ending on w-1 / h-1 — see
+        # _round_rect_framed. Drawn to w / h instead, the right and bottom
+        # hairlines land a pixel past the last column the canvas may paint and
+        # are simply dropped, which framed every chip on three sides.
+        _round_rect_framed(self, w, h, self.R, edge, fill)
+        self.create_text(w / 2, h / 2, text=self._text, fill=ink,
+                         font=self._font)
+
+
+class KeyCap(tk.Canvas):
+    """One keyboard key, drawn.
+
+    A bordered cap reads as a key at a glance; the same thing set in prose is a
+    sentence, and a sentence in a footer is something you skip.
+    """
+
+    H = 17
+
+    def __init__(self, parent, text, bg_parent=BG):
+        super().__init__(parent, height=self.H, bg=bg_parent,
+                         highlightthickness=0, bd=0)
+        self._text = text
+        self._font = (FONT_NUM, 7)
+        try:
+            w = tkfont.Font(family=self._font[0],
+                            size=self._font[1]).measure(text)
+        except Exception:
+            w = len(text) * 6
+        self.configure(width=w + 12)
+        self.bind("<Configure>", lambda e: self._draw())
+        self._draw()
+
+    def _draw(self):
+        if not self.winfo_exists():
+            return
+        self.delete("all")
+        w = max(self.winfo_width(), 2)
+        # Two shapes, the lower one showing as a 2px lip along the bottom:
+        # the cheapest thing Tk can draw that reads as a key rather than as a
+        # tag. Both end on w-1 / h-1 for the reason _round_rect_framed gives.
+        _round_rect(self, 0, 0, w - 1, self.H - 1, 3, fill=BORDER_BRIGHT,
+                    outline=BORDER_BRIGHT)
+        _round_rect(self, 1, 1, w - 2, self.H - 3, 2, fill=BG_HOVER,
+                    outline=BG_HOVER)
+        self.create_text(w / 2, (self.H - 2) / 2, text=self._text,
+                         fill=FG_DIM, font=self._font)
+
+
+class StatBar(tk.Canvas):
+    """A hairline under an inspector figure: how far into its budget the value
+    sits, in the colour the figure itself is already wearing."""
+
+    H = 2
+
+    def __init__(self, parent, bg_parent=BG):
+        super().__init__(parent, height=self.H, bg=bg_parent,
+                         highlightthickness=0, bd=0, width=40)
+        self._frac = 0.0
+        self._col = SELECT
+        self.bind("<Configure>", lambda e: self._draw())
+
+    def set(self, frac, color):
+        self._frac = max(0.0, min(1.0, float(frac)))
+        self._col = color
+        self._draw()
+
+    def _draw(self):
+        if not self.winfo_exists():
+            return
+        self.delete("all")
+        w = max(self.winfo_width(), 2)
+        self.create_rectangle(0, 0, w, self.H, fill=TRACK_OFF, outline="")
+        fw = int(round(w * self._frac))
+        if fw > 0:
+            self.create_rectangle(0, 0, fw, self.H, fill=self._col,
+                                  outline="")
 
 
 class CueMeter(tk.Canvas):
@@ -5808,6 +5979,22 @@ class App:
             ("Max words",      self.words_per_var,     0, 12, 1,   "%d"),
         )
 
+    # Split-recipe shortcuts. NOT the same thing as the Presets card on the
+    # form, which saves every setting on the page: these three touch only the
+    # six values that decide the cut, so they can sit under SPLIT without
+    # claiming to restore a whole configuration.
+    #   (max chars, lines, max secs, cps, min duration, max words)
+    SPLIT_RECIPES = (
+        ("Fast",     (21, 2, 3.0, 30, 0.5, 0)),
+        ("Standard", (15, 1, 2.0, 25, 0.4, 0)),
+        ("Readable", (12, 2, 2.5, 17, 0.8, 0)),
+    )
+    # The filters over the cue list. "Needs attention" is the count that was
+    # only ever a clause in the footer — a number that implies an action, with
+    # no way to act on it.
+    REVIEW_FILTERS = (("all", "All"), ("issue", "Needs attention"),
+                      ("edited", "Edited"))
+
     def _build_review(self, srt_path, cap_path, header, segs):
         self._clear_body()
         self.root.unbind("<Return>")
@@ -5819,6 +6006,8 @@ class App:
         self._review_words = self._flatten_words(segs)
         self._resplit_after = None
         self._sel_desc = None
+        self._review_rows = []
+        self._review_filter = "all"
 
         # ── Header: title + subtitle ─────────────────────────────────────────
         # Right padding clears the frameless window's own min/max/close
@@ -5848,10 +6037,11 @@ class App:
         RoundedButton(bar, "Cancel", self._on_cancel, primary=False,
                       bg_parent=BG, height=40).grid(row=0, column=0,
                                                     sticky="ew", padx=(0, 5))
-        RoundedButton(bar, "Apply captions",
-                      lambda: self._apply_review(srt_path, cap_path, header),
-                      primary=True, bg_parent=BG, height=40).grid(
-            row=0, column=1, sticky="ew", padx=(5, 0))
+        self._apply_btn = RoundedButton(
+            bar, "Apply captions",
+            lambda: self._apply_review(srt_path, cap_path, header),
+            primary=True, bg_parent=BG, height=40)
+        self._apply_btn.grid(row=0, column=1, sticky="ew", padx=(5, 0))
 
         # ── Three columns: split controls · cue cards · live preview ─────────
         mid = tk.Frame(self.body, bg=BG)
@@ -5863,6 +6053,33 @@ class App:
         left.pack_propagate(False)
         tk.Label(left, text="S P L I T", bg=BG, fg=FG_LABEL,
                  font=(UI_FONT, 8, "bold")).pack(anchor="w", pady=(2, 8))
+
+        pills = tk.Frame(left, bg=BG)
+        pills.pack(fill="x", pady=(0, 11))
+        self._recipe_chips = []
+        for i, (name, values) in enumerate(self.SPLIT_RECIPES):
+            chip = Chip(pills, name, command=lambda v=values:
+                        self._apply_recipe(v), bg_parent=BG)
+            chip.pack(side="left", padx=(0 if i == 0 else 5, 0))
+            self._recipe_chips.append((chip, values))
+        Tooltip(pills, "Three starting points for the cut. They set the six "
+                       "values below and nothing else — your saved presets on "
+                       "the previous page are untouched.", app_root=self.root)
+
+        # The one thing about this screen worth saying out loud, at the bottom
+        # of the column that does the work rather than in the footer, where it
+        # was competing with the run's totals for the same 400px. Packed before
+        # the sliders even though it sits under them: pack hands out space
+        # in call order, and six sliders will take all of it and clip this.
+        note = tk.Frame(left, bg=BG_INPUT, highlightthickness=1,
+                        highlightbackground=BORDER, highlightcolor=BORDER)
+        note.pack(side="bottom", fill="x", pady=(10, 2))
+        IconCanvas(note, ICO_LOCAL, size=13, color=FG_MUTE,
+                   bg_parent=BG_INPUT).pack(side="left", padx=(9, 7), pady=8)
+        tk.Label(note, text="Re-cuts run here.\nNo API call.", bg=BG_INPUT,
+                 fg=FG_MUTE, font=(UI_FONT, 8), justify="left").pack(
+            side="left", pady=8)
+
         for spec in self._split_field_specs():
             self._build_split_field(left, *spec)
 
@@ -5886,18 +6103,52 @@ class App:
             fill="x", pady=(12, 10))
         self._build_inspector(right)
 
-        # CENTER — the waveform strip over the scrollable cue cards, with the
-        # run's totals pinned underneath.
+        # CENTER — the filter strip, the waveform, the cue cards, the totals.
         center = tk.Frame(mid, bg=BG)
         center.pack(side="left", fill="both", expand=True)
 
+        filt = tk.Frame(center, bg=BG)
+        filt.pack(side="top", fill="x", pady=(0, 9))
+        self._filter_chips = {}
+        for i, (key, label) in enumerate(self.REVIEW_FILTERS):
+            chip = Chip(filt, label, bg_parent=BG,
+                        tone="warn" if key == "issue" else "select",
+                        command=lambda k=key: self._set_filter(k))
+            chip.pack(side="left", padx=(0 if i == 0 else 5, 0))
+            self._filter_chips[key] = chip
+        self._filter_chips["all"].set_on(True)
+
+        self._search_var = tk.StringVar(value="")
+        search = PillEntry(filt, self._search_var, placeholder="Find in cues…",
+                           bg_parent=BG, height=Chip.H)
+        search.pack(side="right", fill="x", expand=True, padx=(12, 0))
+        search.entry.bind("<KeyRelease>", lambda _e: self._apply_filter())
+        self._search = search
+
         self._review_status = tk.StringVar(value="")
         foot = tk.Frame(center, bg=BG)
-        foot.pack(side="bottom", fill="x", pady=(8, 0))
-        tk.Label(foot, textvariable=self._review_status, bg=BG, fg=FG_MUTE,
-                 font=(UI_FONT, 8), justify="left").pack(side="left")
-        tk.Label(foot, text="Enter splits · ⤵ merges · ✕ deletes",
-                 bg=BG, fg=FG_LABEL, font=(UI_FONT, 8)).pack(side="right")
+        foot.pack(side="bottom", fill="x", pady=(9, 0))
+        # Grid, not two packs. The totals grow with the cue count and the
+        # settings and the key hints are a fixed width, and side by side in a
+        # column this narrow they were drawn straight through each other.
+        foot.grid_columnconfigure(0, weight=1)
+        status = tk.Label(foot, textvariable=self._review_status, bg=BG,
+                          fg=FG_MUTE, font=(UI_FONT, 8), justify="left",
+                          anchor="w")
+        status.grid(row=0, column=0, sticky="w")
+        keys = tk.Frame(foot, bg=BG)
+        keys.grid(row=0, column=1, sticky="e", padx=(12, 0))
+        for cap, word in (("Enter", "split"), ("Ctrl M", "merge"),
+                          ("Ctrl Del", "")):
+            KeyCap(keys, cap, bg_parent=BG).pack(side="left", padx=(9, 0))
+            if word:
+                tk.Label(keys, text=word, bg=BG, fg=FG_LABEL,
+                         font=(UI_FONT, 8)).pack(side="left", padx=(4, 0))
+        # The totals wrap rather than run under the keys at the window's
+        # narrowest, which is the one width where they cannot both fit.
+        foot.bind("<Configure>",
+                  lambda e, l=status, k=keys: l.configure(
+                      wraplength=max(120, e.width - k.winfo_reqwidth() - 16)))
 
         # Created now, packed only once an envelope actually decodes — see
         # _waveform_ready. Without ffmpeg there is no strip at all.
@@ -5940,7 +6191,85 @@ class App:
         self._rebuild_review_rows(segs, self._split_settings())
         for _l, var, *_r in self._split_field_specs():
             var.trace_add("write", lambda *_a: self._schedule_resplit())
+            var.trace_add("write", lambda *_a: self._sync_recipe_chips())
+        self._sync_recipe_chips()
         self._start_waveform()
+
+    # ── The split recipe shortcuts ────────────────────────────────────────
+    def _apply_recipe(self, values):
+        """Set the six split values at once. The traces already on them do the
+        rest — this is the same edit as dragging all six sliders."""
+        for (_l, var, _lo, _hi, _step, fmt), v in zip(
+                self._split_field_specs(), values):
+            var.set(fmt % v)
+
+    def _sync_recipe_chips(self, *_a):
+        """Light the recipe that is actually in force, and none when the values
+        have been dragged away from all three."""
+        for chip, values in getattr(self, "_recipe_chips", ()):
+            try:
+                if not chip.winfo_exists():
+                    continue
+                match = all(
+                    str(var.get()).strip() == fmt % v
+                    for (_l, var, _lo, _hi, _st, fmt), v
+                    in zip(self._split_field_specs(), values))
+                chip.set_on(match)
+            except Exception:
+                pass
+
+    # ── Filtering the cue list ────────────────────────────────────────────
+    def _set_filter(self, key):
+        self._review_filter = key
+        for k, chip in self._filter_chips.items():
+            chip.set_on(k == key)
+        self._apply_filter()
+
+    def _search_query(self):
+        """What is actually typed in the find box — empty while the
+        placeholder is on screen, which is not a search for "Find in cues…"."""
+        try:
+            if self._search._ph_shown:
+                return ""
+            return self._search.entry.get().strip().lower()
+        except Exception:
+            return ""
+
+    def _row_matches(self, desc):
+        key = getattr(self, "_review_filter", "all")
+        if key == "issue" and not desc.get("issue"):
+            return False
+        if key == "edited" and desc["text"].get() == desc.get("orig", ""):
+            return False
+        q = self._search_query()
+        if q and q not in desc["text"].get().lower():
+            return False
+        return True
+
+    def _apply_filter(self):
+        """Show the cues the filter and the find box agree on.
+
+        Everything is unpacked and the survivors re-packed in list order, which
+        is the one way pack() keeps the order it was given — and cheap enough
+        at this size that a filter is instant.
+        """
+        rows = getattr(self, "_review_rows", None)
+        if not rows:
+            return
+        shown = []
+        for d in rows:
+            d["outer"].pack_forget()
+        for d in rows:
+            if self._row_matches(d):
+                d["outer"].pack(fill="x", pady=3)
+                shown.append(d)
+        # A selection the filter just hid is worse than no selection: the
+        # inspector and the preview would keep describing a cue that is not on
+        # screen.
+        if shown and self._sel_desc not in shown:
+            self._select_review(shown[0])
+        if self._review_sync:
+            self.root.after_idle(self._review_sync)
 
     def _build_split_field(self, parent, label, var, lo, hi, step, fmt):
         """One split control: a label with a small number box, and a slider
@@ -5959,17 +6288,19 @@ class App:
                height=26, bg_parent=BG).pack(fill="x", pady=(6, 0))
 
     # ── Inspector: the selected cue's numbers, and its two structural edits ──
-    # The row glyphs (✂ ⤵ ✕) are a fast path once you know them, but nothing on
-    # screen said what they were. Here the same two edits carry their real
-    # names, and the figures the split settings are judged by — duration,
-    # characters against the limit, reading speed — are shown instead of
-    # implied by a warning chip that only appears once it is too late.
+    # The row icons are a fast path once you know them, and they are only on
+    # screen while a row is under the pointer. Here the same two edits carry
+    # their real names permanently, and the figures the split settings are
+    # judged by — duration, characters against the limit, reading speed — are
+    # shown, with a bar under the two that are a value against a budget,
+    # instead of implied by a warning that only appears once it is too late.
     INSPECTOR_FIELDS = (("in", "In"), ("out", "Out"), ("dur", "Duration"),
                         ("chars", "Characters"), ("cps", "Reading speed"),
                         ("lines", "Lines"))
 
     def _build_inspector(self, parent):
         self._insp_vars = {}
+        self._insp_bars = {}
         self._insp_title = tk.StringVar(value="No cue selected")
         tk.Label(parent, textvariable=self._insp_title, bg=BG, fg=FG,
                  font=(UI_FONT, 9, "bold")).pack(anchor="w", pady=(0, 7))
@@ -5983,6 +6314,13 @@ class App:
                            font=(FONT_NUM, 8))
             lab.pack(side="right")
             self._insp_vars[key] = (var, lab)
+            # Two of these six are a value against a budget, and a budget is a
+            # length before it is a number — the bar says "nearly full" in a
+            # glance the digits need a comparison for.
+            if key in ("chars", "cps"):
+                bar = StatBar(parent, bg_parent=BG)
+                bar.pack(fill="x", pady=(3, 4))
+                self._insp_bars[key] = bar
         # Packed from the bottom up so the two actions are the last thing the
         # column will give up space for. The window is a fixed size and the
         # field list above can grow, and a button you cannot reach is worse
@@ -6008,6 +6346,8 @@ class App:
             for var, lab in self._insp_vars.values():
                 var.set("—")
                 lab.configure(fg=FG)
+            for bar in self._insp_bars.values():
+                bar.set(0.0, TRACK_OFF)
             return
         s = self._insp_settings
         seg = dict(desc["seg"])
@@ -6033,6 +6373,12 @@ class App:
             var, lab = self._insp_vars[key]
             var.set(text)
             lab.configure(fg=colour)
+        budget = max(1, s["max_chars"] * s["max_lines"])
+        if "chars" in self._insp_bars:
+            self._insp_bars["chars"].set(chars / float(budget),
+                                         vals["chars"][1])
+        if "cps" in self._insp_bars:
+            self._insp_bars["cps"].set(_frac, col)
 
     def _insp_split(self):
         desc = self._sel_desc
@@ -6213,27 +6559,63 @@ class App:
         for i, seg in enumerate(segs, start=1):
             self._add_review_row(i, seg, s, is_last=(i == len(segs)))
         cps_note = ("CPS ≤ %g" % s["cps"]) if s["cps"] > 0 else "CPS off"
-        flagged = sum(1 for d in self._review_rows if d.get("issue"))
-        # Lead with the count of cues that need attention: it is the only number
-        # here that implies an action.
-        attention = ("%d need attention" % flagged) if flagged else "all within limits"
         self._review_status.set(
-            "%d cues · %d×%d · %s · %s\nre-split locally, no API call"
-            % (len(segs), s["max_chars"], s["max_lines"], cps_note, attention))
-        if self._review_rows:
-            self._select_review(self._review_rows[0])
-        else:
+            "%d cues · %d×%d · %s"
+            % (len(segs), s["max_chars"], s["max_lines"], cps_note))
+        self._apply_btn.set_text("Apply %d captions" % len(segs)
+                                 if segs else "Apply captions")
+        self._sync_filter_counts()
+        self._apply_filter()
+        if self._review_rows and self._sel_desc is None:
+            first = next((d for d in self._review_rows
+                          if self._row_matches(d)), None)
+            self._select_review(first or self._review_rows[0])
+        elif not self._review_rows:
             self._preview_cue("")
             self._refresh_inspector(None)
         self._sync_waveform()
         self.root.after(0, self._review_sync)
+
+    def _sync_filter_counts(self):
+        """Put the live counts on the filter chips.
+
+        This is the number that used to be a clause in the footer — "2 need
+        attention" — with nothing you could do about it. On the chip it is the
+        same number and a way to see only those two.
+        """
+        rows = getattr(self, "_review_rows", [])
+        counts = {
+            "all": len(rows),
+            "issue": sum(1 for d in rows if d.get("issue")),
+            "edited": sum(1 for d in rows
+                          if d["text"].get() != d.get("orig", "")),
+        }
+        for key, label in self.REVIEW_FILTERS:
+            chip = self._filter_chips.get(key)
+            if chip is not None and chip.winfo_exists():
+                chip.set_text("%s %d" % (label, counts[key]))
+
+    @staticmethod
+    def _row_action(parent, text, hot):
+        """One of a cue card's edits, set as a word.
+
+        Muted until the pointer is on it, and delete lights red rather than
+        white: it is the only one of the three that cannot be undone.
+        """
+        lab = tk.Label(parent, text=text, bg=BG_INPUT, fg=FG_MUTE,
+                       font=(UI_FONT, 8), cursor="hand2")
+        lab.pack(side="left", padx=(12, 0))
+        lab.bind("<Enter>", lambda _e: lab.configure(fg=hot), add="+")
+        lab.bind("<Leave>", lambda _e: lab.configure(fg=FG_MUTE), add="+")
+        return lab
 
     def _add_review_row(self, idx, seg, s, is_last=False):
         """One cue as a rounded card: speaker bar, timecode, editable text,
         split/merge/delete, and a reading-speed meter in the right column.
         State — selected, over a limit — is the card's hairline colour."""
         outer = tk.Frame(self._review_lst, bg=BG)
-        outer.pack(fill="x", pady=3)
+        # Deliberately not packed here — _apply_filter packs the rows the
+        # filter and the find box agree on, in list order.
         # The stripe carries the speaker, which is the one thing about a row
         # that never changes as you edit it. State — selected, over a limit —
         # is carried by the card's own hairline instead, where it reads as a
@@ -6255,6 +6637,8 @@ class App:
         main = tk.Frame(inner, bg=BG_INPUT)
         main.pack(side="left", fill="both", expand=True)
 
+        cps, lines, over_cps, over_lines = self._cue_stats(seg, s)
+
         top = tk.Frame(main, bg=BG_INPUT)
         top.pack(fill="x", pady=(7, 0))
         tk.Label(top, text="%02d" % idx, bg=BG_INPUT, fg=FG_MUTE,
@@ -6263,27 +6647,38 @@ class App:
                                         self._fmt_short(seg["e"])),
                  bg=BG_INPUT, fg=FG_MUTE,
                  font=(UI_FONT, 8)).pack(side="left")
-        dele = tk.Label(top, text="✕", bg=BG_INPUT, fg=FG_MUTE,
-                        font=(UI_FONT, 9), cursor="hand2")
-        dele.pack(side="right")
-        split_btn = tk.Label(top, text="✂", bg=BG_INPUT, fg=FG_MUTE,
-                             font=(UI_FONT, 9), cursor="hand2")
-        split_btn.pack(side="right", padx=(0, 8))
-        merge_btn = None
-        if not is_last:
-            merge_btn = tk.Label(top, text="⤵", bg=BG_INPUT, fg=FG_MUTE,
-                                 font=(UI_FONT, 9), cursor="hand2")
-            merge_btn.pack(side="right", padx=(0, 8))
-        cps, lines, over_cps, over_lines = self._cue_stats(seg, s)
+        if over_lines:
+            # Beside the cue's own numbers now, not among the actions: line
+            # overflow is a fact about the cue, and it is the one warning a
+            # number can't carry — the cue simply won't fit the caption box.
+            tk.Label(top, text="▲ %d lines" % lines, bg=BG_INPUT, fg=BAD,
+                     font=(UI_FONT, 8)).pack(side="left", padx=(10, 0))
+
+        # The three edits, as words, and shown only while the row is under
+        # the pointer or selected. They were ✂ ⤵ ✕ set in the UI font, two of
+        # which are in neither Open Sans nor Segoe UI's text face: Tk
+        # substituted them silently, per machine, which is why the merge arrow
+        # rendered as a hollow box. Drawing them as vectors fixed the
+        # substitution but left three small marks nobody can name on sight —
+        # a caption tool has no house glyph for "merge". The words cost about
+        # the same width, need no legend, and no font can refuse them either.
+        # They stay hidden on the rows you are only scrolling past, so the
+        # reading-speed meter beside them keeps the eye it was competing for.
+        acts = tk.Frame(top, bg=BG_INPUT)
+        split_btn = self._row_action(acts, "Split", FG)
+        merge_btn = None if is_last else self._row_action(acts, "Merge", FG)
+        dele = self._row_action(acts, "Delete", BAD)
+        for w, tip in (
+                (split_btn, "Split this cue where the caret is  (Enter)"),
+                (merge_btn, "Merge this cue into the next  (Ctrl+M)"),
+                (dele, "Delete this cue  (Ctrl+Delete)")):
+            if w is not None:
+                Tooltip(w, tip, app_root=self.root)
+
         # Reading speed as a bar, on every row rather than only the bad ones:
         # a row that is fine has to look fine for a row that isn't to stand out.
         meter = CueMeter(gutter, cps, s["cps"], bg_parent=BG_INPUT)
         meter.pack(anchor="ne", pady=(7, 0))
-        if over_lines:
-            # Line overflow is the one warning a number can't carry — the cue
-            # simply won't fit the caption box.
-            tk.Label(top, text="▲ %d lines" % lines, bg=BG_INPUT, fg=BAD,
-                     font=(UI_FONT, 8)).pack(side="right", padx=(0, 10))
 
         # A cue is wrapped text: with "Lines per cue" above 1 it contains real
         # newlines. tk.Entry is single-line and renders an embedded newline as a
@@ -6314,10 +6709,12 @@ class App:
         self.root.after_idle(_fit)
 
         desc = {"seg": seg, "text": ent, "field": field, "selbar": selbar,
-                "outer": outer, "color": color, "meter": meter,
+                "outer": outer, "color": color, "meter": meter, "acts": acts,
+                "acts_on": False, "orig": seg["text"],
                 "issue": bool(over_cps or over_lines)}
         self._apply_row_state(desc)
         self._review_rows.append(desc)
+        self._wire_row_hover(desc, outer, acts)
 
         ent.bind_all_widgets("<FocusIn>",
                              lambda _e, d=desc: self._select_review(d))
@@ -6417,6 +6814,22 @@ class App:
         # Enter mid-cue means "the subtitle should break here" — split at the
         # caret rather than insert a newline the line budget has no room for.
         ent.on_return(lambda: _split_here(focus_right=True))
+
+        # The other two edits, from the keyboard, because the caret is almost
+        # always inside a cue and a bare M would just type one. Both return
+        # "break": Tk's Text binds Control-m to Return and Control-Delete to
+        # "delete the next word", and either would land in the cue text.
+        def _key_merge(_e=None):
+            if merge_btn is not None:
+                _merge_next()
+            return "break"
+
+        def _key_delete(_e=None):
+            _del()
+            return "break"
+        ent.bind_all_widgets("<Control-m>", _key_merge)
+        ent.bind_all_widgets("<Control-M>", _key_merge)
+        ent.bind_all_widgets("<Control-Delete>", _key_delete)
         # Same two edits the inspector offers under their full names.
         desc["split"] = _split_here
         desc["merge"] = _merge_next if merge_btn is not None else None
@@ -6482,6 +6895,61 @@ class App:
                 field.set_border(BORDER)
         except Exception:
             pass
+        # A selected row keeps its actions out: it is the row being worked on,
+        # and reaching for the pointer to see what you can do to it is exactly
+        # the friction hiding them was meant to remove everywhere else.
+        show = desc.get("show_acts")
+        if show is not None:
+            try:
+                show(desc is self._sel_desc or desc.get("hovered"))
+            except Exception:
+                pass
+
+    def _wire_row_hover(self, desc, outer, acts):
+        """Reveal a row's edits while the pointer is over it.
+
+        Tk sends Leave when the pointer crosses onto a child widget, so the
+        card would flicker its own buttons away the moment you reached for
+        them. Leave therefore asks where the pointer actually is rather than
+        trusting the event.
+        """
+        def _show(on):
+            on = bool(on)
+            if on == desc.get("acts_on"):
+                return
+            desc["acts_on"] = on
+            try:
+                if on:
+                    acts.pack(side="right")
+                else:
+                    acts.pack_forget()
+            except Exception:
+                pass
+        desc["show_acts"] = _show
+
+        def _enter(_e=None):
+            desc["hovered"] = True
+            _show(True)
+
+        def _leave(_e=None):
+            try:
+                w = outer.winfo_containing(outer.winfo_pointerx(),
+                                           outer.winfo_pointery())
+            except Exception:
+                w = None
+            while w is not None:
+                if w is outer:
+                    return                      # still inside the card
+                w = getattr(w, "master", None)
+            desc["hovered"] = False
+            _show(desc is self._sel_desc)
+
+        def _bind(widget):
+            widget.bind("<Enter>", _enter, add="+")
+            widget.bind("<Leave>", _leave, add="+")
+            for kid in widget.winfo_children():
+                _bind(kid)
+        _bind(outer)
 
     def _select_review(self, desc):
         prev = self._sel_desc
@@ -6517,8 +6985,14 @@ class App:
             seg["text"] = desc["text"].get()
             cps, _lines, over_cps, over_lines = self._cue_stats(seg, s)
             meter.set(cps, s["cps"])
+            was = desc.get("issue")
             desc["issue"] = bool(over_cps or over_lines)
             self._apply_row_state(desc)
+            # Both counts on the chips can move on a keystroke: an edit makes a
+            # row "edited", and it can take it over or back under the limit.
+            self._sync_filter_counts()
+            if was != desc["issue"] and self._review_filter == "issue":
+                self._apply_filter()
         except Exception:
             pass
 
