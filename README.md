@@ -9,6 +9,8 @@ too, instead of breaking the line into two fonts.
 Transcription is done by the [ElevenLabs Scribe](https://elevenlabs.io) API.
 Everything else — cue splitting, timing, styling, placement — runs locally.
 
+![The Srutilekha main window](docs/main-window.png)
+
 ## What it does
 
 - **Transcribe the timeline, not a file.** Reads the clips on the audio track
