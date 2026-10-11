@@ -7,6 +7,8 @@ a hidden console worker that reports progress to the existing Resolve form.
 ## Build
 
 Use Windows x64, Python 3.12+ and Inno Setup 6.
+Build FFmpeg first in MSYS2 UCRT64 with GCC, make, nasm, curl, tar and xz:
+`bash scripts/build_ffmpeg.sh`. The GitHub workflow does this automatically.
 
 ```powershell
 python -m venv .venv
@@ -57,6 +59,7 @@ the app itself: Inno Setup manages file-in-use handling. Checksums verify
 download integrity, not publisher identity. Authenticode signing is a
 separate release-hardening step requiring the publisher's certificate.
 
-Before broad distribution, verify bundled third-party licenses and the
-corresponding FFmpeg source/build information for the binary being shipped.
+Release assets include the exact FFmpeg 7.1.1 source archive, reproduction
+script, configuration, package versions and LGPL license. Native components
+are compiled with external-library detection disabled and no GPL components.
 Do not publish the initial draft before the clean-PC/Resolve tests pass.

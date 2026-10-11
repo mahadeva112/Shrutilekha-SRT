@@ -1,16 +1,16 @@
-Srutilekha includes third-party software: Python, Tcl/Tk, ElevenLabs SDK,
-truststore, PyInstaller runtime and FFmpeg distributed by imageio-ffmpeg.
-Their applicable licenses remain in force. Third-party package metadata and
-license files are included in the installed runtime where available.
+Srutilekha includes Python, Tcl/Tk, ElevenLabs SDK, truststore, PyInstaller
+runtime and FFmpeg. Applicable third-party licenses remain in force.
+Package metadata and available license files are included in the runtime.
 
-FFmpeg 7.1 essentials is free software, built by gyan.dev, licensed under
-GPLv3. The license text is included as _internal/licenses/COPYING.GPLv3.
-Upstream FFmpeg 7.1 source: https://github.com/FFmpeg/FFmpeg/tree/n7.1
-Binary provenance: https://www.gyan.dev/ffmpeg/builds/
-Distribution package: https://github.com/imageio/imageio-ffmpeg/tree/v0.6.0
-The imageio-ffmpeg wrapper has its own BSD license; the FFmpeg executable
-has a separate GPL license.
-FFmpeg license information: https://ffmpeg.org/legal.html
+FFmpeg 7.1.1 is built from unmodified upstream source with native components,
+without GPL components or external codec libraries, under LGPL 2.1 or later.
+The license is installed as _internal/licenses/COPYING.LGPLv2.1.
+The exact corresponding ffmpeg-7.1.1.tar.xz source, build_ffmpeg.sh,
+configuration and toolchain package versions accompany the GitHub release.
+Source: https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz
+License information: https://ffmpeg.org/legal.html
+Users may replace _internal/bin/ffmpeg.exe with their own compatible build.
+FFmpeg is a separate executable invoked through subprocess pipes/files.
 
 No ElevenLabs API key is included. Users provide their own key and are
 responsible for usage charges on their own account.

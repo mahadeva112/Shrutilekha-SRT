@@ -5,7 +5,7 @@ root = Path(SPECPATH)
 datas = [(str(root / 'loader.pyw'), '.'), (str(root / 'icon.ico'), '.'),
          (str(root / 'version.json'), '.'), (str(root / 'data'), 'data'),
          (str(root / 'build' / 'vendor' / 'ffmpeg.exe'), 'bin'),
-         (str(root / 'installer' / 'COPYING.GPLv3'), 'licenses')]
+         (str(root / 'installer' / 'COPYING.LGPLv2.1'), 'licenses')]
 datas += copy_metadata('elevenlabs', recursive=True)
 datas += copy_metadata('truststore')
 # Both processes share one runtime directory. The worker keeps a console

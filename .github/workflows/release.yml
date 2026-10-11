@@ -24,6 +24,20 @@ jobs:
               assert os.environ['GITHUB_REF_NAME'] == 'v' + version, 'Tag and version.json differ'
       - name: Tests
         run: python -m unittest discover -s tests -v
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            make
+            nasm
+            curl
+            tar
+            xz
+      - name: Build LGPL FFmpeg and preserve corresponding source
+        shell: msys2 {0}
+        run: bash scripts/build_ffmpeg.sh
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
       - name: Build app and installer
