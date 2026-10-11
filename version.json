@@ -1,7 +1,8 @@
 {
-  "version": "1.1.1",
+  "version": "1.1.2",
   "notes": [
-    "Standalone Windows app with per-user encrypted API settings and GitHub release updates."
+    "API settings now open inside the app with matching dark styling.",
+    "Save, remove and test your own ElevenLabs key without leaving the captions window."
   ],
   "mandatory": false,
   "min_version": ""

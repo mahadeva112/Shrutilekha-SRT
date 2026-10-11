@@ -27,3 +27,13 @@ and configuration confirmed LGPL, with GPL/version3/nonfree disabled.
 No paid ElevenLabs transcription was performed during these validation
 tests. Resolve 21.1+ Python-host integration and an actual clean physical PC
 remain untested. A fresh hosted Windows runner is not a physical-PC install.
+
+
+v1.1.2 API settings update: thirteen automated checks passed, including
+in-window ownership, save/remove, failed saves, Back cancellation and restored
+caption shortcuts. Native dark layout was visually checked at 580 × 380.
+The locally built Windows installer passed upgrade from v1.1.0, reinstall,
+uninstall and frozen GUI/form/worker tests without external Python on PATH.
+The frozen report confirms `api_settings: in-window`. Test key and preset bytes
+were preserved; existing Resolve launcher files and install pointer were
+restored after validation. This UI update has not yet run on a fresh CI runner.

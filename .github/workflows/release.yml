@@ -61,4 +61,10 @@ jobs:
         shell: pwsh
         run: |
           $assets = Get-ChildItem 'dist/release' -File | ForEach-Object { $_.FullName }
-          gh release create $env:GITHUB_REF_NAME @assets --draft --verify-tag --title "Srutilekha $env:GITHUB_REF_NAME" --notes-file docs/release-notes.md
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release already exists; validated build remains available as the workflow artifact."
+          } else {
+            gh release create $env:GITHUB_REF_NAME @assets --draft --verify-tag --title "Srutilekha $env:GITHUB_REF_NAME" --notes-file docs/release-notes.md
+            if ($LASTEXITCODE -ne 0) { throw 'GitHub release creation failed' }
+          }

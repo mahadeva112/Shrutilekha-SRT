@@ -4247,7 +4247,8 @@ class App:
 
         RoundedButton(inner, "Cancel", self._on_cancel, primary=False,
                       bg_parent=BG_BAR, height=36).pack(side="right")
-        RoundedButton(inner, "API settings", lambda: show_settings(self.root),
+        RoundedButton(inner, "API settings", lambda: show_settings(self.root, theme={"bg": BG, "card": BG_CARD, "field": BG_INPUT,
+                    "text": FG, "muted": FG_DIM, "accent": ACCENT, "font": UI_FONT}),
                       primary=False, bg_parent=BG_BAR, height=36).pack(side="right", padx=(8, 0))
 
         # ── Middle: stage | inspector ────────────────────────────────────
@@ -5250,7 +5251,8 @@ class App:
             except Exception:
                 missing_key = True
             if missing_key:
-                show_settings(self.root)
+                show_settings(self.root, theme={"bg": BG, "card": BG_CARD, "field": BG_INPUT,
+                    "text": FG, "muted": FG_DIM, "accent": ACCENT, "font": UI_FONT})
                 try:
                     if not credentials.get_key():
                         return

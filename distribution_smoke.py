@@ -29,17 +29,25 @@ def run(output):
         app_class = namespace["App"]
         app_class.__init__.__globals__["updater"] = None
         p = Path(scratch)
-        app = app_class(root, {"items": ["A1 — Test voice"], "defaults": {}},
+        app = app_class(root, {"items": ["A1 â€” Test voice"], "defaults": {}},
                         str(p / "selection"), str(p / "args"), str(p / "done"),
                         str(p / "log"), "unused", "unused", str(p / "result"), str(p / "ack"))
         root.update_idletasks()
         assert app.lang_var.get() == "Auto-detect"
+        from settings_ui import ApiSettingsPanel
+        bindings = {key: root.bind(key) for key in ("<Return>", "<Escape>")}
+        panel = ApiSettingsPanel(root)
+        assert panel.winfo_toplevel() is root
+        panel.value.set("distribution-test-key")
+        panel.save()
+        assert credentials.get_key() == "distribution-test-key"
+        assert all(root.bind(key) == script for key, script in bindings.items())
         root.destroy()
         worker = subprocess.run([str(install_dir() / "Srutilekha-worker.exe"), "--self-test"],
                                 capture_output=True, text=True, encoding="utf-8", timeout=30,
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         if worker.returncode:
             raise RuntimeError(worker.stdout + worker.stderr)
-        report = {"gui": "ok", "resolve_form": "ok", "encrypted_key": "ok",
+        report = {"gui": "ok", "resolve_form": "ok", "encrypted_key": "ok", "api_settings": "in-window",
                   "worker": worker.stdout.strip()}
         Path(output).write_text(json.dumps(report, indent=2), encoding="utf-8")
