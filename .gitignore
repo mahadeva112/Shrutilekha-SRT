@@ -28,6 +28,8 @@ certs.pem
 build/
 dist/
 .tools/
-.cache/
 *-output.log
 *-build.log
+
+# Transcription cache (runtime data)
+.cache/
