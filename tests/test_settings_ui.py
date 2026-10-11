@@ -46,6 +46,20 @@ class SettingsTests(unittest.TestCase):
         panel.test()
         self.assertEqual(panel.status.get(),'Paste your API key first.')
         self.assertTrue(panel.winfo_exists())
+    def test_reveal_toggle_and_disabled_connection_action(self):
+        panel=ApiSettingsPanel(self.root)
+        panel._toggle_reveal()
+        self.assertEqual(panel.entry.cget('show'),'')
+        panel._toggle_reveal()
+        self.assertEqual(panel.entry.cget('show'),'•')
+        with patch.object(panel.test_button,'command') as command:
+            panel.test_button.configure(state='disabled')
+            panel.test_button._invoke()
+            command.assert_not_called()
+            panel.test_button.configure(state='normal')
+            panel.test_button._invoke()
+            command.assert_called_once()
+
     def test_failed_save_keeps_panel_open(self):
         panel=ApiSettingsPanel(self.root)
         with patch('credentials.save_key',side_effect=OSError('test failure')):

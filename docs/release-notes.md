@@ -3,7 +3,8 @@ Public preview: standalone Windows x64 installer for Srutilekha.
 - Bundled Python runtime and transcription worker; no separate Python install.
 - Save your own ElevenLabs API key encrypted for your Windows user.
 - API settings open inside the captions window with matching dark styling.
-- Show/Hide, connection check and key removal stay in the same panel.
+- Rounded account card, rounded input and buttons, and clearer spacing.
+- Integrated Show/Hide, connection check and key removal stay in the same panel.
 - Back/Escape return to captions; Enter saves the key.
 - Installer registers a Lua or Python launcher for your Resolve version.
 - Stable GitHub release updates preserve API keys, presets, cache and logs.

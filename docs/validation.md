@@ -37,3 +37,11 @@ uninstall and frozen GUI/form/worker tests without external Python on PATH.
 The frozen report confirms `api_settings: in-window`. Test key and preset bytes
 were preserved; existing Resolve launcher files and install pointer were
 restored after validation. This UI update has not yet run on a fresh CI runner.
+
+
+v1.1.3 rounded settings update: fourteen checks passed, including the integrated
+Show/Hide control and disabled connection action. Native layout was visually
+checked at 580 × 380 and 930 × 700. The locally built installer passed upgrade,
+reinstall, uninstall, encrypted-key/preset preservation and frozen runtime
+checks with external Python removed from PATH. Existing Resolve launchers and
+installation pointer were restored after testing.
