@@ -35,12 +35,18 @@ import time
 import unicodedata
 import tkinter as tk
 from tkinter import ttk, messagebox, font as tkfont
+from app_runtime import frozen, install_dir, data_dir
+from settings_ui import show_settings
+import credentials
 
 # Self-update. Guarded because an install updated from a build that predates
 # updater.py will not have the file yet — the window must still open, just
 # without the update chip.
 try:
-    import updater
+    if frozen():
+        import release_updater as updater
+    else:
+        import updater
 except Exception:
     updater = None
 
@@ -1033,8 +1039,7 @@ def resolve_subtitle_fonts():
 
     overrides = {}
     try:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            "subtitle_style.json")
+        path = os.path.join(data_dir(), "subtitle_style.json")
         with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f).get("fontByScript") or {}
         if isinstance(raw, dict):
@@ -3788,13 +3793,15 @@ class App:
             self._set_pill("checking", "Checking…")
 
         def work():
+            error = False
             try:
                 info = updater.check()
             except Exception:
-                info = None                # check() already swallows; belt and braces
+                info = None
+                error = True
             # A single attribute store, which is atomic under the GIL, so the
             # poller either sees the previous value or this one.
-            self._update_result = (info, manual)
+            self._update_result = (info, manual, error)
 
         self._update_result = None
         threading.Thread(target=work, daemon=True).start()
@@ -3810,7 +3817,11 @@ class App:
                 pass                       # window gone; nothing to update
             return
         self._update_result = None
-        info, manual = pending
+        info, manual, error = pending
+        if error and frozen():
+            self._update_checking = False
+            self._set_pill("idle", "Check unavailable" if manual else self._idle_pill_text())
+            return
         self._on_update_checked(info, manual)
 
     def _on_update_checked(self, info, manual):
@@ -3931,6 +3942,8 @@ class App:
             round_corners(win, radius=App.CORNER_R)
 
         def close():
+            if state["running"]:
+                return
             self._update_win = None
             try:
                 win.grab_release()
@@ -3939,6 +3952,8 @@ class App:
             win.destroy()
 
         def dismiss():
+            if state["running"]:
+                return
             # "Later" on a required update is the same as declining to run.
             if mandatory:
                 self._on_cancel()
@@ -3948,6 +3963,9 @@ class App:
         state = {"running": False}
 
         def finished(_backup):
+            if frozen():
+                self._on_cancel()
+                return
             status.set("Updated to v%s. Close this window, then start "
                        "Srutilekha again from Workspace ▸ Scripts — Resolve "
                        "loads the new version on the next run."
@@ -4229,6 +4247,8 @@ class App:
 
         RoundedButton(inner, "Cancel", self._on_cancel, primary=False,
                       bg_parent=BG_BAR, height=36).pack(side="right")
+        RoundedButton(inner, "API settings", lambda: show_settings(self.root),
+                      primary=False, bg_parent=BG_BAR, height=36).pack(side="right", padx=(8, 0))
 
         # ── Middle: stage | inspector ────────────────────────────────────
         main = tk.Frame(self.body, bg=BG)
@@ -4748,8 +4768,7 @@ class App:
         """
         c = self._card(parent, "Presets",
                        summary_var=self.preset_sum_var)
-        presets_dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "presets")
+        presets_dir = os.path.join(data_dir(), "presets")
         preset_map = {
             "min_secs": self.min_var, "cps": self.cps_var,
             "text_size": self.textsize_var, "lang": self.lang_var,
@@ -5225,6 +5244,18 @@ class App:
             pass
 
     def _on_submit(self, action="generate"):
+        if frozen() and action in ("generate", "sync"):
+            try:
+                missing_key = not credentials.get_key()
+            except Exception:
+                missing_key = True
+            if missing_key:
+                show_settings(self.root)
+                try:
+                    if not credentials.get_key():
+                        return
+                except Exception:
+                    return
         chosen = self.combo_var.get()
         if action in ("generate", "sync") and not chosen:
             return
@@ -5701,6 +5732,9 @@ class App:
 
         cmd = [self.python_exe, self.script_path,
                "--args-file", self.args_path]
+        if frozen():
+            cmd = [str(install_dir() / "Srutilekha-worker.exe"),
+                   "--args-file", self.args_path]
         try:
             proc = subprocess.Popen(
                 cmd,

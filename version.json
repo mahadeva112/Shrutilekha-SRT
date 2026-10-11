@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.1",
   "notes": [
-    "Srutilekha can now update itself: the title bar shows an Update chip when a newer version is on GitHub."
+    "Standalone Windows app with per-user encrypted API settings and GitHub release updates."
   ],
   "mandatory": false,
   "min_version": ""

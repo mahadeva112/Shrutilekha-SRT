@@ -1,0 +1,16 @@
+Srutilekha includes Python, Tcl/Tk, ElevenLabs SDK, truststore, PyInstaller
+runtime and FFmpeg. Applicable third-party licenses remain in force.
+Package metadata and available license files are included in the runtime.
+
+FFmpeg 7.1.1 is built from unmodified upstream source with native components,
+without GPL components or external codec libraries, under LGPL 2.1 or later.
+The license is installed as _internal/licenses/COPYING.LGPLv2.1.
+The exact corresponding ffmpeg-7.1.1.tar.xz source, build_ffmpeg.sh,
+configuration and toolchain package versions accompany the GitHub release.
+Source: https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz
+License information: https://ffmpeg.org/legal.html
+Users may replace _internal/bin/ffmpeg.exe with their own compatible build.
+FFmpeg is a separate executable invoked through subprocess pipes/files.
+
+No ElevenLabs API key is included. Users provide their own key and are
+responsible for usage charges on their own account.

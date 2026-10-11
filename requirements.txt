@@ -1,2 +1,2 @@
-elevenlabs
-truststore
+elevenlabs==2.71.0
+truststore==0.10.4

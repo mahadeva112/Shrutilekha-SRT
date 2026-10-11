@@ -25,6 +25,11 @@ logs/
 # Per-machine runtime files
 subtitle_style.json
 certs.pem
+build/
+dist/
+.tools/
+*-output.log
+*-build.log
 
 # Transcription cache (runtime data)
 .cache/

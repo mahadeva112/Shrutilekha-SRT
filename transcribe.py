@@ -13,6 +13,9 @@ import ssl
 import subprocess
 import sys
 import unicodedata
+from app_runtime import resources, data_dir, prepare_environment, frozen
+
+prepare_environment()
 
 # Per-language segmentation tables: one module per language, plus the
 # writing-system data they share. Data only — every rule that acts on it
@@ -86,6 +89,10 @@ if os.path.isdir(_EL_FALLBACK) and _EL_FALLBACK not in sys.path:
     sys.path.insert(0, _EL_FALLBACK)
 
 def load_dotenv():
+    from credentials import configure_worker_key
+    configure_worker_key()
+    if frozen():
+        return
     env_file = os.path.join(PIPELINE_DIR, ".env")
     if not os.path.exists(env_file):
         return
@@ -425,7 +432,7 @@ def _translit_dictionary(script):
     if script in _DICTIONARIES:
         return _DICTIONARIES[script]
     table = {}
-    path = os.path.join(PIPELINE_DIR, "data", "translit_%s.json.gz" % script)
+    path = os.path.join(resources(), "data", "translit_%s.json.gz" % script)
     try:
         import gzip
         import json
@@ -530,7 +537,7 @@ def load_speaker_colors():
     """Palette assigned to diarization speakers in order of appearance. Read
     from speaker_colors.json (a JSON array of hex strings) if present, else a
     sensible high-contrast default."""
-    path = os.path.join(PIPELINE_DIR, "speaker_colors.json")
+    path = os.path.join(data_dir(), "speaker_colors.json")
     if os.path.exists(path):
         try:
             import json
@@ -2137,7 +2144,7 @@ class _RawW:
 
 
 def _cache_dir():
-    d = os.path.join(PIPELINE_DIR, ".cache")
+    d = os.path.join(data_dir(), ".cache")
     try:
         os.makedirs(d, exist_ok=True)
     except Exception:
@@ -2924,7 +2931,7 @@ def main_sync(args):
 
     api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
     if not api_key:
-        print("ERROR: ELEVENLABS_API_KEY not set. Add it to " + os.path.join(PIPELINE_DIR, ".env"))
+        print("ERROR: API key not set. Open Srutilekha > API settings and save your ElevenLabs key.")
         sys.exit(1)
     if not os.path.exists(audio_path):
         print("ERROR: Audio file not found: " + audio_path)
@@ -3011,7 +3018,7 @@ def main():
 
     api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
     if not api_key:
-        print("ERROR: ELEVENLABS_API_KEY not set. Add it to " + os.path.join(PIPELINE_DIR, ".env"))
+        print("ERROR: API key not set. Open Srutilekha > API settings and save your ElevenLabs key.")
         sys.exit(1)
 
     if not os.path.exists(audio_path):
@@ -3150,6 +3157,8 @@ def _explain(exc):
     env = os.path.join(PIPELINE_DIR, ".env")
 
     if status == 401:
+        if frozen():
+            return "ElevenLabs rejected your API key. Open Srutilekha > API settings and save a valid key."
         return ("ElevenLabs rejected the API key.\n\n"
                 "The key in %s is no longer valid - it was most likely "
                 "regenerated or revoked. Create a new key at\n"

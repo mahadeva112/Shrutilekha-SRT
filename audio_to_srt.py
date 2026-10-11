@@ -64,14 +64,18 @@ def get_project_dir():
 
 
 PROJECT_DIR = get_project_dir()
+APP_EXE = os.path.join(PROJECT_DIR, "Srutilekha.exe")
+PACKAGED = os.path.isfile(APP_EXE)
+USER_DATA_DIR = (os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
+                             "Srutilekha") if PACKAGED else PROJECT_DIR)
 
 TRANSCRIBE_PY = os.path.join(PROJECT_DIR, "transcribe.py")
 DIALOG_PY = os.path.join(PROJECT_DIR, "dialog.py")
 LOADER_PY = os.path.join(PROJECT_DIR, "loader.pyw")
-LOGS_DIR = os.path.join(PROJECT_DIR, "logs")
+LOGS_DIR = os.path.join(USER_DATA_DIR, "logs")
 LOG_FILE = os.path.join(LOGS_DIR, "audio_to_srt.log")
 LOADER_LOG = LOG_FILE + ".transcribe"
-STYLE_JSON = os.path.join(PROJECT_DIR, "subtitle_style.json")
+STYLE_JSON = os.path.join(USER_DATA_DIR, "subtitle_style.json")
 
 
 # ── Finding the user's Python ───────────────────────────────────────────────
@@ -165,6 +169,8 @@ def hidden_flags():
 def pydialog(*args):
     """Run dialog.py and return its stdout, stripped."""
     cmd = [PYTHONW, DIALOG_PY] + [str(a) for a in args]
+    if PACKAGED:
+        cmd = [APP_EXE, "--dialog"] + [str(a) for a in args]
     try:
         out = subprocess.run(cmd, stdin=subprocess.DEVNULL,
                              stdout=subprocess.PIPE,
@@ -557,6 +563,8 @@ class Run(object):
                "--ack", self.ack,
                "--run-id", self.id,
                "--run-marker", self.marker]
+        if PACKAGED:
+            cmd = [APP_EXE] + cmd[2:]
         kwargs = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
                   "stderr": subprocess.DEVNULL, "cwd": PROJECT_DIR,
                   "close_fds": True}
@@ -1044,7 +1052,7 @@ def main():
     if not write_text(run.prompt, json.dumps(prompt)):
         alert_error("Srutilekha", "Cannot write prompt file: " + run.prompt)
         return
-    if not os.path.exists(LOADER_PY):
+    if not PACKAGED and not os.path.exists(LOADER_PY):
         alert_error("Srutilekha", "loader.pyw not found: " + LOADER_PY)
         return
     if not run.launch_loader():
