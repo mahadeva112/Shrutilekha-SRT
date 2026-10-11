@@ -1,5 +1,10 @@
 # Srutilekha
 
+Windows standalone installer preview: see [build, API settings and release instructions](docs/windows-release.md).
+The installer bundles Python, adds the Resolve launcher and stores each user's own API key encrypted.
+Resolve 21.0 and earlier use the Lua launcher; Resolve 21.1+ use Python.
+Initial builds remain drafts until live timeline and clean-PC validation are complete.
+
 Transcribe a DaVinci Resolve timeline and import the result back as a styled
 SRT subtitle track. Built for Indic-language footage: the output is pinned to a
 single script, so code-switched English is transliterated into that script
