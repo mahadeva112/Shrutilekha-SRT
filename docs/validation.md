@@ -16,8 +16,13 @@ Tested on 11 October 2026:
   cancelled using the run-supersession protocol.
 
 The Resolve test used an existing v1.1.0 packaged runtime. v1.1.1 changes the
-FFmpeg build and ships its corresponding source; its CI and final installer
-checks are recorded separately in GitHub Actions/release notes.
+FFmpeg build and ships its corresponding source. Its clean Windows CI build
+and frozen GUI/form/worker/key tests passed (run 38136544286).
+The downloaded v1.1.1 installer matched its release SHA-256 checksum. Upgrade
+from v1.1.0, reinstall and uninstall passed. Encrypted test-key and preset
+files retained identical bytes throughout. Bundled FFmpeg trimmed a WAV to
+one second and decoded it to 16 kHz mono float samples. Its reported license
+and configuration confirmed LGPL, with GPL/version3/nonfree disabled.
 
 No paid ElevenLabs transcription was performed during these validation
 tests. Resolve 21.1+ Python-host integration and an actual clean physical PC

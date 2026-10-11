@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import winreg
+import wave
 
 ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / ".tools" / "installer-test"
@@ -33,6 +34,12 @@ def main():
     version = json.loads((ROOT / "version.json").read_text())["version"]
     setup = ROOT / "dist" / "release" / ("Srutilekha-Setup-%s.exe" % version)
     flags = {"creationflags": subprocess.CREATE_NO_WINDOW}
+    audio = WORK / "input.wav"
+    with wave.open(str(audio), "wb") as stream:
+        stream.setnchannels(1)
+        stream.setsampwidth(2)
+        stream.setframerate(16000)
+        stream.writeframes(b"\0\0" * 32000)
     user_data = Path(os.environ["LOCALAPPDATA"]) / "Srutilekha"
     user_data.mkdir(exist_ok=True)
     scratch = tempfile.TemporaryDirectory(prefix="installer-validation-", dir=user_data)
@@ -64,6 +71,22 @@ def main():
             assert json.loads(report.read_text())["encrypted_key"] == "ok"
             assert marker.read_bytes() == marker_bytes
             assert key_file.read_bytes() == key_bytes
+            ffmpeg = TARGET / "_internal" / "bin" / "ffmpeg.exe"
+            cut = WORK / "cut.wav"
+            subprocess.run([str(ffmpeg), "-v", "error", "-nostdin", "-y",
+                            "-ss", "0.25", "-i", str(audio), "-t", "1",
+                            "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(cut)],
+                           check=True, timeout=30, **flags)
+            with wave.open(str(cut), "rb") as stream:
+                assert stream.getnframes() == 16000
+            raw = subprocess.run([str(ffmpeg), "-v", "error", "-i", str(cut),
+                                  "-vn", "-ac", "1", "-ar", "16000", "-f", "f32le", "pipe:1"],
+                                 capture_output=True, check=True, timeout=30, **flags)
+            assert len(raw.stdout) == 64000
+            if phase != "previous-version" and version != "1.1.0":
+                license_text = subprocess.run([str(ffmpeg), "-L"], capture_output=True,
+                                              text=True, check=True, timeout=30, **flags)
+                assert "GNU Lesser General Public License" in " ".join(license_text.stdout.split())
             print(phase + ": OK")
     finally:
         uninstaller = TARGET / "unins000.exe"
