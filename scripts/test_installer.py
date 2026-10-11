@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import winreg
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,9 +33,23 @@ def main():
     version = json.loads((ROOT / "version.json").read_text())["version"]
     setup = ROOT / "dist" / "release" / ("Srutilekha-Setup-%s.exe" % version)
     flags = {"creationflags": subprocess.CREATE_NO_WINDOW}
+    user_data = Path(os.environ["LOCALAPPDATA"]) / "Srutilekha"
+    user_data.mkdir(exist_ok=True)
+    scratch = tempfile.TemporaryDirectory(prefix="installer-validation-", dir=user_data)
+    marker = Path(scratch.name) / "presets.json"
+    marker.write_text('{"validation": true}', encoding="utf-8")
+    key_file = Path(scratch.name) / "api-key.dpapi"
+    sys.path.insert(0, str(ROOT))
+    from credentials import _crypt
+    key_file.write_bytes(_crypt(b"installer-validation-key"))
+    marker_bytes, key_bytes = marker.read_bytes(), key_file.read_bytes()
+    previous = ROOT / "dist" / "release" / "Srutilekha-Setup-1.1.0.exe"
+    phases = [("fresh-install", setup), ("reinstall", setup)]
+    if version != "1.1.0" and previous.is_file():
+        phases = [("previous-version", previous), ("upgrade", setup), ("reinstall", setup)]
     try:
-        for phase in ("fresh-install", "reinstall"):
-            subprocess.run([str(setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+        for phase, installer in phases:
+            subprocess.run([str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
                             "/CURRENTUSER", "/DIR=" + str(TARGET), "/LOG=" + str(WORK / (phase + ".log"))],
                            check=True, timeout=180, **flags)
             recorded = pointer.read_text().strip()
@@ -47,6 +62,8 @@ def main():
             subprocess.run([str(TARGET / "Srutilekha.exe"), "--self-test", str(report)],
                            env=env, check=True, timeout=60, **flags)
             assert json.loads(report.read_text())["encrypted_key"] == "ok"
+            assert marker.read_bytes() == marker_bytes
+            assert key_file.read_bytes() == key_bytes
             print(phase + ": OK")
     finally:
         uninstaller = TARGET / "unins000.exe"
@@ -54,7 +71,10 @@ def main():
             if uninstaller.exists():
                 subprocess.run([str(uninstaller), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
                                check=True, timeout=120, **flags)
+            assert marker.read_bytes() == marker_bytes
+            assert key_file.read_bytes() == key_bytes
         finally:
+            scratch.cleanup()
             for path, data in backups.items():
                 if data is None:
                     path.unlink(missing_ok=True)
