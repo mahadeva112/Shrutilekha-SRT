@@ -4,6 +4,25 @@ from tkinter import font as tkfont
 from settings_ui import RoundedAction, rounded_rect, show_settings
 
 
+# Presentation examples only; never written into generated captions or presets.
+DEMO_CAPTIONS = {
+    "English": "Your story.\nYour voice.",
+    "Assamese": "আপোনাৰ কাহিনী।\nআপোনাৰ কণ্ঠ।",
+    "Bengali": "আপনার গল্প।\nআপনার কণ্ঠ।",
+    "Gujarati": "તમારી વાર્તા.\nતમારો અવાજ.",
+    "Hindi": "आपकी कहानी।\nआपकी आवाज़।",
+    "Kannada": "ನಿಮ್ಮ ಕಥೆ.\nನಿಮ್ಮ ಧ್ವನಿ.",
+    "Malayalam": "നിങ്ങളുടെ കഥ.\nനിങ്ങളുടെ ശബ്ദം.",
+    "Marathi": "तुमची गोष्ट.\nतुमचा आवाज.",
+    "Nepali": "तपाईंको कथा।\nतपाईंको आवाज।",
+    "Odia": "ଆପଣଙ୍କ କାହାଣୀ।\nଆପଣଙ୍କ ସ୍ୱର।",
+    "Punjabi": "ਤੁਹਾਡੀ ਕਹਾਣੀ।\nਤੁਹਾਡੀ ਆਵਾਜ਼।",
+    "Tamil": "உங்கள் கதை.\nஉங்கள் குரல்.",
+    "Telugu": "మీ కథ.\nమీ స్వరం.",
+    "Urdu": "آپ کی کہانی۔\nآپ کی آواز۔",
+}
+
+
 class StudioSurface(tk.Canvas):
     def __init__(self, parent, theme, padding=18):
         super().__init__(parent, bg=parent.cget("bg"), bd=0,
@@ -191,29 +210,39 @@ def build_form(app):
 
     app._plate_right_var = tk.StringVar()
     label(stage, size=9, dim=True, textvariable=app._plate_right_var).pack(side="bottom", pady=(9, 0))
-    viewport = tk.Frame(stage, bg="#101216")
-    viewport.pack(fill="both", expand=True)
+    demo_row = tk.Frame(stage, bg=card)
+    demo_row.pack(fill="x", pady=(0, 12))
+    label(demo_row, "Demo language", size=9, dim=True).pack(side="left", padx=(0, 10))
+    app.demo_language_var = tk.StringVar(value="English")
+    demo_pick = g["Dropdown"](demo_row, tuple(sorted(DEMO_CAPTIONS)), app.demo_language_var,
+                              bg_parent=card, height=30, radius=8, max_rows=6)
+    demo_pick.configure(width=150)
+    demo_pick._label.configure(font=(font, -13))
+    demo_pick.studio_menu_font = (font, -14)
+    demo_pick.pack(side="left")
+    app._demo_language_control = demo_pick
+
+    viewport_theme = dict(theme, card="#11161e", border="#303844")
+    viewport_surface = StudioSurface(stage, viewport_theme, padding=10)
+    viewport_surface.pack(fill="both", expand=True)
+    viewport = viewport_surface.body
     app._preview = g["ReelPreview"](viewport, app.srt_posy_var, app.textsize_var,
         color_var=app.color_var, outline_var=app.outline_var, shadow_var=app.shadow_var,
-        safe_zone_var=app.safe_zone_var, width=190, bg_parent="#101216",
+        safe_zone_var=app.safe_zone_var, width=190, bg_parent=viewport_theme["card"],
         aspect=app._frame()["aspect"], srt_posy_default=lambda: app._frame()["srt_posy"],
         frame_height=lambda: (app._timeline_res() or (0, 0))[1] or None)
     app._preview.studio_illustration = True
     def sample_changed(*args):
-        name = app.lang_var.get()
-        sample = ("Your story.\nYour own words." if name == "English" else
-                  "आपकी कहानी,\nआपकी भाषा।" if name == "Hindi" else
-                  "তোমার গল্প,\nতোমার ভাষায়।" if name in ("Auto-detect", "Bengali") else
-                  "Your caption\npreview.")
-        app._preview.SAMPLE = sample
+        name = app.demo_language_var.get()
+        app._preview.SAMPLE = DEMO_CAPTIONS.get(name, DEMO_CAPTIONS["English"])
         if app._preview.winfo_exists():
             app._preview._draw()
-    app.lang_var.trace_add("write", sample_changed)
+    app.demo_language_var.trace_add("write", sample_changed)
     sample_changed()
     app._preview.place(relx=.5, rely=.5, anchor="center")
-    viewport.bind("<Configure>", lambda e: app._preview.set_bounds(e.width-24, e.height-24))
+    viewport.bind("<Configure>", lambda e: app._preview.set_bounds(e.width-20, e.height-38))
     app._sync_frame_plate()
-    label(viewport, "Illustrated sample · enlarged text", size=8, dim=True).place(relx=1, rely=1, x=-8, y=-6, anchor="se")
+    label(viewport, "Demo only · enlarged text", size=8, dim=True).place(relx=.5, rely=1, y=-4, anchor="s")
 
     inspector = inspector_surface.body
     tabbar = tk.Frame(inspector, bg=card)

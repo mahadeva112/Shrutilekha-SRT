@@ -66,3 +66,13 @@ workflow regression checks. The new native layout was visually inspected on
 Windows. The local installer passed upgrade from v1.2.0, reinstall, uninstall,
 encrypted-key/preset preservation and frozen runtime checks without external
 Python on PATH. Paid transcription was not repeated for this presentation change.
+
+v1.2.2 neutral demos: twenty-two checks passed. All 14 supported demo languages
+are available; setup starts in English even when the actual transcription
+language changes to Bengali. Demo selection leaves output settings and point
+size unchanged. Both Reel and HD keep their aspect ratios within the normal
+and minimum window sizes. The rounded native preview was visually inspected.
+The locally built installer passed upgrade from v1.2.1, reinstall, uninstall,
+encrypted-key/preset preservation and frozen runtime checks without external
+Python on PATH. The frozen report confirms `demo_languages: independent`.
+Existing Resolve launchers and the installation pointer were restored.

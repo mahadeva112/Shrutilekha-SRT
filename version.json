@@ -1,8 +1,9 @@
 {
-  "version": "1.2.1",
+  "version": "1.2.2",
   "notes": [
-    "Refined Studio typography: readable text, bold headings and consistent controls.",
-    "Enlarged illustrative caption samples and softer preview artwork.",
+    "Neutral English preview by default, with demos for all 14 supported languages.",
+    "Separate demo language selector leaves transcription settings unchanged.",
+    "Rounded preview stage and cleaner caption placement display.",
     "Existing caption workflows, saved presets and encrypted API keys preserved."
   ],
   "mandatory": false,

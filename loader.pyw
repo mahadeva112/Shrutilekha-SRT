@@ -2337,6 +2337,8 @@ class ReelPreview(tk.Canvas):
         if h > self._ph_max:
             h = self._ph_max
             w = int(round(h * aspect))
+        if getattr(self, "studio_illustration", False):
+            return max(1, w), max(1, h)
         return max(120, w), max(80, h)
 
     def set_aspect(self, aspect):
@@ -2565,13 +2567,14 @@ class ReelPreview(tk.Canvas):
                     if dx or dy:
                         self.create_text(cx + dx, cy + dy, text=self.SAMPLE, justify="center",
                                          font=font, fill=ocol)
-        self.create_text(cx, cy, text=self.SAMPLE, font=font, fill=col)
+        self.create_text(cx, cy, text=self.SAMPLE, justify="center", font=font, fill=col)
 
         # anchor dot + live height readout
-        self.create_oval(cx - 2, cy - 2, cx + 2, cy + 2,
-                         fill=ACCENT, outline="")
-        self.create_text(fx0 + 5, fy1 - 7, text="Y %.2f" % py,
-                         anchor="w", fill=FG_MUTE, font=(UI_FONT, 7))
+        if not getattr(self, "studio_illustration", False):
+            self.create_oval(cx - 2, cy - 2, cx + 2, cy + 2,
+                             fill=ACCENT, outline="")
+            self.create_text(fx0 + 5, fy1 - 7, text="Y %.2f" % py,
+                             anchor="w", fill=FG_MUTE, font=(UI_FONT, 7))
 
 
 class Tooltip:

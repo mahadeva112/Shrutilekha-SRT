@@ -17,6 +17,7 @@ worker. Browser and native font rendering are not pixel-identical.
 | Existing SRT path and Browse | Files tab in Sync mode |
 | Save/load/remove named presets | Presets tab; existing JSON format retained |
 | Reel / HD preview | Preview header |
+| Demo caption language | Separate preview selector; English initially, all 14 supported languages available |
 | Safe-zone overlay, draggable caption placement | Preview; linked position slider |
 | Font, font style, colour, outline, shadow, size and position saved in presets | Existing preset fields retained |
 | Caption editing, local re-split, recipes, filters, merge/split and apply | Existing review editor retained |
@@ -46,3 +47,11 @@ Illustrated setup captions are enlarged relative to the selected point size
 for readability and labelled accordingly. Real review captions remain scaled
 against the timeline dimensions. Saved caption point size, colour, outline,
 shadow, placement and backend output are unchanged.
+
+The demo selector is independent of the Audio tab's transcription language.
+Every setup starts with the neutral English example, including when a saved
+caption preset selects Bengali. Demo text is never written to SRT files or
+presets. Changing demo language does not change Auto-detect or any output setting.
+The preview stage has rounded corners; the setup's decorative anchor dot and
+internal Y readout are omitted because the linked position slider already
+displays the value. Dragging captions and platform safe-zone overlays remain.

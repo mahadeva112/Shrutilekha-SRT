@@ -83,12 +83,16 @@ class StudioFormTests(unittest.TestCase):
         self.assertEqual(selection['settings'],'15,1,2')
         self.assertEqual(selection['ref_script'],'reference.txt')
     def test_frame_switch_and_position_keep_preview_in_bounds(self):
-        self.app.srt_posy_var.set('.31');self.app.aspect_var.set('HD');self.root.update()
-        self.assertEqual(self.app.srt_posy_var.get(),'.31')
-        preview=self.app._preview
-        self.assertLessEqual(preview.winfo_height(),preview.master.winfo_height())
-        self.assertLessEqual(preview.winfo_width(),preview.master.winfo_width())
-        self.assertAlmostEqual(preview._pw/preview._ph,16/9,delta=.03)
+        self.app.srt_posy_var.set('.31')
+        for geometry in ('1040x780','920x640'):
+            self.root.geometry(geometry);self.root.update()
+            for aspect,ratio in [('HD',16/9),('Reel',9/16)]:
+                self.app.aspect_var.set(aspect);self.root.update()
+                self.assertEqual(self.app.srt_posy_var.get(),'.31')
+                preview=self.app._preview
+                self.assertLessEqual(preview.winfo_height(),preview.master.winfo_height())
+                self.assertLessEqual(preview.winfo_width(),preview.master.winfo_width())
+                self.assertAlmostEqual(preview._pw/preview._ph,ratio,delta=.03)
 
     def test_typography_and_sample_match_design_tokens(self):
         title_font=tkfont.Font(font=self.app._studio_title.cget('font'))
@@ -97,11 +101,26 @@ class StudioFormTests(unittest.TestCase):
         value_font=tkfont.Font(font=self.app.studio_controls['track']._label.cget('font'))
         self.assertEqual(int(self.root.tk.splitlist(self.app.studio_controls['track']._label.cget('font'))[1]),-15)
         self.assertEqual(self.app._generate_btn.font.cget('size'),-14)
-        self.assertIn('তোমার',self.app._preview.SAMPLE)
-        self.app.lang_var.set('English')
+        self.assertEqual(self.app.demo_language_var.get(),'English')
         self.assertIn('Your story',self.app._preview.SAMPLE)
         # Changing sample language leaves the real caption point size untouched.
         self.assertEqual(self.app.textsize_var.get(),'55')
+
+    def test_demo_languages_are_complete_and_do_not_change_output(self):
+        from studio_form import DEMO_CAPTIONS
+        self.assertEqual(set(DEMO_CAPTIONS),set(self.ns['LANGUAGES'])-{'Auto-detect'})
+        self.assertEqual(self.app.lang_var.get(),'Auto-detect')
+        self.app.lang_var.set('Bengali')
+        self.assertEqual(self.app._preview.SAMPLE,DEMO_CAPTIONS['English'])
+        settings=[v.get() for v in self.app.settings_vars]
+        for language,sample in DEMO_CAPTIONS.items():
+            self.app.demo_language_var.set(language);self.root.update()
+            self.assertEqual(self.app._preview.SAMPLE,sample)
+            self.assertEqual(self.app.lang_var.get(),'Bengali')
+            self.assertEqual([v.get() for v in self.app.settings_vars],settings)
+            self.assertEqual(self.app.textsize_var.get(),'55')
+        self.app.demo_language_var.set('Unknown')
+        self.assertEqual(self.app._preview.SAMPLE,DEMO_CAPTIONS['English'])
 
     def test_review_edit_and_local_resplit_still_work(self):
         p=Path(self.scratch.name)
