@@ -57,3 +57,12 @@ encrypted-key/preset preservation and frozen runtime checks without external
 Python on PATH. Existing Resolve launchers and installation pointer were
 restored. Native layout was inspected on the development Windows display.
 See [feature mapping](studio-ui.md) for preserved features and rendering limits.
+
+
+v1.2.1 refinement: twenty-one checks passed, including explicit typography token
+checks, Bengali/English sample switching, preservation of the real output point
+size, all setup controls at normal/minimum window dimensions and the existing
+workflow regression checks. The new native layout was visually inspected on
+Windows. The local installer passed upgrade from v1.2.0, reinstall, uninstall,
+encrypted-key/preset preservation and frozen runtime checks without external
+Python on PATH. Paid transcription was not repeated for this presentation change.

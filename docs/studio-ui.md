@@ -34,3 +34,15 @@ arbitrarily many captions.
 The illustrated placement preview is labelled as a sample. It is not a live
 Resolve video frame. Mock-only playback and sample import simulations are not
 included in the real application.
+
+
+The refined UI uses explicit pixel type sizes rather than inheriting old widget
+point sizes: 27 px bold heading, 14 px interface labels/buttons and 15 px input
+values. Headings and labels have stronger weights. Compact windows reduce gaps
+without reducing text size. The API panel and standalone home use the same
+palette and type scale.
+
+Illustrated setup captions are enlarged relative to the selected point size
+for readability and labelled accordingly. Real review captions remain scaled
+against the timeline dimensions. Saved caption point size, colour, outline,
+shadow, placement and backend output are unchanged.

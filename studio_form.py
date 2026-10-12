@@ -1,5 +1,6 @@
 """Studio presentation layer. Resolve protocol and processing remain in App."""
 import tkinter as tk
+from tkinter import font as tkfont
 from settings_ui import RoundedAction, rounded_rect, show_settings
 
 
@@ -47,8 +48,10 @@ class VisibilityHandle:
 def build_form(app):
     g = app.__class__.__init__.__globals__
     theme = dict(bg=g["BG"], card=g["BG_CARD"], field=g["BG_INPUT"],
-                 text=g["FG"], muted=g["FG_DIM"], border="#363940",
-                 accent=g["ACCENT"], font=g["UI_FONT"])
+                 text=g["FG"], muted=g["FG_DIM"], border="#3a414d",
+                 accent=g["ACCENT"], font=g["UI_FONT"], button_size=-14)
+    if "Segoe UI Semibold" in tkfont.families(app.root):
+        theme["button_font"] = "Segoe UI Semibold"
     bg, card, font = theme["bg"], theme["card"], theme["font"]
     app._clear_body(pad=0)
     app._studio_form = True
@@ -62,10 +65,10 @@ def build_form(app):
     app.studio_controls = {}
     app._studio_theme = theme
 
-    def label(parent, text=None, size=10, dim=False, **kwargs):
+    def label(parent, text=None, size=10, dim=False, bold=False, **kwargs):
         return tk.Label(parent, text=text, bg=parent.cget("bg"),
                         fg=theme["muted"] if dim else theme["text"],
-                        font=(font, size), **kwargs)
+                        font=(font, -round(size*1.4), "bold" if bold else "normal"), **kwargs)
 
     def button(parent, text, command, primary=False, tab=False, **kwargs):
         control = RoundedAction(parent, text, command, theme, primary=primary, **kwargs)
@@ -77,13 +80,15 @@ def build_form(app):
     def field(parent, text):
         wrap = tk.Frame(parent, bg=card)
         wrap.pack(fill="x", pady=(0, 15))
-        label(wrap, text, dim=True).pack(anchor="w", pady=(0, 7))
+        label(wrap, text, bold=True).pack(anchor="w", pady=(0, 8))
         return wrap
 
     def dropdown(parent, text, variable, values, key):
         wrap = field(parent, text)
         pick = g["Dropdown"](wrap, values, variable, bg_parent=card,
-                              height=36, radius=8, max_rows=6)
+                              height=42, radius=10, max_rows=6)
+        pick._label.configure(font=(font, -15, "bold"))
+        pick.studio_menu_font = (font, -14)
         pick.pack(fill="x")
         app.studio_controls[key] = pick
         return pick
@@ -91,7 +96,7 @@ def build_form(app):
     def toggle(parent, text, variable, key):
         row = tk.Frame(parent, bg=card)
         row.pack(fill="x", pady=9)
-        label(row, text).pack(side="left")
+        label(row, text, bold=True).pack(side="left")
         switch = g["ToggleSwitch"](row, variable)
         switch.configure(bg=card)
         switch.pack(side="right")
@@ -103,7 +108,7 @@ def build_form(app):
     bar.pack(fill="x")
     bar.pack_propagate(False)
     g["LogoTile"](bar, size=26, radius=8, bg_parent=g["BG_BAR"]).pack(side="left", padx=(18, 10))
-    brand = label(bar, "Srutilekha", size=12)
+    brand = label(bar, "Srutilekha", size=13, bold=True)
     brand.pack(side="left")
     crumb = label(bar, app._timeline_crumb(), size=9, dim=True)
     crumb.pack(side="left", padx=12)
@@ -121,7 +126,7 @@ def build_form(app):
     actions = tk.Frame(footer, bg=g["BG_BAR"])
     actions.pack(fill="x", padx=22, pady=13)
     app.summary_var = tk.StringVar(value="")
-    summary = label(actions, size=9, dim=True, textvariable=app.summary_var, anchor="w")
+    summary = label(actions, size=9, textvariable=app.summary_var, anchor="w")
     summary.pack(side="left", fill="x", expand=True)
     summary.bind("<Configure>", lambda e: summary.configure(wraplength=max(1, e.width)))
     app._generate_btn = button(actions, "Generate captions", lambda: app._on_submit(
@@ -134,7 +139,8 @@ def build_form(app):
     heading.pack(fill="x", padx=24, pady=(20, 18))
     title = tk.Frame(heading, bg=bg)
     title.pack(side="left")
-    label(title, "Caption studio", size=19).pack(anchor="w")
+    app._studio_title = label(title, "Caption studio", size=19, bold=True)
+    app._studio_title.pack(anchor="w")
     label(title, "Your audio. Clear, readable captions.", size=10, dim=True).pack(anchor="w", pady=(4, 0))
     button(heading, "API settings", lambda: show_settings(app.root, theme=theme), height=36).pack(side="right", padx=(12, 0))
     app._seg_sync = button(heading, "Sync existing SRT", lambda: app._set_task("Sync Existing"), tab=True)
@@ -157,7 +163,7 @@ def build_form(app):
     app._stage = stage
     preview_head = tk.Frame(stage, bg=card)
     preview_head.pack(fill="x", pady=(0, 12))
-    label(preview_head, "Caption preview", size=11).pack(side="left")
+    label(preview_head, "Caption preview", size=10, bold=True).pack(side="left")
     app._frame_btns = {}
     for name, text in (("HD", "HD 16:9"), ("Reel", "Reel 9:16")):
         control = button(preview_head, text, lambda n=name: app.aspect_var.set(n),
@@ -167,10 +173,11 @@ def build_form(app):
 
     placement = tk.Frame(stage, bg=card)
     placement.pack(side="bottom", fill="x", pady=(14, 0))
-    toggle(placement, "Safe zone", app.safe_zone_var, "safe_zone")
+    safe_row = toggle(placement, "Safe zone", app.safe_zone_var, "safe_zone")
+    safe_row.pack_configure(side="left", fill="y", padx=(0, 16), pady=0)
     position_row = tk.Frame(placement, bg=card)
-    position_row.pack(fill="x", pady=(6, 0))
-    label(position_row, "Caption position", size=9, dim=True).pack(side="left")
+    position_row.pack(side="left", fill="x", expand=True)
+    label(position_row, "Caption position", size=9).pack(side="left")
     app._studio_position_label = tk.StringVar()
     label(position_row, size=9, textvariable=app._studio_position_label).pack(side="right")
     position_slider = g["Slider"](position_row, app.srt_posy_var, 0, 1,
@@ -192,10 +199,21 @@ def build_form(app):
         aspect=app._frame()["aspect"], srt_posy_default=lambda: app._frame()["srt_posy"],
         frame_height=lambda: (app._timeline_res() or (0, 0))[1] or None)
     app._preview.studio_illustration = True
+    def sample_changed(*args):
+        name = app.lang_var.get()
+        sample = ("Your story.\nYour own words." if name == "English" else
+                  "आपकी कहानी,\nआपकी भाषा।" if name == "Hindi" else
+                  "তোমার গল্প,\nতোমার ভাষায়।" if name in ("Auto-detect", "Bengali") else
+                  "Your caption\npreview.")
+        app._preview.SAMPLE = sample
+        if app._preview.winfo_exists():
+            app._preview._draw()
+    app.lang_var.trace_add("write", sample_changed)
+    sample_changed()
     app._preview.place(relx=.5, rely=.5, anchor="center")
     viewport.bind("<Configure>", lambda e: app._preview.set_bounds(e.width-24, e.height-24))
     app._sync_frame_plate()
-    label(viewport, "Illustrated placement preview", size=8, dim=True).place(relx=1, rely=1, x=-8, y=-6, anchor="se")
+    label(viewport, "Illustrated sample · enlarged text", size=8, dim=True).place(relx=1, rely=1, x=-8, y=-6, anchor="se")
 
     inspector = inspector_surface.body
     tabbar = tk.Frame(inspector, bg=card)
@@ -217,7 +235,7 @@ def build_form(app):
     for name in ("Audio", "Timing", "Script", "Presets"):
         page = tk.Frame(host, bg=card)
         app.studio_pages[name] = page
-        control = button(tabbar, name, lambda n=name: select_tab(n), primary=name == "Audio", height=32, tab=True)
+        control = button(tabbar, name, lambda n=name: select_tab(n), primary=name == "Audio", height=35, tab=True)
         control.pack(side="left", fill="x", expand=True, padx=(0, 3))
         app._studio_tabs[name] = control
 
@@ -230,6 +248,7 @@ def build_form(app):
     toggle(audio, "Review captions first", app.review_var, "review")
 
     timing = app.studio_pages["Timing"]
+    timing_labels = []
     for i, (text, var, unit, key) in enumerate((
         ("Max characters", app.settings_vars[0], "chars", "max_chars"),
         ("Lines per cue", app.settings_vars[1], "lines", "max_lines"),
@@ -239,9 +258,12 @@ def build_form(app):
         ("Max words", app.words_per_var, "0 = off", "max_words"))):
         timing.grid_columnconfigure(i % 2, weight=1, uniform="studio-number")
         cell = tk.Frame(timing, bg=card)
-        cell.grid(row=i//2, column=i%2, sticky="ew", padx=(0, 7) if i%2 == 0 else (7, 0), pady=(0, 6))
-        label(cell, text, size=9, dim=True).pack(anchor="w", pady=(0, 7))
-        control = g["SmallInput"](cell, var, unit=unit, bg_parent=card, size=12, height=36)
+        cell.grid(row=i//2, column=i%2, sticky="ew", padx=(0, 7) if i%2 == 0 else (7, 0), pady=(0, 4))
+        timing_label = label(cell, text, size=10, bold=True)
+        timing_label.pack(anchor="w", pady=(0, 7))
+        timing_labels.append(timing_label)
+        control = g["SmallInput"](cell, var, unit=unit, bg_parent=card, size=-15, height=40)
+        control.entry.configure(font=(font, -15, "bold"))
         control.pack(fill="x")
         app.studio_controls[key] = control
         limits = ((8, 60), (1, 4), (0, 4), (1, 12), (8, 30), (0, 12))[i]
@@ -253,7 +275,8 @@ def build_form(app):
         wrap = field(parent, text)
         row = tk.Frame(wrap, bg=card)
         row.pack(fill="x")
-        control = g["PillEntry"](row, variable, placeholder="Choose a file or paste its path…", bg_parent=card, height=36)
+        control = g["PillEntry"](row, variable, placeholder="Choose a file or paste its path…", bg_parent=card, height=42)
+        control.entry.configure(font=(font, -15))
         control.pack(side="left", fill="x", expand=True)
         button(row, "Browse", browse).pack(side="right", padx=(8, 0))
         app.studio_controls[key] = control
@@ -265,6 +288,23 @@ def build_form(app):
     file_field(sync, "Existing SRT", app.sync_srt_path_var, app._pick_sync_srt, "sync_srt")
     app._sync_srt_handle = VisibilityHandle(sync)
     app._build_presets(app.studio_pages["Presets"])
+
+    compact_state = {"value": None}
+    def fit_spacing(event=None):
+        if event is not None and event.widget is not app.root:
+            return
+        if not heading.winfo_exists():
+            return
+        compact = app.root.winfo_height() < 700
+        if compact_state["value"] == compact:
+            return
+        compact_state["value"] = compact
+        heading.pack_configure(pady=(16, 14) if compact else (20, 18))
+        tabbar.pack_configure(pady=(0, 16 if compact else 20))
+        for widget in timing_labels:
+            widget.pack_configure(pady=(0, 5 if compact else 7))
+    app.root.bind("<Configure>", fit_spacing, add="+")
+    app.root.after_idle(fit_spacing)
 
     select_tab("Audio")
     app._apply_task()

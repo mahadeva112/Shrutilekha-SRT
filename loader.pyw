@@ -210,25 +210,25 @@ CREATE_NO_WINDOW = 0x08000000
 # being dragged, and of the button that makes them. Resolve uses no amber
 # anywhere, which is exactly why it can be this window's signature.
 BG_OUTER = "#17181a"        # void — Resolve's menu and toolbar ground
-BG_BAR   = "#1c1e23"        # title bar and action bar — the same dark band,
+BG_BAR   = "#1e2128"        # title bar and action bar — the same dark band,
 #                             because in Resolve the chrome is darker than the
 #                             panels, not raised above them
-BG       = "#17181c"        # ground — its secondary panel
-BG_CARD  = "#212329"        # panel — its main list surface
+BG       = "#17191e"        # ground — its secondary panel
+BG_CARD  = "#22252c"        # panel — its main list surface
 BG_PANEL2 = "#2d2f33"       # group-card header band (one step above the card)
-BG_INPUT = "#191b20"        # field interiors (sunken, below the card)
+BG_INPUT = "#191c22"        # field interiors (sunken, below the card)
 BG_HOVER = "#35373d"        # raised — hover, secondary buttons
 BG_TILE  = "#35373d"        # 28×28 icon tile bg
-BORDER   = "#17171b"        # input hairline — darker than what it encloses
+BORDER   = "#414957"        # input hairline — darker than what it encloses
 BORDER_TILE = "#3a3a3a"     # icon tile border
 BORDER_CARD = "#17171b"     # outer card border
 BORDER_BRIGHT = "#4a4a50"   # hover hairline
 SHADOW   = "#090909"
-FG       = "#ececef"
-FG_DIM   = "#a4a8b3"
+FG       = "#f1f2f5"
+FG_DIM   = "#afb5c2"
 FG_MUTE  = "#969dab"
 FG_LABEL = "#a4a8b3"
-ACCENT       = "#f0cf70"     # subtitle yellow — captions, baseline, Generate
+ACCENT       = "#eed185"     # subtitle yellow — captions, baseline, Generate
 ACCENT_DARK  = "#c9a62f"
 ACCENT_HOVER = "#f2d264"
 ACCENT_GLOW  = "#453a1c"     # solid stand-in for the amber glow halo
@@ -1469,7 +1469,7 @@ class Dropdown(RoundedField):
         w, h = self._menu_w, self._menu_h
         gutter = (self.SB_W + self.SB_GAP) if self._max_top else 0
         current = self.variable.get()
-        row_font = (UI_FONT, 10)
+        row_font = getattr(self, "studio_menu_font", (UI_FONT, 10))
 
         for slot in range(self._vis):
             i = self._top + slot
@@ -2360,7 +2360,7 @@ class ReelPreview(tk.Canvas):
     def _screen(self):
         # A phone needs a visible bezel; a 16:9 frame is a picture, not a
         # handset, so it gets a hairline instead.
-        p = self._pad if self.is_portrait else 3
+        p = 3 if getattr(self, "studio_illustration", False) else self._pad if self.is_portrait else 3
         return p, p, self._pw - p, self._ph - p
 
     def _fnum(self, var, default):
@@ -2413,6 +2413,8 @@ class ReelPreview(tk.Canvas):
         # Body + screen. The rounded phone shell is right for a reel and wrong
         # for a 16:9 cut, which gets a plain bezel instead.
         body_r, screen_r = (16, 11) if self.is_portrait else (7, 4)
+        if getattr(self, "studio_illustration", False):
+            body_r, screen_r = 10, 8
         _round_rect(self, 1, 1, w - 1, h - 1, body_r,
                     fill=BG_TILE, outline=BORDER_BRIGHT)
         _round_rect(self, fx0, fy0, fx1, fy1, screen_r,
@@ -2421,14 +2423,22 @@ class ReelPreview(tk.Canvas):
         sw, sh = fx1 - fx0, fy1 - fy0
 
         if getattr(self, "studio_illustration", False):
-            self.create_rectangle(fx0+2, fy0+2, fx1-2, fy1-2, fill="#7d8587", outline="")
-            self.create_oval(fx0+sw*.57, fy0+sh*.24, fx0+sw*.82, fy0+sh*.24+sw*.25,
-                             fill="#ead8b4", outline="")
-            self.create_polygon(fx0+2, fy0+sh*.54, fx0+sw*.3, fy0+sh*.42,
-                fx0+sw*.7, fy0+sh*.48, fx1-2, fy0+sh*.35, fx1-2, fy1-2,
-                fx0+2, fy1-2, fill="#53686e", outline="")
-            self.create_polygon(fx0+2, fy0+sh*.83, fx0+sw*.4, fy0+sh*.66,
-                fx1-2, fy0+sh*.72, fx1-2, fy1-2, fx0+2, fy1-2, fill="#243d43", outline="")
+            for row in range(96):
+                y0 = fy0+2+(sh-4)*row/96
+                y1 = fy0+2+(sh-4)*(row+1)/96
+                color = self._blend("#d0b992", "#707f91", min(1., row/60.))
+                self.create_rectangle(fx0+2, y0, fx1-2, y1+1, fill=color, outline="")
+            self.create_oval(fx0+sw*.59, fy0+sh*.20, fx0+sw*.80, fy0+sh*.20+sw*.21,
+                             fill="#f7e6c2", outline="")
+            self.create_polygon(fx0+2, fy0+sh*.58, fx0+2, fy0+sh*.58,
+                fx0+sw*.2, fy0+sh*.48, fx0+sw*.7, fy0+sh*.42,
+                fx1-2, fy0+sh*.45, fx1-2, fy0+sh*.45,
+                fx1-2, fy1-2, fx1-2, fy1-2, fx0+2, fy1-2, fx0+2, fy1-2,
+                fill="#5c747a", outline="", smooth=True, splinesteps=24)
+            self.create_polygon(fx0+2, fy0+sh*.91, fx0+2, fy0+sh*.91,
+                fx0+sw*.4, fy0+sh*.73, fx1-2, fy0+sh*.72, fx1-2, fy0+sh*.72,
+                fx1-2, fy1-2, fx1-2, fy1-2, fx0+2, fy1-2, fx0+2, fy1-2,
+                fill="#294b53", outline="", smooth=True, splinesteps=24)
 
         mx, my = sw * 0.05, sh * 0.05
         if not getattr(self, "studio_illustration", False):
@@ -2494,7 +2504,12 @@ class ReelPreview(tk.Canvas):
         ts = pt / float(self._frame_height() or 1080)
         fontpx = int(round(ts * sh))
         fontpx = max(8, min(int(sh * 0.28), fontpx))
-        col = (self.color_var.get().strip() if self.color_var else "") or "#ffffff"
+        if getattr(self, "studio_illustration", False):
+            # The labelled sample is enlarged for legibility. Real cue review
+            # retains timeline-scaled text; saved point sizes are unchanged.
+            fontpx = max(12, int(round(21 * pt / 55.0)))
+        col = (self.color_var.get().strip() if self.color_var else "") or (
+            "#fff4d5" if getattr(self, "studio_illustration", False) else "#ffffff")
 
         # Measured, then shrunk if the sample would overflow the frame width
         # (real captions scale to fit) so nothing is clipped.
@@ -2504,14 +2519,15 @@ class ReelPreview(tk.Canvas):
         fam = cue_font_family()
         try:
             font = _font(fam, -fontpx, "bold")
-            tw = font.measure(self.SAMPLE)
-            th = font.metrics("linespace")
+            sample_lines = self.SAMPLE.splitlines() or [""]
+            tw = max(font.measure(line) for line in sample_lines)
+            th = font.metrics("linespace") * len(sample_lines)
             avail = sw * 0.90
             if tw > avail and tw > 0:
                 fontpx = max(7, int(fontpx * avail / tw))
                 font = _font(fam, -fontpx, "bold")
-                tw = font.measure(self.SAMPLE)
-                th = font.metrics("linespace")
+                tw = max(font.measure(line) for line in sample_lines)
+                th = font.metrics("linespace") * len(sample_lines)
         except Exception:
             font = (fam, 9, "bold")
             tw, th = fontpx * 8, fontpx
@@ -2533,20 +2549,21 @@ class ReelPreview(tk.Canvas):
         scol_soft = self._blend(scol, pill, 0.18)
 
         # translucent-ish backing pill for legibility
-        _round_rect(self, cx - half_w, cy - half_h, cx + half_w, cy + half_h,
-                    5, fill=self._blend(pill, "#0a0c10", 1.0), outline="")
+        if not getattr(self, "studio_illustration", False):
+            _round_rect(self, cx - half_w, cy - half_h, cx + half_w, cy + half_h,
+                        5, fill=self._blend(pill, "#0a0c10", 1.0), outline="")
 
         if shadow_on:
             for hx, hy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                self.create_text(cx + sdx + hx, cy + sdy + hy, text=self.SAMPLE,
+                self.create_text(cx + sdx + hx, cy + sdy + hy, text=self.SAMPLE, justify="center",
                                  font=font, fill=scol_soft)
-            self.create_text(cx + sdx, cy + sdy, text=self.SAMPLE,
+            self.create_text(cx + sdx, cy + sdy, text=self.SAMPLE, justify="center",
                              font=font, fill=scol_core)
         if outline_on:
             for dx in (-1, 0, 1):
                 for dy in (-1, 0, 1):
                     if dx or dy:
-                        self.create_text(cx + dx, cy + dy, text=self.SAMPLE,
+                        self.create_text(cx + dx, cy + dy, text=self.SAMPLE, justify="center",
                                          font=font, fill=ocol)
         self.create_text(cx, cy, text=self.SAMPLE, font=font, fill=col)
 
@@ -4316,7 +4333,8 @@ class App:
             slot.grid(row=0, column=1, sticky="e", padx=(0, 9), pady=4)
 
         tk.Label(text, text=label, bg=BG_CARD, fg=FG,
-                 font=(UI_FONT, 10), anchor="w").pack(anchor="w")
+                 font=(UI_FONT, -14, "bold") if getattr(self, "_studio_form", False)
+                 else (UI_FONT, 10), anchor="w").pack(anchor="w")
         if hint:
             # The hint is a tooltip now rather than a line under the label.
             # Bound again after idle because the caller fills `slot` after this
@@ -4706,6 +4724,14 @@ class App:
         studio = getattr(self, "_studio_form", False)
         self._preset_actions = {"save": _save_preset, "remove": _remove_preset, "apply": _apply_preset}
         if studio:
+            preset_dd._label.configure(font=(UI_FONT, -15, "bold"))
+            preset_dd.studio_menu_font = (UI_FONT, -14)
+            preset_dd._r = 10
+            preset_dd.set_height(42)
+            name.entry.configure(font=(UI_FONT, -15))
+            name._r = 10
+            name.set_height(42)
+        if studio:
             name.pack(fill="x", pady=(14, 0))
             actions = tk.Frame(slot, bg=BG_CARD)
             actions.pack(fill="x", pady=(12, 0))
@@ -4713,12 +4739,15 @@ class App:
             name.configure(width=150)
             name.pack(side="left", padx=(7, 0))
             actions = slot
-        RoundedButton(actions, "Save", _save_preset, primary=False,
-                      bg_parent=BG_CARD, height=32).pack(side="left",
-                                                         padx=(7, 0))
-        RoundedButton(actions, "Remove", _remove_preset, primary=False,
-                      bg_parent=BG_CARD, height=32).pack(side="left",
-                                                         padx=(5, 0))
+        if studio:
+            from settings_ui import RoundedAction
+            RoundedAction(actions, "Save preset", _save_preset, self._studio_theme).pack(side="left")
+            RoundedAction(actions, "Remove", _remove_preset, self._studio_theme).pack(side="left", padx=(8, 0))
+        else:
+            RoundedButton(actions, "Save", _save_preset, primary=False,
+                          bg_parent=BG_CARD, height=32).pack(side="left", padx=(7, 0))
+            RoundedButton(actions, "Remove", _remove_preset, primary=False,
+                          bg_parent=BG_CARD, height=32).pack(side="left", padx=(5, 0))
 
     # ── The stage: live preview + placement ───────────────────────────────
     def _build_stage(self):

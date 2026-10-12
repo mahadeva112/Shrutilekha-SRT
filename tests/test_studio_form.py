@@ -4,6 +4,7 @@ from pathlib import Path
 import runpy
 import tempfile
 import tkinter as tk
+from tkinter import font as tkfont
 import unittest
 from unittest.mock import patch
 
@@ -88,6 +89,19 @@ class StudioFormTests(unittest.TestCase):
         self.assertLessEqual(preview.winfo_height(),preview.master.winfo_height())
         self.assertLessEqual(preview.winfo_width(),preview.master.winfo_width())
         self.assertAlmostEqual(preview._pw/preview._ph,16/9,delta=.03)
+
+    def test_typography_and_sample_match_design_tokens(self):
+        title_font=tkfont.Font(font=self.app._studio_title.cget('font'))
+        self.assertEqual(int(self.root.tk.splitlist(self.app._studio_title.cget('font'))[1]),-27)
+        self.assertEqual(title_font.cget('weight'),'bold')
+        value_font=tkfont.Font(font=self.app.studio_controls['track']._label.cget('font'))
+        self.assertEqual(int(self.root.tk.splitlist(self.app.studio_controls['track']._label.cget('font'))[1]),-15)
+        self.assertEqual(self.app._generate_btn.font.cget('size'),-14)
+        self.assertIn('তোমার',self.app._preview.SAMPLE)
+        self.app.lang_var.set('English')
+        self.assertIn('Your story',self.app._preview.SAMPLE)
+        # Changing sample language leaves the real caption point size untouched.
+        self.assertEqual(self.app.textsize_var.get(),'55')
 
     def test_review_edit_and_local_resplit_still_work(self):
         p=Path(self.scratch.name)

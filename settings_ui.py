@@ -54,7 +54,8 @@ class RoundedAction(tk.Canvas):
         self.colors, self.text, self.command = colors, text, command
         self.primary, self.fill, self.ink = primary, fill, ink
         self.interactive, self.hover = interactive, False
-        self.font = tkfont.Font(family=colors["font"], size=9,
+        self.font = tkfont.Font(family=colors.get("button_font", colors["font"]),
+                                size=colors.get("button_size", -14),
                                 weight="bold" if primary else "normal")
         super().__init__(parent, width=width or self.font.measure(text)+26,
                          height=height, bg=parent.cget("bg"), highlightthickness=0,
@@ -118,9 +119,9 @@ class RoundedAction(tk.Canvas):
 class ApiSettingsPanel(tk.Frame):
     """A modal child panel; the Resolve form stays intact underneath it."""
     def __init__(self, parent, theme=None):
-        colors = dict(bg="#212126", card="#28282e", field="#1c1c21",
-                      text="#d4d4d6", muted="#9a9a9d", border="#3b3b43",
-                      accent="#e8c547", font="Segoe UI")
+        colors = dict(bg="#17191e", card="#22252c", field="#191c22",
+                      text="#f1f2f5", muted="#afb5c2", border="#3a414d",
+                      accent="#eed185", font="Segoe UI", button_size=-14)
         colors.update(theme or {})
         self.colors = colors
         self.parent = parent
@@ -142,7 +143,7 @@ class ApiSettingsPanel(tk.Frame):
         bar.pack(fill="x", padx=24, pady=(14, 10))
         self._button(bar, "‹  Back to captions", self.close).pack(side="left")
         tk.Label(bar, text="SETTINGS  /  API CONNECTION", bg=colors["bg"],
-                 fg=colors["muted"], font=(font, 8)).pack(side="right")
+                 fg=colors["muted"], font=(font, -12)).pack(side="right")
         space = tk.Frame(self, bg=colors["bg"])
         space.pack(fill="both", expand=True, padx=24, pady=(0, 18))
         card = RoundedSurface(space, colors["bg"], colors["card"],
@@ -160,22 +161,22 @@ class ApiSettingsPanel(tk.Frame):
         provider_text = tk.Frame(provider, bg=colors["card"])
         provider_text.pack(side="left")
         tk.Label(provider_text, text="ElevenLabs", bg=colors["card"], fg=colors["text"],
-                 font=(font, 11, "bold"), anchor="w").pack(anchor="w")
+                 font=(font, -16, "bold"), anchor="w").pack(anchor="w")
         tk.Label(provider_text, text="Speech-to-text provider", bg=colors["card"],
-                 fg=colors["muted"], font=(font, 9)).pack(anchor="w", pady=(2, 0))
+                 fg=colors["muted"], font=(font, -13)).pack(anchor="w", pady=(2, 0))
         badge = RoundedAction(provider, "Personal account", lambda: None, colors,
                               fill="#343126", ink=colors["accent"], height=28,
                               interactive=False)
         badge.pack(side="right")
         title = tk.Label(body, text="Connect your account", bg=colors["card"],
-                        fg=colors["text"], font=(font, 17, "bold"), anchor="w")
+                        fg=colors["text"], font=(font, -27, "bold"), anchor="w")
         title.pack(fill="x")
         description = tk.Label(body, text="Bring your own API key to generate captions.",
                                bg=colors["card"], fg=colors["muted"],
-                               font=(font, 9), anchor="w")
+                               font=(font, -14), anchor="w")
         description.pack(fill="x", pady=(5, 16))
         tk.Label(body, text="ELEVENLABS API KEY", bg=colors["card"],
-                 fg=colors["muted"], font=(font, 8, "bold"), anchor="w").pack(fill="x", pady=(0, 7))
+                 fg=colors["muted"], font=(font, -13, "bold"), anchor="w").pack(fill="x", pady=(0, 7))
         self.value = tk.StringVar(master=self)
         load_error = False
         try:
@@ -189,7 +190,7 @@ class ApiSettingsPanel(tk.Frame):
         self.entry = tk.Entry(row, textvariable=self.value, show="•", bd=0,
                               bg=colors["field"], fg=colors["text"],
                               insertbackground=colors["accent"], relief="flat",
-                              highlightthickness=0, font=(font, 11))
+                              highlightthickness=0, font=(font, -15))
         self.entry.pack(side="left", fill="x", expand=True)
         self.reveal = tk.BooleanVar(master=self)
         self.reveal_button = RoundedAction(row, "Show", self._toggle_reveal, colors,
@@ -220,7 +221,7 @@ class ApiSettingsPanel(tk.Frame):
                               fill="", outline="#94aa97", width=1)
         shield.create_line(5, 9, 8, 12, 13, 7, fill="#94aa97", width=1.5)
         status_label = tk.Label(note, textvariable=self.status, bg=colors["card"],
-                                fg=colors["muted"], font=(font, 9), anchor="w",
+                                fg=colors["muted"], font=(font, -13), anchor="w",
                                 justify="left", wraplength=480)
         status_label.pack(side="left", fill="x", expand=True)
         note.bind("<Configure>", lambda e: status_label.configure(wraplength=max(1, e.width-26)))
