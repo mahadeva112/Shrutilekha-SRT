@@ -50,7 +50,16 @@ def main():
     from credentials import _crypt
     key_file.write_bytes(_crypt(b"installer-validation-key"))
     marker_bytes, key_bytes = marker.read_bytes(), key_file.read_bytes()
-    previous = ROOT / "dist" / "release" / "Srutilekha-Setup-1.1.0.exe"
+    current_tuple = tuple(map(int, version.split(".")))
+    candidates = []
+    for candidate in (ROOT / "dist" / "release").glob("Srutilekha-Setup-*.exe"):
+        try:
+            candidate_tuple = tuple(map(int, candidate.stem.removeprefix("Srutilekha-Setup-").split(".")))
+            if candidate_tuple < current_tuple:
+                candidates.append((candidate_tuple, candidate))
+        except ValueError:
+            pass
+    previous = max(candidates)[1] if candidates else ROOT / "dist/release/previous-version-missing.exe"
     phases = [("fresh-install", setup), ("reinstall", setup)]
     if version != "1.1.0" and previous.is_file():
         phases = [("previous-version", previous), ("upgrade", setup), ("reinstall", setup)]

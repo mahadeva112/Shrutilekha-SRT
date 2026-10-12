@@ -88,6 +88,16 @@ class RoundedAction(tk.Canvas):
         self.text = text
         self._draw()
 
+    def set_primary(self, primary):
+        if getattr(self, "selection_button", False):
+            self.primary = False
+            self.fill = "#3a3d45" if primary else self.master.cget("bg")
+            self.ink = self.colors["text"] if primary else self.colors["muted"]
+        else:
+            self.primary = primary
+            self.font.configure(weight="bold" if primary else "normal")
+        self._draw()
+
     def _draw(self, event=None):
         self.delete("all")
         c = self.colors

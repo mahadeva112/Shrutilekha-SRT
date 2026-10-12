@@ -45,3 +45,15 @@ checked at 580 × 380 and 930 × 700. The locally built installer passed upgrade
 reinstall, uninstall, encrypted-key/preset preservation and frozen runtime
 checks with external Python removed from PATH. Existing Resolve launchers and
 installation pointer were restored after testing.
+
+
+v1.2.0 Studio layout: twenty checks passed, including controls at 1040 × 780
+and 920 × 640, Sync/Generate switching with settings retained, preset save/load/
+remove with all legacy style fields, Resolve selection payload, bounded aspect
+ratios and caption placement, and a real review/edit/local-resplit/SRT-save
+regression check. The new frozen report confirms `studio_tabs: ok`.
+The local installer passed upgrade from v1.1.3, reinstall, uninstall,
+encrypted-key/preset preservation and frozen runtime checks without external
+Python on PATH. Existing Resolve launchers and installation pointer were
+restored. Native layout was inspected on the development Windows display.
+See [feature mapping](studio-ui.md) for preserved features and rendering limits.

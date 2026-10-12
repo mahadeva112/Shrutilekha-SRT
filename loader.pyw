@@ -210,13 +210,13 @@ CREATE_NO_WINDOW = 0x08000000
 # being dragged, and of the button that makes them. Resolve uses no amber
 # anywhere, which is exactly why it can be this window's signature.
 BG_OUTER = "#17181a"        # void — Resolve's menu and toolbar ground
-BG_BAR   = "#17181a"        # title bar and action bar — the same dark band,
+BG_BAR   = "#1c1e23"        # title bar and action bar — the same dark band,
 #                             because in Resolve the chrome is darker than the
 #                             panels, not raised above them
-BG       = "#212126"        # ground — its secondary panel
-BG_CARD  = "#28282e"        # panel — its main list surface
+BG       = "#17181c"        # ground — its secondary panel
+BG_CARD  = "#212329"        # panel — its main list surface
 BG_PANEL2 = "#2d2f33"       # group-card header band (one step above the card)
-BG_INPUT = "#1c1c21"        # field interiors (sunken, below the card)
+BG_INPUT = "#191b20"        # field interiors (sunken, below the card)
 BG_HOVER = "#35373d"        # raised — hover, secondary buttons
 BG_TILE  = "#35373d"        # 28×28 icon tile bg
 BORDER   = "#17171b"        # input hairline — darker than what it encloses
@@ -224,20 +224,20 @@ BORDER_TILE = "#3a3a3a"     # icon tile border
 BORDER_CARD = "#17171b"     # outer card border
 BORDER_BRIGHT = "#4a4a50"   # hover hairline
 SHADOW   = "#090909"
-FG       = "#d4d4d6"
-FG_DIM   = "#9a9a9d"
-FG_MUTE  = "#6e7176"
-FG_LABEL = "#6e7176"
-ACCENT       = "#e8c547"     # subtitle yellow — captions, baseline, Generate
+FG       = "#ececef"
+FG_DIM   = "#a4a8b3"
+FG_MUTE  = "#969dab"
+FG_LABEL = "#a4a8b3"
+ACCENT       = "#f0cf70"     # subtitle yellow — captions, baseline, Generate
 ACCENT_DARK  = "#c9a62f"
 ACCENT_HOVER = "#f2d264"
 ACCENT_GLOW  = "#453a1c"     # solid stand-in for the amber glow halo
 ACCENT_INK   = "#14150f"     # text/glyphs drawn ON an accent fill
-SELECT       = "#007fe3"     # Resolve blue — on, selected, focused, running
-SELECT_DARK  = "#0063b0"
-SELECT_HOVER = "#2b96e8"
+SELECT       = "#bda25f"     # Resolve blue — on, selected, focused, running
+SELECT_DARK  = "#8a713b"
+SELECT_HOVER = "#e0c369"
 SELECT_GLOW  = "#12293d"
-SELECT_INK   = "#ffffff"
+SELECT_INK   = "#242016"
 DIVIDER  = "#1b1b1f"
 DIVIDER_MID = "#35373d"
 TRACK_OFF = "#3a3a40"
@@ -263,7 +263,7 @@ FONT_NUM = "Consolas"
 # Resolved once at startup against the families the machine actually reports,
 # because Tk substitutes silently for a family it cannot find.
 UI_FONT = "Segoe UI"
-UI_FONT_CANDIDATES = ("Open Sans", "Segoe UI", "Tahoma")
+UI_FONT_CANDIDATES = ("Segoe UI", "Open Sans", "Tahoma")
 
 
 def resolve_ui_font():
@@ -1627,7 +1627,7 @@ class ToggleSwitch(tk.Canvas):
         track = SELECT if on else TRACK_OFF
         self._rounded(1, 2, self.W - 1, self.H - 2, (self.H - 4) // 2, track)
         kx = self.W - 16 if on else 4
-        thumb = SELECT_INK if on else THUMB_OFF
+        thumb = "#fff0bf" if on else THUMB_OFF
         self.create_oval(kx, 3, kx + 14, self.H - 3,
                          fill=thumb, outline=thumb)
 
@@ -2325,6 +2325,11 @@ class ReelPreview(tk.Canvas):
         self._ph_max = int(round(w * 16 / 9))
         self._reshape()
 
+    def set_bounds(self, width, height):
+        self._pw_max = max(80, int(width))
+        self._ph_max = max(80, int(height))
+        self._reshape()
+
     def _fit(self, aspect):
         """Largest (w, h) of the given aspect that fits the stage box."""
         w = self._pw_max
@@ -2415,27 +2420,39 @@ class ReelPreview(tk.Canvas):
 
         sw, sh = fx1 - fx0, fy1 - fy0
 
-        # rule-of-thirds guides
-        for i in (1, 2):
-            gx = fx0 + sw * i / 3
-            self.create_line(gx, fy0 + 4, gx, fy1 - 4, fill="#1c212b")
-            gy = fy0 + sh * i / 3
-            self.create_line(fx0 + 4, gy, fx1 - 4, gy, fill="#1c212b")
-        # safe-area box (5% inset, dashed)
-        mx, my = sw * 0.05, sh * 0.05
-        self.create_rectangle(fx0 + mx, fy0 + my, fx1 - mx, fy1 - my,
-                              outline="#2a3341", dash=(2, 3))
+        if getattr(self, "studio_illustration", False):
+            self.create_rectangle(fx0+2, fy0+2, fx1-2, fy1-2, fill="#7d8587", outline="")
+            self.create_oval(fx0+sw*.57, fy0+sh*.24, fx0+sw*.82, fy0+sh*.24+sw*.25,
+                             fill="#ead8b4", outline="")
+            self.create_polygon(fx0+2, fy0+sh*.54, fx0+sw*.3, fy0+sh*.42,
+                fx0+sw*.7, fy0+sh*.48, fx1-2, fy0+sh*.35, fx1-2, fy1-2,
+                fx0+2, fy1-2, fill="#53686e", outline="")
+            self.create_polygon(fx0+2, fy0+sh*.83, fx0+sw*.4, fy0+sh*.66,
+                fx1-2, fy0+sh*.72, fx1-2, fy1-2, fx0+2, fy1-2, fill="#243d43", outline="")
 
-        # Viewfinder corner ticks. Purely framing — they mark the edge of the
-        # deliverable frame, which the dashed safe area alone doesn't do once
-        # the safe-zone overlay is switched off.
-        tl = max(7.0, sw * 0.075)
-        tw = 2
-        tick = _mix("#2a3341", ACCENT, 0.35)
-        for ox, oy, dx, dy in ((fx0, fy0, 1, 1), (fx1, fy0, -1, 1),
-                               (fx0, fy1, 1, -1), (fx1, fy1, -1, -1)):
-            self.create_line(ox, oy, ox + dx * tl, oy, fill=tick, width=tw)
-            self.create_line(ox, oy, ox, oy + dy * tl, fill=tick, width=tw)
+        mx, my = sw * 0.05, sh * 0.05
+        if not getattr(self, "studio_illustration", False):
+            # rule-of-thirds guides
+            for i in (1, 2):
+                gx = fx0 + sw * i / 3
+                self.create_line(gx, fy0 + 4, gx, fy1 - 4, fill="#1c212b")
+                gy = fy0 + sh * i / 3
+                self.create_line(fx0 + 4, gy, fx1 - 4, gy, fill="#1c212b")
+            # safe-area box (5% inset, dashed)
+            mx, my = sw * 0.05, sh * 0.05
+            self.create_rectangle(fx0 + mx, fy0 + my, fx1 - mx, fy1 - my,
+                                  outline="#2a3341", dash=(2, 3))
+
+            # Viewfinder corner ticks. Purely framing — they mark the edge of the
+            # deliverable frame, which the dashed safe area alone doesn't do once
+            # the safe-zone overlay is switched off.
+            tl = max(7.0, sw * 0.075)
+            tw = 2
+            tick = _mix("#2a3341", ACCENT, 0.35)
+            for ox, oy, dx, dy in ((fx0, fy0, 1, 1), (fx1, fy0, -1, 1),
+                                   (fx0, fy1, 1, -1), (fx1, fy1, -1, -1)):
+                self.create_line(ox, oy, ox + dx * tl, oy, fill=tick, width=tw)
+                self.create_line(ox, oy, ox, oy + dy * tl, fill=tick, width=tw)
 
         # "Safe zone" overlay — but the thing being kept clear is not the same
         # in the two frames. On a reel it is the platform's own furniture
@@ -2444,7 +2461,7 @@ class ReelPreview(tk.Canvas):
         # platform chrome; what matters is the broadcast title-safe box, which
         # is where a burned-in subtitle is expected to sit.
         if self.safe_zone_var is None or bool(int(self._fnum(self.safe_zone_var, 1))):
-            ui = "#3a4453"
+            ui = "#91a0a7" if getattr(self, "studio_illustration", False) else "#3a4453"
             if self.is_portrait:
                 cxr = fx1 - sw * 0.11        # right-side action column
                 r = max(3, sw * 0.045)
@@ -3631,9 +3648,9 @@ class App:
         # columns read comfortably at ~290 each. A Resolve panel is compact,
         # and a window larger than its contents was one of the things that
         # made this read as a guest in its own host.
-        W = min(930, sw - 140)
-        H = min(740, sh - 70)
-        self._min_w, self._min_h = 880, 560
+        W = min(1040, sw - 80)
+        H = min(780, sh - 70)
+        self._min_w, self._min_h = min(920, sw - 40), min(640, sh - 70)
         root.geometry("%dx%d+%d+%d" % (W, H, (sw - W) // 2, max(20, (sh - H) // 2)))
         root.configure(bg=BG)
         self._maximized = False
@@ -4151,182 +4168,8 @@ class App:
     # The stage never scrolls and is never rebuilt, so the live preview stays
     # put while you move between tabs. Only the tab body scrolls.
     def _build_form(self):
-        self._clear_body(pad=0)
-        items    = self.prompt_data.get("items", [])
-        defaults = self.prompt_data.get("defaults", {})
-        self._defaults = defaults
-
-        self._declare_vars(items, defaults)
-
-        # ── Title bar ────────────────────────────────────────────────────
-        # Full-bleed panel band. The frameless window's own minimise/maximise/
-        # close buttons are placed over its right end at the root level, so the
-        # task switch sits left of centre and never collides with them.
-        bar = tk.Frame(self.body, bg=BG_BAR, height=44)
-        bar.pack(fill="x", side="top")
-        bar.pack_propagate(False)
-        # Hairline under the title bar, so the band reads as a raised surface
-        # rather than as the top of the page. Tk has no gradient on a Frame,
-        # and the bar hosts widgets, so it cannot become a Canvas without
-        # re-placing all of them — a lit edge buys most of what the fill would.
-        tk.Frame(self.body, bg=DIVIDER_MID, height=1).pack(fill="x", side="top")
-
-        logo = LogoTile(bar, size=22, radius=6, bg_parent=BG_BAR)
-        logo.pack(side="left", padx=(14, 10))
-        title_lbl = tk.Label(bar, text="Srutilekha", bg=BG_BAR, fg=FG,
-                             font=(UI_FONT, 11, "bold"))
-        title_lbl.pack(side="left")
-
-        crumb = self._timeline_crumb()
-        crumb_lbl = tk.Label(bar, text=crumb, bg=BG_BAR, fg=FG_MUTE,
-                             font=(UI_FONT, 9))
-        crumb_lbl.pack(side="left", padx=(10, 0))
-        for w in (bar, title_lbl, crumb_lbl):
-            self._make_draggable(w)
-
-        # Generate / Sync Existing — this switches what the whole window is
-        # for, so it belongs in the title bar rather than among the settings.
-        task_seg = tk.Frame(bar, bg=BG_BAR)
-        task_seg.pack(side="left", padx=(18, 0))
-        self._seg_gen = RoundedButton(
-            task_seg, "Generate", lambda: self._set_task("Generate"),
-            primary=True, bg_parent=BG_BAR, height=24)
-        self._seg_gen.pack(side="left", padx=(0, 4))
-        self._seg_sync = RoundedButton(
-            task_seg, "Sync Existing", lambda: self._set_task("Sync Existing"),
-            primary=False, bg_parent=BG_BAR, height=24)
-        self._seg_sync.pack(side="left")
-
-        # Update chip, always mounted. It used to be created hidden and packed
-        # only once a check found something, which meant an install that was
-        # current — the normal case — showed nothing, and "no update" was
-        # indistinguishable from "the updater is broken". It now shows the
-        # running version, and clicking it checks on demand. It is packed
-        # clear of the minimise/maximise/close buttons, which are placed over
-        # the right end of this bar at the root level and so are invisible to
-        # pack().
-        if updater is not None:
-            if self._update_info:
-                state, label = "available", "Update"
-            elif self._update_checking:
-                state, label = "checking", "Checking…"
-            else:
-                state, label = "idle", self._idle_pill_text()
-            self._update_pill = UpdatePill(bar, label, self._on_update_click,
-                                           bg_parent=BG_BAR, state=state)
-            self._update_pill.pack(
-                side="right", padx=(0, TitleBarControls.BTN_W * 3 + 12))
-
-        # ── Action bar (packed before the middle so it can never be clipped)
-        act = tk.Frame(self.body, bg=BG_BAR)
-        act.pack(fill="x", side="bottom")
-        tk.Frame(act, bg=_mix(BG_BAR, "#ffffff", 0.06),
-                 height=1).pack(fill="x", side="top")
-        inner = tk.Frame(act, bg=BG_BAR)
-        inner.pack(fill="x", padx=16, pady=11)
-
-        self.summary_var = tk.StringVar(value="")
-        summary = tk.Label(inner, textvariable=self.summary_var, bg=BG_BAR,
-                           fg=FG_MUTE, font=(UI_FONT, 9), anchor="w",
-                           justify="left")
-        summary.pack(side="left", fill="x", expand=True)
-
-        self._generate_btn = RoundedButton(
-            inner, "Generate captions",
-            lambda: self._on_submit(
-                "sync" if self.task_var.get() == "Sync Existing" else "generate"),
-            primary=True, bg_parent=BG_BAR, height=36)
-        self._generate_btn.pack(side="right", padx=(8, 0))
-
-        # Undo deletes the last caption track. It is secondary to generating
-        # and it is destructive, so it does not sit at Generate's size beside it.
-        RoundedButton(inner, "Undo last captions",
-                      lambda: self._on_submit("undo"), primary=False,
-                      bg_parent=BG_BAR, height=36).pack(side="right",
-                                                         padx=(8, 0))
-
-        RoundedButton(inner, "Cancel", self._on_cancel, primary=False,
-                      bg_parent=BG_BAR, height=36).pack(side="right")
-        RoundedButton(inner, "API settings", lambda: show_settings(self.root, theme={"bg": BG, "card": BG_CARD, "field": BG_INPUT,
-                    "text": FG, "muted": FG_DIM, "accent": ACCENT, "font": UI_FONT}),
-                      primary=False, bg_parent=BG_BAR, height=36).pack(side="right", padx=(8, 0))
-
-        # ── Middle: stage | inspector ────────────────────────────────────
-        main = tk.Frame(self.body, bg=BG)
-        main.pack(fill="both", expand=True)
-
-        self._stage = tk.Frame(main, bg=BG_OUTER, width=self.STAGE_W)
-        self._stage.pack(side="left", fill="y")
-        self._stage.pack_propagate(False)
-        self._build_stage()
-
-        tk.Frame(main, bg=DIVIDER, width=1).pack(side="left", fill="y")
-
-        insp = tk.Frame(main, bg=BG)
-        insp.pack(side="left", fill="both", expand=True)
-
-        # ── Settings: one page, Source and Timing side by side ───────────
-        # There were two tabs here. Everything they held fits in two columns
-        # at this window width, and half the settings being one click away
-        # meant the summary in the action bar described things you could not
-        # see. The tab names survive as the column headings.
-        wrap = tk.Frame(insp, bg=BG)
-        wrap.pack(fill="both", expand=True)
-        canvas = tk.Canvas(wrap, bg=BG, highlightthickness=0, bd=0)
-        vsb = SlimScrollbar(wrap, canvas.yview, width=6, reserve=True)
-        canvas.configure(yscrollcommand=vsb.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y", padx=(4, 4))
-        self._scroll_canvas = canvas
-
-        form = tk.Frame(canvas, bg=BG)
-        form_id = canvas.create_window((0, 0), window=form, anchor="nw")
-        self._form_id = form_id
-
-        def _sync_scrollregion(_e=None):
-            # A queued <Configure> can arrive after the form has been swapped
-            # out for the progress view and this canvas destroyed.
-            if not canvas.winfo_exists():
-                return
-            canvas.configure(scrollregion=canvas.bbox("all"))
-
-        form.bind("<Configure>", _sync_scrollregion)
-        canvas.bind("<Configure>",
-                    lambda e: canvas.itemconfigure(form_id, width=e.width))
-        self._sync_scrollregion = _sync_scrollregion
-
-        def _on_wheel(e):
-            if not canvas.winfo_exists():
-                return
-            try:
-                # Wheel events inside a popup (font list, dropdown) scroll that
-                # list, not the form behind it.
-                if e.widget.winfo_toplevel() is not self.root:
-                    return
-            except Exception:
-                return
-            first, last = canvas.yview()
-            if last - first >= 1.0:      # tab fits — nothing to scroll to
-                return
-            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_wheel)
-
-        self._tab_host = form
-        self._cards = []          # every GroupCard, for the activity rail
-        self._build_setup_page(form, defaults, items)
-
-        self._apply_task()
-        self._wire_summary()
-        self._wire_card_activity()
-        try:
-            self.aspect_var.trace_add("write", self._apply_frame)
-        except AttributeError:
-            self.aspect_var.trace("w", self._apply_frame)
-
-        self.root.after(0, _sync_scrollregion)
-        self.root.bind("<Return>", lambda e: self._on_submit(
-            "sync" if self.task_var.get() == "Sync Existing" else "generate"))
-        self.root.bind("<Escape>", lambda e: self._on_cancel())
+        from studio_form import build_form
+        build_form(self)
 
     STAGE_W = 300          # stage column; preview is this minus the padding
 
@@ -4430,7 +4273,11 @@ class App:
 
     def _card(self, parent, title, summary_var=None):
         """Add a group card to a tab and register it for the activity rail."""
-        c = GroupCard(parent, title, summary_var=summary_var, bg_parent=BG)
+        if getattr(self, "_studio_form", False):
+            from studio_form import StudioGroup
+            c = StudioGroup(parent, BG_CARD)
+        else:
+            c = GroupCard(parent, title, summary_var=summary_var, bg_parent=BG)
         c.pack(fill="x", pady=(0, 9))
         self._cards.append(c)
         return c
@@ -4796,11 +4643,11 @@ class App:
         # name and the two verbs after it. Two stacked rows cost 110px of a
         # page that has to fit the window, for a group nobody opens twice.
         slot = self._row(
-            c, "Preset",
+            c, "Preset", stacked=getattr(self, "_studio_form", False),
             hint="Everything on this page except the track choices, so a "
                  "preset survives being loaded on a different timeline.")
         preset_dd = self._pick(slot, _list_presets() or ["(none saved)"],
-                               self.preset_pick_var, width=176)
+                               self.preset_pick_var, width=176, fill=getattr(self, "_studio_form", False))
 
         def _apply_preset(name):
             if not name or name in ("Select a preset", "(none saved)"):
@@ -4856,12 +4703,20 @@ class App:
 
         name = PillEntry(slot, self.preset_name_var, placeholder="Save as…",
                          bg_parent=BG_CARD, height=34)
-        name.configure(width=150)
-        name.pack(side="left", padx=(7, 0))
-        RoundedButton(slot, "Save", _save_preset, primary=False,
+        studio = getattr(self, "_studio_form", False)
+        self._preset_actions = {"save": _save_preset, "remove": _remove_preset, "apply": _apply_preset}
+        if studio:
+            name.pack(fill="x", pady=(14, 0))
+            actions = tk.Frame(slot, bg=BG_CARD)
+            actions.pack(fill="x", pady=(12, 0))
+        else:
+            name.configure(width=150)
+            name.pack(side="left", padx=(7, 0))
+            actions = slot
+        RoundedButton(actions, "Save", _save_preset, primary=False,
                       bg_parent=BG_CARD, height=32).pack(side="left",
                                                          padx=(7, 0))
-        RoundedButton(slot, "Remove", _remove_preset, primary=False,
+        RoundedButton(actions, "Remove", _remove_preset, primary=False,
                       bg_parent=BG_CARD, height=32).pack(side="left",
                                                          padx=(5, 0))
 
@@ -5143,6 +4998,9 @@ class App:
         if handle is None:
             return
         handle.set_visible(self.task_var.get() == "Sync Existing")
+        if getattr(self, "_studio_form", False):
+            self._studio_tabs["Script"].set_text("Files" if self.task_var.get() == "Sync Existing" else "Script")
+            self._select_studio_tab("Script" if self.task_var.get() == "Sync Existing" else "Audio")
 
         # Settle the geometry here rather than leaving it to the canvas's own
         # <Configure>, which arrives a layout pass later: the cards moved on

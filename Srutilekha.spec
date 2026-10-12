@@ -11,7 +11,7 @@ datas += copy_metadata('truststore')
 # Both processes share one runtime directory. The worker keeps a console
 # subsystem for its UTF-8 progress pipe, but is started with CREATE_NO_WINDOW.
 gui = Analysis(['app.py'], pathex=[str(root)], binaries=[], datas=datas,
-               hiddenimports=['dialog', 'transcribe', 'release_updater', 'truststore',
+               hiddenimports=['dialog', 'transcribe', 'release_updater', 'studio_form', 'truststore',
                               'tkinter.font', 'tkinter.filedialog'],
                hookspath=[], hooksconfig={}, runtime_hooks=[], excludes=[], noarchive=False)
 worker = Analysis(['worker.py'], pathex=[str(root)], binaries=[], datas=datas,
