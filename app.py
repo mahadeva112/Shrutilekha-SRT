@@ -15,6 +15,17 @@ def main():
         sys.stderr = open(os.devnull, "w", encoding="utf-8")
     if "--resolve" in sys.argv:
         sys.argv.remove("--resolve")
+    if "--bridge-run" in sys.argv:
+        from resolve_bridge import run_workflow
+        try:
+            run_workflow()
+        except Exception as exc:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk(); root.withdraw()
+            messagebox.showerror("Srutilekha — Resolve connection", str(exc), parent=root)
+            root.destroy()
+        return
     if "--self-test" in sys.argv:
         from distribution_smoke import run
         output = sys.argv[sys.argv.index("--self-test") + 1]
@@ -43,7 +54,7 @@ def main():
     import threading
     root = tk.Tk()
     root.title("Srutilekha")
-    root.geometry("580x380")
+    root.geometry("620x470")
     root.configure(bg="#17191e")
     style = ttk.Style(root)
     style.theme_use("clam")
@@ -57,7 +68,12 @@ def main():
     body.pack(fill="both", expand=True)
     ttk.Label(body, text="Srutilekha", font=("Segoe UI", -27, "bold")).pack(anchor="w")
     ttk.Label(body, text="Timeline audio → captions", font=("Segoe UI", 12)).pack(anchor="w", pady=8)
-    ttk.Label(body, text="In DaVinci Resolve, open Workspace → Scripts → Srutilekha.\nChoose your audio track and generate captions.", wraplength=520).pack(anchor="w", pady=16)
+    ttk.Label(body, text="Resolve 21.1+: start Workspace → Scripts → Srutilekha once,\nthen connect here. Supports Free and Studio editions.\nResolve 21.0 or earlier: launch Srutilekha from the Scripts menu.", wraplength=560).pack(anchor="w", pady=16)
+    def connect_resolve():
+        import subprocess
+        command = [str(install_dir() / "Srutilekha.exe"), "--bridge-run"] if getattr(sys, "frozen", False) else [sys.executable, str(resources() / "app.py"), "--bridge-run"]
+        subprocess.Popen(command, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    ttk.Button(body, text="Connect to Resolve", command=connect_resolve).pack(anchor="w", pady=(0, 10))
     ttk.Button(body, text="API settings", command=lambda: show_settings(root)).pack(anchor="w")
     status = tk.StringVar(value="v" + release_updater.VERSION)
     ttk.Label(body, textvariable=status, wraplength=520).pack(anchor="w", pady=14)

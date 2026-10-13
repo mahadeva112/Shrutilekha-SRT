@@ -3,6 +3,7 @@ from PyInstaller.utils.hooks import copy_metadata
 
 root = Path(SPECPATH)
 datas = [(str(root / 'loader.pyw'), '.'), (str(root / 'icon.ico'), '.'),
+         (str(root / 'resolve_bridge.lua'), '.'),
          (str(root / 'version.json'), '.'), (str(root / 'data'), 'data'),
          (str(root / 'build' / 'vendor' / 'ffmpeg.exe'), 'bin'),
          (str(root / 'installer' / 'COPYING.LGPLv2.1'), 'licenses')]

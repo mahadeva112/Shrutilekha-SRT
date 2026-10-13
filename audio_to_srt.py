@@ -27,6 +27,9 @@ them, and json replaces the hand-written JSON and the patterns that read it
 back.
 
 audio_to_srt.lua is kept in the repo for DaVinci Resolve 21.0 and earlier.
+On 21.1 Free, resolve_bridge.py imports this orchestration into the desktop
+runtime and injects Lua-backed Resolve proxies. Direct Python menu scripting
+on 21.1 requires Studio.
 """
 
 import json
@@ -68,6 +71,7 @@ APP_EXE = os.path.join(PROJECT_DIR, "Srutilekha.exe")
 PACKAGED = os.path.isfile(APP_EXE)
 USER_DATA_DIR = (os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
                              "Srutilekha") if PACKAGED else PROJECT_DIR)
+USER_DATA_DIR = os.environ.get("SRUTILEKHA_USER_DIR", USER_DATA_DIR)
 
 TRANSCRIBE_PY = os.path.join(PROJECT_DIR, "transcribe.py")
 DIALOG_PY = os.path.join(PROJECT_DIR, "dialog.py")
@@ -1346,19 +1350,20 @@ def main():
     run.cleanup()
 
 
-try:
-    main()
-except Exception:
-    # A traceback printed to Resolve's console is easy to miss, and an
-    # unhandled error here otherwise looks exactly like the menu entry doing
-    # nothing -- the very symptom this port exists to fix.
-    import traceback
-    tb = traceback.format_exc()
-    log("UNHANDLED ERROR\n" + tb)
+if __name__ != "audio_to_srt":
     try:
-        alert_error("Srutilekha - script error",
-                    tb.strip().splitlines()[-1] + "\n\nFull traceback:\n"
-                    + LOG_FILE)
+        main()
     except Exception:
-        pass
-    raise
+        # A traceback printed to Resolve's console is easy to miss, and an
+        # unhandled error here otherwise looks exactly like the menu entry doing
+        # nothing -- the very symptom this port exists to fix.
+        import traceback
+        tb = traceback.format_exc()
+        log("UNHANDLED ERROR\n" + tb)
+        try:
+            alert_error("Srutilekha - script error",
+                        tb.strip().splitlines()[-1] + "\n\nFull traceback:\n"
+                        + LOG_FILE)
+        except Exception:
+            pass
+        raise

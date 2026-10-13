@@ -2,7 +2,7 @@
 
 Windows standalone installer: [download stable v1.3.0](https://github.com/mahadeva112/Shrutilekha-SRT/releases/tag/v1.3.0), or see [build, API settings and release instructions](docs/windows-release.md).
 The installer bundles Python, adds the Resolve launcher and stores each user's own API key encrypted.
-Resolve 21.0 and earlier use the Lua launcher; Resolve 21.1+ use Python.
+Resolve 21.0 and earlier use the legacy Lua launcher. Resolve 21.1+ Free requires the [v1.3.1 preview Lua bridge](docs/resolve-bridge.md). Python menu scripting on 21.1+ requires Studio.
 Lua launching and SRT import were verified in Resolve 21.0.4.5. See [validation scope](docs/validation.md) for remaining checks. Public stable releases appear through the app's update checker. Use Check for updates, then Install update.
 
 Transcribe a DaVinci Resolve timeline and import the result back as a styled
@@ -86,10 +86,9 @@ falls back to exporting the Windows certificate store to a PEM for pip.
 Launch from Resolve: **Workspace → Scripts → Srutilekha**.
 
 > **Note**
-> Resolve 21.1 runs menu scripts in a Lua sandbox without the `io` table, so
-> the Lua entry point cannot run there. Setup removes any `Srutilekha.lua` left
-> by an earlier install. [audio_to_srt.lua](audio_to_srt.lua) remains in the
-> repository for Resolve 21.0 and earlier.
+> Resolve 21.1 Free needs the preview EXE installer and [Lua bridge](docs/resolve-bridge.md).
+> The legacy `setup.bat` installs Python scripting, which requires Studio on 21.1+.
+> The legacy Lua launcher remains available for Resolve 21.0 and earlier.
 
 ## Usage
 
@@ -243,9 +242,9 @@ third-party package — just a data file loaded lazily on the first Latin word.
   Scripts folder (`Srutilekha.py`), not the repository file. Re-run `setup.bat`
   after editing that file. All other Python files are read live.
 - **A run fails silently inside Resolve.** Check `logs/audio_to_srt.log` first.
-- **The menu entry does nothing on Resolve 21.1.** A stale `Srutilekha.lua` is
-  present; re-run `setup.bat` to remove it. Lua errors appear only in
-  `Support\logs\ResolveDebug.txt`.
+- **The menu entry is missing on Resolve 21.1 Free.** Install the preview using
+  the Free/Studio Lua bridge option and restart Resolve when your work is saved.
+  Start the script once, then select Connect in the desktop app.
 
 ### Running the worker standalone
 

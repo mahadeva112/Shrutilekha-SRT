@@ -13,6 +13,11 @@ def run(output):
     prepare_environment()
     with tempfile.TemporaryDirectory() as scratch:
         os.environ["SRUTILEKHA_USER_DIR"] = scratch
+        import resolve_bridge
+        import audio_to_srt
+        assert callable(resolve_bridge.run_workflow)
+        assert callable(audio_to_srt.import_srt_to_new_track)
+        assert (resources() / 'resolve_bridge.lua').is_file()
         import credentials
         credentials.save_key("distribution-test-key")
         assert credentials.get_key() == "distribution-test-key"

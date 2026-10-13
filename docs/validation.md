@@ -1,5 +1,17 @@
 # Windows release validation
 
+v1.3.1 preview: 29 checks passed, including mailbox encoding, response errors,
+timeout cleanup, lock exclusion, rejected styling writes, clip speed/range
+mapping and import isolation from existing cues. Actual Lua handshake and
+read-only audio-track/frame-rate metadata succeeded on Resolve 21.1.1.10 Free.
+The current project was not switched, modified or saved. Real 21.1 caption
+import/styling and paid transcription are not validated; this is a prerelease.
+The installer upgraded the existing v1.3.0 installation to v1.3.1, selected the
+Lua bridge automatically for Resolve 21.1, and preserved encrypted-key and
+preset/settings bytes. Frozen runtime checks passed before and after upgrade,
+including bridge modules/resources, all Master Studio sections, independent
+demo languages, account settings, worker and FFmpeg. Resolve was not restarted.
+
 Tested on 11 October 2026:
 
 - Nine distribution tests: encrypted key round-trip/corruption, stable release

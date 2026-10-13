@@ -31,12 +31,15 @@ for this check and speech-to-text permission for actual transcription.
 
 Restart Resolve, open a timeline, and run Workspace → Scripts → Srutilekha.
 Setup offers the packaged Lua launcher for Resolve 21.0 and earlier, or the
-Python launcher for Resolve 21.1+. It detects the usual Windows installation
+Lua bridge for Resolve 21.1+ Free or Studio, with an optional Studio-only
+Python launcher. It detects the usual Windows installation
 path to preselect an option; users can override it for custom installations.
-Both launch the bundled GUI/worker. Lua launching and SRT timeline import were
+The bridge starts in Resolve; select Connect in the desktop app to open the
+bundled form/worker. Legacy Lua launching and SRT timeline import were
 verified in Resolve 21.0.4.5; see [validation details](validation.md). The Python
 launcher requires a working Python scripting host in Resolve. The bundled app
-runtime does not configure Resolve's Python host. Resolve 21.1+ remains untested.
+runtime does not configure Resolve's Python host. Resolve 21.1.1 Free connection
+was verified; real caption import/styling awaits validation. See [bridge usage](resolve-bridge.md).
 
 API keys are encrypted by Windows DPAPI for the current Windows user and
 stored under `%LOCALAPPDATA%/Srutilekha`. Keys never enter the installer,

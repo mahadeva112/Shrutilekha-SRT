@@ -1,4 +1,14 @@
-Public stable release: standalone Windows x64 installer for Srutilekha.
+v1.3.1 preview: Resolve 21.1 Free/Studio Lua bridge.
+
+- Fixes the installer choosing Studio-only Python scripting for Free edition.
+- Start Workspace > Scripts > Srutilekha once, then Connect in the desktop app.
+- Retains Master Studio, English demos, processing/review, presets and encrypted keys.
+- Prevents overlapping desktop workflows and reports rejected caption styling writes.
+- 29 tests passed; connection and read-only metadata verified on Resolve 21.1.1.10 Free.
+- Real Resolve 21.1 caption import/styling has not been tested. The current project was left untouched; no paid API calls were made.
+- This prerelease does not replace v1.3.0 in stable automatic updates.
+
+Features retained from the stable standalone Windows x64 release:
 
 - Master Studio puts preview, audio, timing, script/files, presets and caption style in one workspace.
 - Font, style, point size, colour, outline and shadow are directly editable with live sample feedback.
