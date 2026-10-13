@@ -1,5 +1,14 @@
 # Windows release validation
 
+v1.3.4 preview: disabled PillEntry controls now use the same #191c22 background
+as enabled controls, with muted disabled text. Generate/Sync widget inspection
+confirmed the disabled/normal states and matching backgrounds. All 39 existing
+tests passed, and frozen/installed runtime checks passed. The installed
+upgrade preserved encrypted-key and preset/settings bytes and restarted one
+tray helper and one caption form. The idle old form was closed through its
+existing supersede protocol; no transcription worker or submitted selection
+was active. No Resolve project changes or paid API calls were performed.
+
 v1.3.3 preview: 39 tests passed. Tray tests cover one launch per script-click
 marker, reopening on a new marker, raising an active caption window, ignoring
 old Resolve sessions, opening the app before the script, single-helper locking,

@@ -1,4 +1,10 @@
-v1.3.3 preview: resident Windows tray helper.
+v1.3.4 preview: dark disabled file inputs.
+
+- Existing SRT stays dark and readable in Generate mode; Sync enables the same input.
+- Existing caption settings, presets, API keys and tray workflow are retained.
+- Real Resolve 21.1 caption import/styling still awaits validation; this remains a prerelease.
+
+v1.3.3 introduced the resident Windows tray helper:
 
 - Setup starts a single tray helper and enables per-user Windows startup.
 - Click Workspace > Scripts > Srutilekha to open captions; repeated clicks reopen or raise the existing caption window.

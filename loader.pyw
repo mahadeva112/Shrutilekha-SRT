@@ -781,6 +781,7 @@ class PillEntry(RoundedField):
             # clipped rather than widened.
             self, width=8,
             bg=BG_INPUT, fg=FG, insertbackground=SELECT,
+            disabledbackground=BG_INPUT, disabledforeground=FG_MUTE,
             relief="flat", bd=0, highlightthickness=0,
             font=(UI_FONT, 10),
         )
