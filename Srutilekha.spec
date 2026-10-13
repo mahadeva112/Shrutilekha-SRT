@@ -25,7 +25,7 @@ worker = Analysis(['worker.py'], pathex=[str(root)], binaries=[], datas=datas,
 gui_pyz = PYZ(gui.pure)
 worker_pyz = PYZ(worker.pure)
 gui_exe = EXE(gui_pyz, gui.scripts, [], exclude_binaries=True, name='Srutilekha',
-              console=False, icon=str(root / 'icon.ico'))
+              console=False, icon=str(root / 'icon.ico'), manifest=str(root / 'app.manifest'))
 worker_exe = EXE(worker_pyz, worker.scripts, [], exclude_binaries=True,
                  name='Srutilekha-worker', console=True, icon=str(root / 'icon.ico'))
 coll = COLLECT(gui_exe, worker_exe, gui.binaries, gui.datas, worker.binaries,

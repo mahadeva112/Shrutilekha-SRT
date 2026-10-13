@@ -54,7 +54,7 @@ class RoundedAction(tk.Canvas):
         self.colors, self.text, self.command = colors, text, command
         self.primary, self.fill, self.ink = primary, fill, ink
         self.interactive, self.hover = interactive, False
-        self.font = tkfont.Font(family=colors.get("button_font", colors["font"]),
+        self.font = tkfont.Font(root=parent, family=colors.get("button_font", colors["font"]),
                                 size=colors.get("button_size", -14),
                                 weight="bold" if primary else "normal")
         super().__init__(parent, width=width or self.font.measure(text)+26,
@@ -161,8 +161,13 @@ class ApiSettingsPanel(tk.Frame):
                          highlightthickness=0)
         mark.pack(side="left", padx=(0, 12))
         rounded_rect(mark, 1, 1, 41, 41, 12, fill="#373326", outline="#4e4630")
-        for x, y in ((15, 13), (24, 10)):
-            mark.create_line(x, y, x, 30, width=4, fill=colors["accent"], capstyle="round")
+        from ui_icons import photo
+        def draw_provider(event=None):
+            mark.delete("icon")
+            mark._icon = photo(mark, 'provider', 30, colors["accent"])
+            mark.create_image(21, 21, image=mark._icon, tags='icon')
+        mark.bind('<Configure>', draw_provider)
+        draw_provider()
         provider_text = tk.Frame(provider, bg=colors["card"])
         provider_text.pack(side="left")
         tk.Label(provider_text, text="ElevenLabs", bg=colors["card"], fg=colors["text"],
@@ -222,9 +227,12 @@ class ApiSettingsPanel(tk.Frame):
         note.pack(fill="x", pady=(12, 16))
         shield = tk.Canvas(note, width=18, height=20, bg=colors["card"], highlightthickness=0)
         shield.pack(side="left", anchor="n", padx=(0, 8))
-        shield.create_polygon(9, 2, 16, 5, 15, 12, 9, 18, 3, 12, 2, 5,
-                              fill="", outline="#94aa97", width=1)
-        shield.create_line(5, 9, 8, 12, 13, 7, fill="#94aa97", width=1.5)
+        def draw_shield(event=None):
+            shield.delete('all')
+            shield._icon = photo(shield, 'shield', 18, '#94aa97')
+            shield.create_image(9, 10, image=shield._icon)
+        shield.bind('<Configure>', draw_shield)
+        draw_shield()
         status_label = tk.Label(note, textvariable=self.status, bg=colors["card"],
                                 fg=colors["muted"], font=(font, -13), anchor="w",
                                 justify="left", wraplength=480)

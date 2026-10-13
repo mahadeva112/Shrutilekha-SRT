@@ -6,6 +6,8 @@ from app_runtime import resources, install_dir, prepare_environment
 
 
 def main():
+    from dpi import enable
+    enable()
     prepare_environment()
     # Windowed Python has no standard streams. Modules may still print while
     # rendering previews; discard these rather than failing the GUI.
@@ -69,6 +71,8 @@ def main():
     import queue
     import threading
     root = tk.Tk()
+    from dpi import attach
+    attach(root)
     root.title("Srutilekha")
     root.geometry("620x550")
     try:

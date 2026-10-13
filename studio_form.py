@@ -52,22 +52,13 @@ class SectionMark(tk.Canvas):
     def __init__(self, parent, kind, theme):
         super().__init__(parent, width=18, height=18, bg=theme['card'],
                          bd=0, highlightthickness=0)
-        ink = theme['accent']
-        if kind == 'Audio':
-            for x,y in ((3,6),(7,3),(11,5),(15,7)):
-                self.create_line(x,y,x,18-y,fill=ink,width=2,capstyle='round')
-        elif kind == 'Timing':
-            self.create_oval(2,2,16,16,outline=ink,width=1.5)
-            self.create_line(9,5,9,9,12,11,fill=ink,width=1.5)
-        elif kind == 'Files':
-            self.create_rectangle(4,2,14,16,outline=ink,width=1.5)
-            for y in (6,9,12):self.create_line(7,y,11,y,fill=ink)
-        elif kind == 'Presets':
-            self.create_polygon(4,2,14,2,14,16,9,12,4,16,outline=ink,fill='',width=1.5)
-        else:
-            for y,x in ((4,6),(9,12),(14,8)):
-                self.create_line(2,y,16,y,fill=ink)
-                self.create_oval(x-2,y-2,x+2,y+2,fill=theme['card'],outline=ink,width=1.5)
+        def draw(event=None):
+            from ui_icons import photo
+            self.delete('all')
+            self._photo = photo(self,kind,18,theme['accent'])
+            self.create_image(9,9,image=self._photo)
+        self.bind('<Configure>',draw)
+        draw()
 
 
 class StudioGroup(tk.Frame):

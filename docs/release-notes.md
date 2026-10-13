@@ -1,3 +1,14 @@
+v1.3.6 preview: clearer text and display-scaled icons.
+
+- Per-monitor DPI awareness is embedded in the Windows EXE manifest.
+- Interface dimensions, fonts, canvas coordinates and mouse interactions share logical units.
+- Segoe UI numeric fields match the interface; output caption fonts and sizes stay independent.
+- Main section, title-bar, logo and account icons use antialiased display-resolution artwork.
+- Monitor-scale changes relayout controls and preserve caption settings.
+- Scaling is capped on small displays to keep the full Master Studio visible without scrolling.
+- Existing caption features, English demos, saved presets and encrypted keys are retained.
+- This remains a prerelease; real Resolve 21.1 caption import/styling still awaits validation.
+
 v1.3.5 preview: refined Master Studio presentation.
 
 - Softer rounded cards with subtle shadows and quieter borders.

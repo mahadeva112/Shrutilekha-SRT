@@ -34,6 +34,13 @@ def run(output):
         assert len(transcribe.languages.LANGUAGES) == 14
         assert (resources() / "data" / "translit_beng.json.gz").is_file()
         root = tk.Tk()
+        import dpi
+        if os.name == 'nt':
+            import ctypes
+            u = ctypes.windll.user32
+            u.GetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+            u.AreDpiAwarenessContextsEqual.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+            assert u.AreDpiAwarenessContextsEqual(u.GetThreadDpiAwarenessContext(), ctypes.c_void_p(-4))
         root.withdraw()
         namespace = runpy.run_path(str(resources() / "loader.pyw"))
         app_class = namespace["App"]
@@ -71,6 +78,6 @@ def run(output):
         if worker.returncode:
             raise RuntimeError(worker.stdout + worker.stderr)
         report = {"gui": "ok", "resolve_form": "ok", "master_studio": "all sections", "demo_languages": "independent", "encrypted_key": "ok", "api_settings": "in-window",
-                  "tray": "native icon and menu",
+                  "tray": "native icon and menu", "dpi": "PerMonitorV2 and native pixel fonts",
                   "worker": worker.stdout.strip()}
         Path(output).write_text(json.dumps(report, indent=2), encoding="utf-8")

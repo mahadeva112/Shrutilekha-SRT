@@ -1,3 +1,18 @@
+v1.3.6 preview: 45 tests pass. Simulated 100%, 125%, 150% and 200%
+render scales on a virtual large work area verify native font pixels, all
+Master Studio control bounds and unchanged caption values. Dynamic scale
+transitions preserve output font/size and control bounds. Tests also cover
+logical mouse coordinates, canvas dimensions, font copying and antialiased
+icon edges. The real desktop is 1920 x 1080 at 100%; its isolated Windows
+preview and in-window account panel were visually inspected. Windows display
+settings were not changed; physical multi-monitor DPI transitions remain
+untested. Small displays cap scale to preserve the minimum no-scroll layout. Frozen
+and installed EXE smoke checks passed, including the PerMonitorV2 awareness
+context, native tray, embedded API panel and bundled worker. The upgrade
+preserved existing encrypted-key bytes; no saved preset files existed in
+the installed user profile. No Resolve project changes or paid API calls
+were performed.
+
 # Windows release validation
 
 v1.3.5 preview: 39 checks passed, covering all visible Master Studio controls,

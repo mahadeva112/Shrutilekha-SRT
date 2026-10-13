@@ -39,7 +39,10 @@ def _dark_window(title):
     with content. A custom title bar (title + close button) is already added
     and made draggable along with the card.
     """
+    from dpi import enable, attach
+    enable()
     root = tk.Tk()
+    attach(root)
     root.title(title)
     root.resizable(False, False)
     root.configure(bg=BG_OUTER)

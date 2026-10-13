@@ -52,49 +52,8 @@ except Exception:
 
 
 def _enable_dpi_awareness():
-    """Tell Windows this process handles its own scaling.
-
-    Without this, an unaware process gets its whole window bitmap-scaled by
-    Windows on any display that isn't at 100% scaling (125%/150%/etc. are the
-    Windows default on most laptops and 4K monitors). That stretch happens
-    AFTER Tk has already laid out and drawn every pixel-measured widget in
-    this file, so the true window edge lands to the left of where Tk thinks
-    it is — the rightmost content (our right-hand settings column) gets
-    silently cut off. This must run before the first Tk() is created; it is
-    called once at import time, below. No-op on non-Windows or on failure.
-    """
-    if sys.platform != "win32":
-        return
-    try:
-        import ctypes
-        # Per-Monitor v2 (Windows 10 1703+): best fidelity, matches whichever
-        # monitor the window is actually on.
-        #
-        # NOTE: this call does not exist on shcore — it lives in user32 — so
-        # this branch always raises and the process settles for
-        # SYSTEM_DPI_AWARE below. That is currently load-bearing, not a typo
-        # to fix in passing: under Per-Monitor v2 Tk is told the monitor's real
-        # DPI, so its point-sized fonts grow (10pt goes from 17px to ~25px at
-        # 150%) while the window stays pinned to the pixel literals in
-        # App.__init__ (930x740, min 880x560) and every widget size in this
-        # file. The layout overflows. Moving to Per-Monitor v2 means scaling
-        # those constants by dpi/96 first — a separate change, and one that
-        # has to be tested on a scaled display.
-        ctypes.windll.shcore.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
-        return
-    except Exception:
-        pass
-    try:
-        import ctypes
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
-        return
-    except Exception:
-        pass
-    try:
-        import ctypes
-        ctypes.windll.user32.SetProcessDPIAware()
-    except Exception:
-        pass
+    from dpi import enable
+    enable()
 
 
 _enable_dpi_awareness()
@@ -245,10 +204,9 @@ THUMB_OFF = "#8b8b8e"
 GOOD     = "#4fae7a"         # within limits / stage complete
 BAD      = "#e64b3d"         # over the reading-speed limit / failed
 
-# Numeric fields hold values like 0.120 and 0.280 that change as you drag a
-# slider. Proportional Segoe makes those digits jitter because its figures
-# aren't tabular; Consolas is fixed-width and ships on every Windows install.
-FONT_NUM = "Consolas"
+# Numeric controls share the interface face; output subtitle fonts remain
+# independently selectable in Caption style.
+FONT_NUM = "Segoe UI"
 
 # The UI face. Open Sans is the one Resolve itself uses — "Open Sans" is the
 # only UI family named in BMDDavUI.dll, and measuring a clip name in a Resolve
@@ -367,14 +325,15 @@ def round_corners(win, radius=8, square=False):
             ctypes.windll.user32.SetWindowRgn(hwnd, 0, True)
             return
         win.update_idletasks()
-        w, h = win.winfo_width(), win.winfo_height()
+        from dpi import pixels
+        w, h = pixels(win, win.winfo_width()), pixels(win, win.winfo_height())
         if w <= 1 or h <= 1:
             return
         # CreateRoundRectRgn's last two arguments are the ellipse's full width
         # and height, not its radius — hence the doubling. Off-by-two here is
         # a corner that looks almost but not quite right.
         rgn = ctypes.windll.gdi32.CreateRoundRectRgn(
-            0, 0, w + 1, h + 1, radius * 2, radius * 2)
+            0, 0, w + 1, h + 1, pixels(win, radius * 2), pixels(win, radius * 2))
         # Ownership of the region passes to the window; do not delete it.
         ctypes.windll.user32.SetWindowRgn(hwnd, rgn, True)
     except Exception:
@@ -461,6 +420,7 @@ class IconCanvas(tk.Canvas):
         self._name = name
         self._size = size
         self._color = color
+        self.bind("<Configure>", lambda e: self._draw())
         self._draw()
 
     def set_color(self, color):
@@ -475,20 +435,10 @@ class IconCanvas(tk.Canvas):
     config = configure
 
     def _draw(self):
+        from ui_icons import photo
         self.delete("all")
-        s = self._size
-        c = self._color
-        n = self._name
-        if n == "mic":
-            self._mic(s, c)
-        elif n == "volume":
-            self._volume(s, c)
-        elif n == "chevron-down":
-            self._chevron(s, c)
-        elif n == "bullet":
-            self._bullet(s, c)
-        elif n == "local":
-            self._local(s, c)
+        self._photo = photo(self, self._name, self._size, self._color)
+        self.create_image(self._size/2, self._size/2, image=self._photo)
 
     def _mic(self, s, c):
         w = s * 0.42
@@ -722,6 +672,16 @@ class RoundedField(tk.Canvas):
         self._redraw()
 
     def _redraw(self):
+        if getattr(self, "_drawing", False):
+            return
+        self._drawing = True
+        try:
+            self.update_idletasks()
+            self._redraw_field()
+        finally:
+            self._drawing = False
+
+    def _redraw_field(self):
         self.delete("bg")
         w = self.winfo_width()
         h = self._h
@@ -739,7 +699,8 @@ class RoundedField(tk.Canvas):
                     w - 6, h // 2, anchor="e", window=self._right_child)
             else:
                 self.coords(self._right_win, w - 6, h // 2)
-            self.update_idletasks()
+            # Geometry was settled before measuring the field; do not drain
+            # the queue again with an old width captured during a DPI change.
             right_w = self._right_child.winfo_reqwidth() + 8
 
         if self._child is not None:
@@ -852,9 +813,7 @@ class PillEntry(RoundedField):
 class SmallInput(RoundedField):
     """Compact numeric input cell — same Fluent-style focus underline.
 
-    Set in FONT_NUM rather than Segoe: these cells hold slider-linked values
-    like 0.120, and fixed-width figures keep the digits from shifting sideways
-    while you drag.
+    Numeric values use the same readable face as the other controls.
     """
 
     def __init__(self, parent, textvariable, unit=None, bg_parent=BG,
@@ -1681,6 +1640,7 @@ class LogoTile(tk.Canvas):
                          bg=bg_parent, highlightthickness=0, bd=0)
         self._size = size
         self._radius = radius
+        self.bind("<Configure>", self._draw)
         self._draw()
 
     def _bar(self, cy, width):
@@ -1693,18 +1653,11 @@ class LogoTile(tk.Canvas):
         self.create_rectangle(cx - half_w, y, cx + half_w, y + h,
                               fill=ACCENT_INK, outline="")
 
-    def _draw(self):
+    def _draw(self, event=None):
+        from ui_icons import photo
         self.delete("all")
-        s = self._size
-        _round_rect(self, 0, 0, s, s, self._radius, fill=ACCENT, outline="")
-        cy = s / 2.0
-        # The bars are drawn h pixels thick, so the centre-to-centre offset has
-        # to clear h or the ideal fraction rounds down into a merged block at
-        # the smallest sizes.
-        h = max(2, int(round(s * self.BAR_H)))
-        off = max(int(round(s * self.GAP)), h + 1)
-        self._bar(cy - off, s * self.TOP_W)
-        self._bar(cy + off, s * self.BOTTOM_W)
+        self._photo = photo(self, "logo", self._size, ACCENT)
+        self.create_image(self._size/2, self._size/2, image=self._photo)
 
 
 class RoundedIconTile(tk.Canvas):
@@ -1840,30 +1793,17 @@ class TitleBarControls(tk.Frame):
             c.create_rectangle(0, 0, self.BTN_W, self.BTN_H, fill=bg, outline=bg)
             fg = "#ffffff" if hover else FG_DIM
             cx, cy = self.BTN_W // 2, self.BTN_H // 2
-            if c._kind == "min":
-                c.create_line(cx - 5, cy, cx + 5, cy,
-                              fill=fg, width=1)
-            elif c._kind == "max":
-                if c._maximized:
-                    # Restore: back square, then front square offset
-                    c.create_rectangle(cx - 2, cy - 5, cx + 5, cy + 2,
-                                       outline=fg, fill=bg, width=1)
-                    c.create_rectangle(cx - 5, cy - 2, cx + 2, cy + 5,
-                                       outline=fg, fill=bg, width=1)
-                else:
-                    c.create_rectangle(cx - 5, cy - 5, cx + 5, cy + 5,
-                                       outline=fg, fill="", width=1)
-            elif c._kind == "close":
-                c.create_line(cx - 5, cy - 5, cx + 5, cy + 5,
-                              fill=fg, width=1, capstyle="round")
-                c.create_line(cx + 5, cy - 5, cx - 5, cy + 5,
-                              fill=fg, width=1, capstyle="round")
+            from ui_icons import photo
+            name = "restore" if c._kind == "max" and c._maximized else c._kind
+            c._photo = photo(c, name, 14, fg)
+            c.create_image(cx, cy, image=c._photo)
 
         draw()
         c.bind("<Enter>",    lambda e: draw(True))
         c.bind("<Leave>",    lambda e: draw(False))
         c.bind("<Button-1>", lambda e: cmd())
         c._draw = draw
+        c.bind("<Configure>", lambda e: draw())
         return c
 
     def update_max_icon(self, maximized):
@@ -3608,6 +3548,8 @@ class App:
     def __init__(self, root, prompt_data, selection_path, args_path,
                  done_path, log_path, python_exe, script_path,
                  result_path, ack_path, run_id=None, run_marker=None):
+        from dpi import attach
+        attach(root)
         self.root = root
         # Before any widget: every font tuple below reads UI_FONT when the
         # widget is created, so this has to be settled first.
