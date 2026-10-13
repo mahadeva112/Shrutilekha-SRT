@@ -43,6 +43,10 @@ def artwork(kind, size, color):
     elif kind=='chevron-down':line((4,7,9,12,14,7),1.5)
     elif kind=='provider':
         line((6,5,6,15),2);line((12,3,12,15),2)
+    elif kind=='warning':
+        line((9,2,17,16,1,16,9,2),1.3)
+        line((9,6,9,10),1.5)
+        draw.ellipse(box((8.25,12,9.75,13.5)),fill=color)
     elif kind=='shield':
         line((9,1,16,4,15,11,9,17,3,11,2,4,9,1),1)
         line((5,8,8,11,13,6),1.3)

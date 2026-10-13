@@ -1,3 +1,14 @@
+v1.3.7 preview: Resolve 21.1 audio-track compatibility and refined account pages.
+
+- Resolve 21.1 Lua clip collections include internal __flags metadata. The bridge now returns real clip lists, so existing audio sources are recognized.
+- Both old running bridges and new Lua launchers are supported; clip APIs no longer fail silently.
+- Source preparation failures appear inside the caption window with a Close action instead of leaving progress waiting for worker arguments.
+- Account settings have a warm card accent, subtle background artwork and matching typography.
+- Error dialogs use clear headings, smooth icons, rounded actions and actionable source guidance.
+- All existing caption controls, English demos, encrypted keys and presets are retained.
+- Read-only live validation found and mapped all clips on both audio tracks with readable source files. No paid transcription or timeline changes were performed.
+- This remains a prerelease; real Resolve 21.1 caption import/styling still awaits validation.
+
 v1.3.6 preview: clearer text and display-scaled icons.
 
 - Per-monitor DPI awareness is embedded in the Windows EXE manifest.

@@ -5415,7 +5415,7 @@ class App:
             return
         self.root.after(200, self._poll_result)
 
-    def _build_done(self, message):
+    def _build_done(self, message, failed=False):
         self._clear_body()
 
         header = tk.Frame(self.body, bg=BG)
@@ -5438,7 +5438,7 @@ class App:
         # strands it against one edge.
         card = ResultCard(block, bg_parent=BG)
         card.pack(anchor="center")
-        self._fill_done_card(card.inner, message)
+        self._fill_done_card(card.inner, message, failed=failed)
 
         btn_frm = tk.Frame(self.body, bg=BG)
         btn_frm.pack(fill="x", side="bottom")
@@ -5479,7 +5479,7 @@ class App:
                  lambda e, l=lbl: l.configure(wraplength=max(140, e.width - 2)))
         return lbl
 
-    def _fill_done_card(self, parent, message):
+    def _fill_done_card(self, parent, message, failed=False):
         lines = [ln.strip() for ln in (message or "").splitlines()]
         lines = [ln for ln in lines if ln]
         headline = lines[0] if lines else "Done."
@@ -5499,13 +5499,18 @@ class App:
         head.pack(fill="x")
         tick = tk.Canvas(head, width=22, height=22, bg=BG_CARD,
                          highlightthickness=0, bd=0)
-        tick.create_oval(1, 1, 21, 21, fill=GOOD, outline=GOOD)
-        tick.create_line(6.5, 11.5, 9.5, 15, fill=ACCENT_INK, width=2,
-                         capstyle="round")
-        tick.create_line(9.5, 15, 15.5, 7, fill=ACCENT_INK, width=2,
-                         capstyle="round")
+        if failed:
+            from ui_icons import photo
+            tick._image=photo(tick,'warning',22,ACCENT)
+            tick.create_image(11,11,image=tick._image)
+        else:
+            tick.create_oval(1, 1, 21, 21, fill=GOOD, outline=GOOD)
+            tick.create_line(6.5, 11.5, 9.5, 15, fill=ACCENT_INK, width=2,
+                             capstyle="round")
+            tick.create_line(9.5, 15, 15.5, 7, fill=ACCENT_INK, width=2,
+                             capstyle="round")
         tick.pack(side="left", padx=(0, 11))
-        tk.Label(head, text="Done", bg=BG_CARD, fg=FG,
+        tk.Label(head, text="Couldn't start captions" if failed else "Done", bg=BG_CARD, fg=FG,
                  font=(UI_FONT, 15, "bold")).pack(side="left")
 
         self._wrap_label(parent, headline, FG, 11).pack(fill="x", pady=(14, 0))
@@ -5565,6 +5570,10 @@ class App:
         deadline = time.time() + 600
         while time.time() < deadline:
             if self.cancelled:
+                return
+            if os.path.exists(self.result_path):
+                with open(self.result_path, encoding='utf-8') as result:
+                    self.q.put(('preflight_error',result.read().strip()))
                 return
             if os.path.exists(self.args_path):
                 break
@@ -5663,6 +5672,10 @@ class App:
                     self._set_progress(evt[1], evt[2])
                 elif kind == "error":
                     self._set_progress(100, evt[1])
+                elif kind == "preflight_error":
+                    self.exit_code = 1
+                    self._build_done(evt[1], failed=True)
+                    return
                 elif kind == "exit":
                     self.exit_code = evt[1]
                     # Optional review/edit pass before the Resolve-side script

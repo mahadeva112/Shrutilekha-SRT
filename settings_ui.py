@@ -46,6 +46,37 @@ class RoundedSurface(tk.Canvas):
         for shape in (shadow, face):
             self.addtag_withtag("surface", shape)
         self.tag_lower("surface")
+        # Quiet warm accent gives the account card a distinct visual anchor.
+        self.create_line(self.padding, 2, min(width-self.padding, self.padding+72), 2,
+                         fill="#7c6d44", width=2, tags='surface', capstyle='round')
+
+
+class ConnectionBackdrop(tk.Canvas):
+    """Subtle decoration behind the account panel, without interactive chrome."""
+    def __init__(self, parent, colors):
+        super().__init__(parent, bg=colors['bg'], bd=0, highlightthickness=0)
+        self.colors = colors
+        self.bind('<Configure>', self.draw)
+
+    def draw(self, event=None):
+        self.delete('decoration')
+        w, h = self.winfo_width(), self.winfo_height()
+        if w < 520 or h < 520:
+            return
+        for r in (64, 98, 132):
+            self.create_oval(w-80-r, 90-r, w-80+r, 90+r,
+                             outline='#242831', width=1, tags='decoration')
+        self.create_text(28, 32, text='ACCOUNT & CONNECTION', anchor='nw',
+                         font=(self.colors['font'], -12, 'bold'), fill='#c4af78', tags='decoration')
+        self.create_text(28, 58, text='A personal space for your caption workflow.', anchor='nw',
+                         font=(self.colors['font'], -14), fill=self.colors['muted'], tags='decoration')
+        for i, amplitude in enumerate((7, 13, 20, 30, 23, 14, 8)):
+            x=32+i*9
+            self.create_line(x,h-38-amplitude/2,x,h-38+amplitude/2,
+                             fill='#3a3830',width=3,capstyle='round',tags='decoration')
+        self.create_text(110,h-38,text='Your account. Your credits. Your creative flow.',anchor='w',
+                         font=(self.colors['font'],-12),fill='#858c99',tags='decoration')
+        self.tag_lower('decoration')
 
 
 class RoundedAction(tk.Canvas):
@@ -149,10 +180,10 @@ class ApiSettingsPanel(tk.Frame):
         self._button(bar, "‹  Back to captions", self.close).pack(side="left")
         tk.Label(bar, text="SETTINGS  /  API CONNECTION", bg=colors["bg"],
                  fg=colors["muted"], font=(font, -12)).pack(side="right")
-        space = tk.Frame(self, bg=colors["bg"])
+        space = ConnectionBackdrop(self, colors)
         space.pack(fill="both", expand=True, padx=24, pady=(0, 18))
         card = RoundedSurface(space, colors["bg"], colors["card"],
-                              colors["border"], radius=18, padding=26)
+                              colors["border"], radius=22, padding=30)
         card.place(relx=.5, rely=.5, anchor="center", width=600)
         body = card.body
         provider = tk.Frame(body, bg=colors["card"])
@@ -252,8 +283,8 @@ class ApiSettingsPanel(tk.Frame):
                 provider.pack_forget()
             elif not provider.winfo_manager():
                 provider.pack(fill="x", pady=(0, 22), before=title)
-            card.set_padding(18 if compact else 26)
-        space.bind("<Configure>", fit)
+            card.set_padding(18 if compact else 30)
+        space.bind("<Configure>", fit, add='+')
         self._binding_ids["<Return>"] = parent.bind("<Return>", self.save)
         self._binding_ids["<Escape>"] = parent.bind("<Escape>", self.close)
         self.grab_set()

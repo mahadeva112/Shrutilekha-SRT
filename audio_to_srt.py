@@ -823,8 +823,11 @@ def collect_clip_ranges(run, timeline, clips, fps, tl_start):
     for c in clips:
         try:
             cmpi = c.GetMediaPoolItem()
-        except Exception:
-            cmpi = None
+        except Exception as exc:
+            log("Cannot inspect clip media pool item: %s" % exc)
+            raise RuntimeError("Resolve could not read this clip's source information.\n"
+                               "Restart Resolve and run Workspace > Scripts > Srutilekha again.\n"
+                               "Details: %s" % exc) from exc
         if not cmpi:
             log("Skipping clip with no media pool item")
             continue
@@ -1115,9 +1118,15 @@ def main():
     track_index = int(m.group(1)) if m else 1
     log("Selected track index: %d" % track_index)
 
-    clips = timeline.GetItemListInTrack("audio", track_index)
+    try:
+        clips = timeline.GetItemListInTrack("audio", track_index)
+    except RuntimeError as exc:
+        run.report("Audio source unavailable\n\nResolve could not read the audio track.\nDetails: %s" % exc)
+        run.cleanup()
+        return
     if not clips:
-        alert_error("Srutilekha", "No clips on the selected audio track.")
+        run.report("Audio source unavailable\n\nNo clips on the selected audio track.\n"
+                   "Select a track containing speech and try again. No transcription was started.")
         run.cleanup()
         return
 
@@ -1128,11 +1137,19 @@ def main():
     tl_start = timeline.GetStartFrame()
     tc = timeline_timecode(fps, tl_start)
 
-    range_count, audio_path = collect_clip_ranges(run, timeline, clips, fps,
-                                                  tl_start)
+    try:
+        range_count, audio_path = collect_clip_ranges(run, timeline, clips, fps,
+                                                      tl_start)
+    except RuntimeError as exc:
+        run.report("Audio source unavailable\n\n" + str(exc))
+        run.cleanup()
+        return
     if not range_count:
-        alert_error("Srutilekha",
-                    "No clips on the selected track have a usable source file.")
+        run.report("Audio source unavailable\n\n"
+                    "Track %d has clips, but Resolve did not provide their original audio files.\n\n"
+                    "Check that this is the speech track and its media is online. "
+                    "Nested timelines or generated clips may need to be bounced to an audio file first.\n\n"
+                    "No transcription was started." % track_index)
         run.cleanup()
         return
     log("Audio file (primary): " + audio_path)

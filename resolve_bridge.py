@@ -16,6 +16,22 @@ class BridgeError(RuntimeError):
     pass
 
 
+LIST_RESULTS = frozenset({'GetItemListInTrack', 'GetClipList', 'GetSubFolderList',
+                          'ImportMedia', 'AppendToTimeline', 'GetProjectListInCurrentFolder'})
+
+
+def normalize_list_result(value):
+    """Resolve 21.1 Lua collections carry __flags alongside 1-based items."""
+    if not isinstance(value, dict):
+        return value
+    entries = [(str(k), v) for k, v in value.items() if k != '__flags']
+    if not entries:
+        return []
+    if all(k.isdigit() and int(k) >= 1 for k, _ in entries):
+        return [v for k, v in sorted(entries, key=lambda pair: int(pair[0]))]
+    raise BridgeError('Resolve returned an unexpected clip collection; reconnect the app.')
+
+
 @contextmanager
 def mailbox_lock(path, timeout=0):
     """Windows process lock; automatically released if the app exits."""
@@ -153,7 +169,8 @@ class BridgeClient:
             self.flush()
         if not args and (ref, method) in self.cache:
             return self.cache[ref, method]
-        return self.request({'op':'call','ref':ref,'method':method,'args':args,'argc':len(args)})
+        result = self.request({'op':'call','ref':ref,'method':method,'args':args,'argc':len(args)})
+        return normalize_list_result(result) if method in LIST_RESULTS else result
 
     def flush(self):
         if self.pending:

@@ -11,6 +11,22 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 
 class StudioFormTests(unittest.TestCase):
+    def test_source_preparation_error_shows_in_window_without_launching_worker(self):
+        self.app._build_progress()
+        Path(self.app.result_path).write_text('Audio source unavailable\nNo transcription was started.',encoding='utf-8')
+        with patch.object(self.app,'_run_transcribe') as worker:
+            self.app._wait_for_args_and_run()
+            worker.assert_not_called()
+        self.app._pump();self.root.update()
+        self.assertEqual(self.app.exit_code,1)
+        def texts(widget):
+            result=[]
+            if isinstance(widget,tk.Label):result.append(widget.cget('text'))
+            for child in widget.winfo_children():result.extend(texts(child))
+            return result
+        self.assertIn("Couldn't start captions",texts(self.root))
+        self.assertEqual(self.app.demo_language_var.get(),'English')
+
     def setUp(self):
         self.scratch=tempfile.TemporaryDirectory()
         self.addCleanup(self.scratch.cleanup)

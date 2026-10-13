@@ -62,13 +62,19 @@ local function json(value, depth)
     if t~='table' then error('Unsupported API result: '..t) end
     if getmetatable(value) and type(value.GetName)=='function' then return '{"__ref":'..register(value)..'}' end
     local out, count, is_array = {}, 0, true
-    for k in pairs(value) do count=count+1; if type(k)~='number' or k<1 or k%1~=0 then is_array=false end end
+    for k in pairs(value) do
+        if k~='__flags' then
+            count=count+1; if type(k)~='number' or k<1 or k%1~=0 then is_array=false end
+        end
+    end
     if count~=#value then is_array=false end
     if is_array and count>0 then
         for i=1,#value do out[#out+1]=json(value[i],depth) end
         return '['..table.concat(out,',')..']'
     end
-    for k,v in pairs(value) do out[#out+1]=quote(k)..':'..json(v,depth) end
+    for k,v in pairs(value) do
+        if k~='__flags' then out[#out+1]=quote(k)..':'..json(v,depth) end
+    end
     return '{'..table.concat(out,',')..'}'
 end
 local alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'

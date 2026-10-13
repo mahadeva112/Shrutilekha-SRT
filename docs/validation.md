@@ -1,3 +1,13 @@
+v1.3.7 preview: 48 tests passed. Regression tests cover Resolve 21.1 Lua collections with
+__flags, empty collections, retained clip-property dictionaries and surfaced
+media API errors. Live read-only probes of Resolve 21.1.1.10 Free found one
+clip on audio track 1 and two on track 2. The corrected bridge and existing
+collect_clip_ranges mapped every clip and each primary source file was
+readable. Preparation-error tests verify that no worker starts and the
+in-window failure screen appears. No transcription, timeline edits, project
+switches or saves were performed. Frozen and installed EXE checks passed; upgrade preserved the existing encrypted key.
+Real caption import/styling remains untested.
+
 v1.3.6 preview: 45 tests pass. Simulated 100%, 125%, 150% and 200%
 render scales on a virtual large work area verify native font pixels, all
 Master Studio control bounds and unchanged caption values. Dynamic scale

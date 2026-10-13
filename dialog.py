@@ -26,9 +26,9 @@ FG           = "#e6e9ef"
 FG_DIM       = "#9aa1b1"
 FG_MUTE      = "#7b8190"
 FG_LABEL     = "#8a93a4"
-ACCENT       = "#3b82f6"
-ACCENT_DARK  = "#2563eb"
-ACCENT_HOVER = "#4f93ff"
+ACCENT       = "#eed185"
+ACCENT_DARK  = "#c5ab63"
+ACCENT_HOVER = "#f0d99a"
 CLOSE_HOVER  = "#c42b1c"
 
 
@@ -71,13 +71,12 @@ def _dark_window(title):
         bg = CLOSE_HOVER if hover else BG
         close.create_rectangle(0, 0, 44, 30, fill=bg, outline=bg)
         fg = "#ffffff" if hover else FG_DIM
-        cx, cy = 22, 15
-        close.create_line(cx - 5, cy - 5, cx + 5, cy + 5, fill=fg,
-                          width=1, capstyle="round")
-        close.create_line(cx + 5, cy - 5, cx - 5, cy + 5, fill=fg,
-                          width=1, capstyle="round")
+        from ui_icons import photo
+        close._image=photo(close,'close',16,fg)
+        close.create_image(22,15,image=close._image)
 
     _draw_close()
+    close.bind('<Configure>',lambda e:_draw_close())
     close.bind("<Enter>", lambda e: _draw_close(True))
     close.bind("<Leave>", lambda e: _draw_close(False))
     close.bind("<Button-1>", lambda e: root.destroy())
@@ -90,17 +89,10 @@ def _dark_window(title):
 
 
 def _accent_button(parent, text, command, width=10, primary=True):
-    """Flat pill-ish button matching the main UI's accent buttons."""
-    base = ACCENT if primary else BG_INPUT
-    hover = ACCENT_HOVER if primary else BG_HOVER
-    fg = "#ffffff" if primary else FG
-    btn = tk.Label(parent, text=text, bg=base, fg=fg,
-                   font=("Segoe UI", 10, "bold" if primary else "normal"),
-                   padx=18, pady=7, cursor="hand2", width=width)
-    btn.bind("<Enter>", lambda e: btn.configure(bg=hover))
-    btn.bind("<Leave>", lambda e: btn.configure(bg=base))
-    btn.bind("<Button-1>", lambda e: command())
-    return btn
+    from settings_ui import RoundedAction
+    colors=dict(accent=ACCENT,text=FG,muted=FG_DIM,font='Segoe UI',button_size=-14,
+                button_fill='#2b3039',button_hover='#373e49',button_border='#414957',radius=9)
+    return RoundedAction(parent,text,command,colors,primary=primary,width=width*9+24,height=38)
 
 
 def _make_draggable(win):
@@ -167,23 +159,62 @@ def center(win):
     win.attributes("-topmost", True)
     win.lift()
     win.after(50, lambda: _steal_focus(win))
+    if win.overrideredirect():
+        win.after(60, lambda: _round_dialog(win))
+
+
+def _round_dialog(win):
+    """Apply a rounded region to the frameless dialog at native DPI."""
+    if sys.platform != 'win32':
+        return
+    try:
+        import ctypes
+        from dpi import pixels
+        u=ctypes.windll.user32;g=ctypes.windll.gdi32
+        u.GetAncestor.argtypes=[ctypes.c_void_p,ctypes.c_uint]
+        u.GetAncestor.restype=ctypes.c_void_p
+        hwnd=u.GetAncestor(win.winfo_id(),2)
+        g.CreateRoundRectRgn.argtypes=[ctypes.c_int]*6;g.CreateRoundRectRgn.restype=ctypes.c_void_p
+        u.SetWindowRgn.argtypes=[ctypes.c_void_p,ctypes.c_void_p,ctypes.c_bool]
+        g.DeleteObject.argtypes=[ctypes.c_void_p]
+        region=g.CreateRoundRectRgn(0,0,pixels(win,win.winfo_width())+1,
+                                   pixels(win,win.winfo_height())+1,pixels(win,28),pixels(win,28))
+        if not u.SetWindowRgn(hwnd,region,True):g.DeleteObject(region)
+    except (OSError,tk.TclError,AttributeError):
+        pass
+
+
+def build_alert_content(body, title, message, error=False):
+    """Shared content builder, also usable in an isolated visual preview."""
+    from ui_icons import photo
+    header=tk.Frame(body,bg=BG)
+    header.pack(fill='x',pady=(8,18))
+    icon=tk.Canvas(header,width=48,height=48,bg=BG,highlightthickness=0)
+    icon.pack(side='left',padx=(0,14))
+    from settings_ui import rounded_rect
+    def draw(event=None):
+        icon.delete('all')
+        rounded_rect(icon,1,1,47,47,14,fill='#382d25' if error else '#343022',outline='#594731')
+        icon._image=photo(icon,'warning' if error else 'shield',24,'#eac987')
+        icon.create_image(24,24,image=icon._image)
+    icon.bind('<Configure>',draw);draw()
+    headings=tk.Frame(header,bg=BG);headings.pack(side='left',fill='x',expand=True)
+    tk.Label(headings,text='CAPTION STUDIO',font=('Segoe UI',-11,'bold'),fg='#b7a273',bg=BG,
+             anchor='w').pack(fill='x')
+    tk.Label(headings,text=title,font=('Segoe UI',-20,'bold'),fg=FG,bg=BG,
+             anchor='w',wraplength=380,justify='left').pack(fill='x',pady=(4,0))
+    tk.Label(body,text=message,bg=BG,fg='#bec4cf',wraplength=450,justify='left',
+             font=('Segoe UI',-14)).pack(anchor='w',fill='x',pady=(0,20))
+    tk.Frame(body,bg='#2c323c',height=1).pack(fill='x',pady=(0,14))
 
 
 def alert(title, message, accent=ACCENT):
     root, body, _ = _dark_window(title)
-    tk.Label(body, text=message, bg=BG, fg=FG, wraplength=360,
-             justify="left", font=("Segoe UI", 10)).pack(
-        anchor="w", pady=(0, 18))
+    build_alert_content(body,title,message,error=accent!=ACCENT)
     btn_frm = tk.Frame(body, bg=BG)
     btn_frm.pack(anchor="e")
     btn = _accent_button(btn_frm, "OK", root.destroy, width=8)
     btn.pack()
-    # Override accent if a custom one was passed (e.g. error red).
-    if accent != ACCENT:
-        hover = "#e0473a"
-        btn.configure(bg=accent)
-        btn.bind("<Enter>", lambda e: btn.configure(bg=hover))
-        btn.bind("<Leave>", lambda e: btn.configure(bg=accent))
     root.bind("<Return>", lambda e: root.destroy())
     root.bind("<Escape>", lambda e: root.destroy())
     center(root)
@@ -194,7 +225,7 @@ def alert(title, message, accent=ACCENT):
 
 
 def alert_error(title, message):
-    alert("⚠  " + title, message, accent=CLOSE_HOVER)
+    alert(title, message, accent=CLOSE_HOVER)
 
 
 def pick(title, prompt, items):

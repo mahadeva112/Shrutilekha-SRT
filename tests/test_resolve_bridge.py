@@ -11,6 +11,28 @@ from resolve_bridge import BridgeClient, BridgeError, RemoteObject, lua_value, m
 import audio_to_srt as workflow
 
 class BridgeTests(unittest.TestCase):
+    def test_resolve_21_flagged_collections_map_real_clips(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            client=BridgeClient(tmp,Path(tmp)/'prefs')
+            media=SimpleNamespace(GetClipProperty=lambda:{'File Path':'demo.wav'})
+            clip=SimpleNamespace(GetMediaPoolItem=lambda:media,GetLeftOffset=lambda:0,
+                                 GetStart=lambda:24,GetEnd=lambda:48,GetPlayBackSpeed=lambda:1)
+            with patch.object(client,'request',return_value={'1':clip,'__flags':0}):
+                clips=client.call(1,'GetItemListInTrack',['audio',2])
+            count,path=workflow.collect_clip_ranges(SimpleNamespace(ranges=str(Path(tmp)/'ranges')),
+                                                    None,clips,24,0)
+            self.assertEqual((count,path),(1,'demo.wav'))
+            with patch.object(client,'request',return_value={'__flags':0}):
+                self.assertEqual(client.call(1,'GetClipList',[]),[])
+            with patch.object(client,'request',return_value={'File Path':'demo.wav','__flags':0}):
+                self.assertEqual(client.call(1,'GetClipProperty',[])['File Path'],'demo.wav')
+
+    def test_media_api_failure_is_reported_instead_of_silently_skipping_audio(self):
+        clip=SimpleNamespace(GetMediaPoolItem=lambda:(_ for _ in ()).throw(BridgeError('API unavailable')))
+        with patch.object(workflow,'log'):
+            with self.assertRaisesRegex(RuntimeError,'API unavailable'):
+                workflow.collect_clip_ranges(None,None,[clip],24,0)
+
     def test_strings_are_only_byte_escapes(self):
         text='বাংলা "\\\nreturn os.execute("bad")'
         encoded=lua_value(text)

@@ -1,8 +1,8 @@
-# Resolve 21.1 connection — v1.3.6 preview
+# Resolve 21.1 connection — v1.3.7 preview
 
 The old installer selected Python for every Resolve 21.1 installation. Python scripting requires Studio, so this hid the launcher in Free. The preview uses a local Lua bridge and keeps the UI and transcription in the desktop EXE.
 
-1. Install Srutilekha-Setup-1.3.6.exe. Select **Resolve 21.1 or newer, Free or Studio (Lua bridge + desktop app)**, the detected default. Setup starts the tray helper and registers it for Windows login.
+1. Install Srutilekha-Setup-1.3.7.exe. Select **Resolve 21.1 or newer, Free or Studio (Lua bridge + desktop app)**, the detected default. Setup starts the tray helper and registers it for Windows login.
 2. Save your work and restart Resolve when convenient to refresh the Scripts menu.
 3. Click **Workspace > Scripts > Srutilekha**. The tray helper opens the caption form. Subsequent clicks reopen closed captions or bring the existing caption window forward.
 4. Use the existing Master Studio controls, review and Generate/Sync workflow.
