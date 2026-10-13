@@ -37,10 +37,37 @@ class StudioSurface(tk.Canvas):
         self.coords(self._window, p, p)
         self.itemconfigure(self._window, width=max(1, width-p*2), height=max(1, height-p*2))
         self.delete("surface")
-        face = rounded_rect(self, 1, 1, width-1, height-1, 14,
+        shadow = rounded_rect(self, 2, 4, width-2, height-1, 16,
+                              fill="#101318", outline="")
+        face = rounded_rect(self, 1, 1, width-1, height-3, 16,
                             fill=self.theme["card"], outline=self.theme["border"])
-        self.addtag_withtag("surface", face)
+        highlight = self.create_line(17, 2, max(17, width-17), 2, fill="#303641")
+        for shape in (shadow, face, highlight):
+            self.addtag_withtag("surface", shape)
         self.tag_lower("surface")
+
+
+class SectionMark(tk.Canvas):
+    """Small semantic marks drawn with the native canvas, without emoji fonts."""
+    def __init__(self, parent, kind, theme):
+        super().__init__(parent, width=18, height=18, bg=theme['card'],
+                         bd=0, highlightthickness=0)
+        ink = theme['accent']
+        if kind == 'Audio':
+            for x,y in ((3,6),(7,3),(11,5),(15,7)):
+                self.create_line(x,y,x,18-y,fill=ink,width=2,capstyle='round')
+        elif kind == 'Timing':
+            self.create_oval(2,2,16,16,outline=ink,width=1.5)
+            self.create_line(9,5,9,9,12,11,fill=ink,width=1.5)
+        elif kind == 'Files':
+            self.create_rectangle(4,2,14,16,outline=ink,width=1.5)
+            for y in (6,9,12):self.create_line(7,y,11,y,fill=ink)
+        elif kind == 'Presets':
+            self.create_polygon(4,2,14,2,14,16,9,12,4,16,outline=ink,fill='',width=1.5)
+        else:
+            for y,x in ((4,6),(9,12),(14,8)):
+                self.create_line(2,y,16,y,fill=ink)
+                self.create_oval(x-2,y-2,x+2,y+2,fill=theme['card'],outline=ink,width=1.5)
 
 
 class StudioGroup(tk.Frame):
@@ -100,8 +127,10 @@ class ColorSwatch(RoundedAction):
 def build_form(app):
     g = app.__class__.__init__.__globals__
     theme = dict(bg=g["BG"], card=g["BG_CARD"], field=g["BG_INPUT"],
-                 text=g["FG"], muted=g["FG_DIM"], border="#3a414d",
-                 accent=g["ACCENT"], font=g["UI_FONT"], button_size=-14)
+                 text=g["FG"], muted=g["FG_DIM"], border="#323b48",
+                 accent=g["ACCENT"], font=g["UI_FONT"], button_size=-14,
+                 button_fill="#2c3440", button_hover="#384354", button_border="#3c4758",
+                 selected="#393427", selected_text=g["ACCENT"], radius=10)
     if "Segoe UI Semibold" in tkfont.families(app.root):
         theme["button_font"] = "Segoe UI Semibold"
     bg, card, font = theme["bg"], theme["card"], theme["font"]
@@ -139,7 +168,7 @@ def build_form(app):
     def dropdown(parent, variable, values, key, height=34):
         pick = g["Dropdown"](parent, values, variable, bg_parent=card,
                               height=height, radius=8, max_rows=6)
-        pick._label.configure(font=(font, -15, "bold"))
+        pick._label.configure(font=(theme.get("button_font",font), -15))
         pick.studio_menu_font = (font, -14)
         pick.pack(fill="x")
         app.studio_controls[key] = pick
@@ -192,7 +221,7 @@ def build_form(app):
     title.pack(side="left")
     app._studio_title = label(title, "Caption studio", size=27, bold=True)
     app._studio_title.pack(anchor="w")
-    label(title, "Every setting. One workspace.", size=14, dim=True).pack(anchor="w", pady=(3, 0))
+    label(title, "Your audio. Clear, readable captions.", size=14, dim=True).pack(anchor="w", pady=(3, 0))
     button(heading, "API settings", lambda: show_settings(app.root, theme=theme), height=36).pack(side="right", padx=(12, 0))
     app._seg_sync = button(heading, "Sync existing SRT", lambda: app._set_task("Sync Existing"), selected=True)
     app._seg_sync.pack(side="right", padx=(5, 0))
@@ -220,8 +249,12 @@ def build_form(app):
         surface.grid(row=row, column=column, columnspan=span, sticky="nsew",
                      padx=(0, 6) if span == 1 and column == 0 else (6, 0) if span == 1 else 0,
                      pady=(0, 12) if row < 2 else 0)
-        head = label(surface.body, title, size=15, bold=True)
+        head = tk.Frame(surface.body, bg=card)
         head.pack(anchor="w", pady=(0, 10))
+        SectionMark(head, name, theme).pack(side="left", padx=(0,8))
+        caption = label(head, title, size=15, bold=True)
+        caption.configure(font=(theme.get("button_font",font), -15))
+        caption.pack(side="left")
         section_heads.append(head)
         content = tk.Frame(surface.body, bg=card)
         content.pack(fill="both", expand=True)
@@ -324,7 +357,12 @@ def build_form(app):
     # The preview uses a neutral English demo even when a saved preset is Indic.
     stage = preview_surface.body
     app._stage = stage
-    label(stage, "Caption preview", size=15, bold=True).pack(anchor="w", pady=(0, 12))
+    preview_head = tk.Frame(stage, bg=card)
+    preview_head.pack(fill="x", pady=(0,12))
+    label(preview_head, "Caption preview", size=15, bold=True).pack(side="left")
+    RoundedAction(preview_head, 'Demo', lambda:None, dict(theme,button_size=-11),
+                  fill="#393427", ink=theme['accent'], height=20, width=46,
+                  interactive=False).pack(side="right")
     aspect_row = tk.Frame(stage, bg=card)
     aspect_row.pack(fill="x", pady=(0, 12))
     app._frame_btns = {}
@@ -382,6 +420,11 @@ def build_form(app):
     viewport.bind("<Configure>", lambda e: app._preview.set_bounds(e.width-16, e.height-34))
     label(viewport, "Demo only · enlarged text", size=11, dim=True).place(relx=.5, rely=1, y=-2, anchor="s")
     app._sync_frame_plate()
+    # Consistent rounded field chrome, including controls supplied by presets.
+    for control in app.studio_controls.values():
+        if isinstance(control, g["RoundedField"]):
+            control._r = 9
+            control.set_border(theme["border"])
 
     # All sections stay mapped. Compact sizes reduce gaps, not the type scale.
     fit_job = {"id": None}

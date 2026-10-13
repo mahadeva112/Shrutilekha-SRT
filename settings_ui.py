@@ -92,8 +92,8 @@ class RoundedAction(tk.Canvas):
     def set_primary(self, primary):
         if getattr(self, "selection_button", False):
             self.primary = False
-            self.fill = "#3a3d45" if primary else self.master.cget("bg")
-            self.ink = self.colors["text"] if primary else self.colors["muted"]
+            self.fill = self.colors.get("selected", "#3a3d45") if primary else self.master.cget("bg")
+            self.ink = self.colors.get("selected_text",self.colors["text"]) if primary else self.colors["muted"]
         else:
             self.primary = primary
             self.font.configure(weight="bold" if primary else "normal")
@@ -103,15 +103,20 @@ class RoundedAction(tk.Canvas):
         self.delete("all")
         c = self.colors
         disabled = self.cget("state") == "disabled"
-        fill = self.fill or (c["accent"] if self.primary else "#323239")
+        fill = self.fill or (c["accent"] if self.primary else c.get("button_fill", "#323239"))
         ink = self.ink or ("#242016" if self.primary else c["text"])
         if self.hover and not disabled:
-            fill = "#f0d66d" if self.primary else "#3b3b43"
+            fill = "#f0d66d" if self.primary else c.get("button_hover", "#3b3b43")
         if disabled:
             ink = c["muted"]
-        border = c["accent"] if self.focus_get() is self and self.interactive else fill
-        rounded_rect(self, 1, 1, self.winfo_width()-1, self.winfo_height()-1,
-                     8, fill=fill, outline=border)
+        border = c.get("button_border",fill) if not self.primary and self.fill is None else fill
+        if self.focus_get() is self and self.interactive:
+            border = c["accent"]
+        radius = c.get("radius",8)
+        rounded_rect(self, 2, 3, self.winfo_width()-2, self.winfo_height()-1,
+                     radius, fill="#14171d", outline="")
+        rounded_rect(self, 1, 1, self.winfo_width()-1, self.winfo_height()-3,
+                     radius, fill=fill, outline=border)
         self.create_text(self.winfo_width()/2, self.winfo_height()/2,
                          text=self.text, fill=ink, font=self.font)
 

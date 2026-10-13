@@ -1,4 +1,15 @@
-v1.3.4 preview: dark disabled file inputs.
+v1.3.5 preview: refined Master Studio presentation.
+
+- Softer rounded cards with subtle shadows and quieter borders.
+- Small waveform, clock, file, preset and style marks make sections easier to scan.
+- Clearer headings, warm selected modes and a visible Demo badge in the preview.
+- Consistent rounded inputs, outlined secondary actions, hover feedback and gold focus borders.
+- Error borders remain red, and disabled file inputs remain dark.
+- All caption features stay visible together without scrolling at supported window sizes.
+- English demos, existing preset format, encrypted keys, tray workflow and caption processing are retained.
+- This remains a prerelease; real Resolve 21.1 caption import/styling still awaits validation.
+
+v1.3.4 fixed dark disabled file inputs:
 
 - Existing SRT stays dark and readable in Generate mode; Sync enables the same input.
 - Existing caption settings, presets, API keys and tray workflow are retained.

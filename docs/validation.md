@@ -1,5 +1,14 @@
 # Windows release validation
 
+v1.3.5 preview: 39 checks passed, covering all visible Master Studio controls,
+Generate/Sync switching, preset/output values, language demos and layout bounds
+at normal and compact window sizes. An isolated native Windows preview was
+visually inspected at 1180 x 820 for section marks, card depth, typography,
+warm selected controls and dark inputs. Frozen and installed runtime checks
+passed. Upgrade/reinstall preserved encrypted-key and preset/settings bytes.
+Focus styling retains error borders. No Resolve project changes or paid API
+calls were made. Real Resolve 21.1 caption import/styling remains unverified.
+
 v1.3.4 preview: disabled PillEntry controls now use the same #191c22 background
 as enabled controls, with muted disabled text. Generate/Sync widget inspection
 confirmed the disabled/normal states and matching backgrounds. All 39 existing

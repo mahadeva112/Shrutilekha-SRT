@@ -725,7 +725,8 @@ class RoundedField(tk.Canvas):
         self.delete("bg")
         w = self.winfo_width()
         h = self._h
-        _round_rect_framed(self, w, h, self._r, self._border, self._fill,
+        border = SELECT if getattr(self, "_focused", False) and self._border != BAD else self._border
+        _round_rect_framed(self, w, h, self._r, border, self._fill,
                            tags=("bg",))
         # Keep background polygons below the hosted child widgets
         self.tag_lower("bg")
