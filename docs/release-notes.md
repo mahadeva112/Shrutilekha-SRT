@@ -1,3 +1,13 @@
+v1.3.9 preview: redesigned account connection and cumulative Studio improvements.
+
+- Replaces the API settings page with clear page and provider headings, a larger key field, saved-key status and distinct Test connection / Save & return actions.
+- Wide windows show setup guidance beside the connection card; compact windows retain the key field and all actions without clipping.
+- Retains encrypted key storage, Show/Hide, removal, connection checks and Back/Escape/Enter behavior.
+- Tests cover API settings at 620 × 550, 1040 × 720 and 1180 × 820 across 80/100/125/150/200% render scales.
+- Includes the existing native-resolution fonts/icons, compact Studio layout, crisper illustrated preview, Resolve audio-track compatibility and large-review/split/Apply fixes from previous releases.
+- All setup sections, presets, demo languages, caption styling and tray workflows are included.
+- This remains a prerelease: real Resolve 21.1 caption import/styling and clean physical-PC validation remain outstanding.
+
 v1.3.8 preview: repair large caption review, splitting and Apply.
 
 - Rounded fields coalesce layout work at idle, preventing recursive Tk event-draining when large review lists open.

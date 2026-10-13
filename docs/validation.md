@@ -1,3 +1,17 @@
+v1.3.9 preview: all 52 automated regression tests passed. Includes all prior
+Studio, Resolve bridge, tray and caption review/split/Apply changes plus the
+redesigned API connection page. API layout checks cover 620 × 550,
+1040 × 720 and 1180 × 820 at 80/100/125/150/200% render scales; password masking,
+save/remove, failed-save handling and host shortcut restoration also pass.
+The v1.3.9 installer compiled successfully. The frozen GUI/form/API/tray,
+native DPI awareness, encrypted-key storage, 255-cue review/split/Apply and
+bundled worker smoke checks passed with external Python removed from PATH.
+The caption workspace and wide API page were visually inspected in native
+Windows previews. The full review page visual audit remains incomplete due
+to capture/activation failures. Real Resolve 21.1 import/styling, paid
+transcription and clean physical-PC validation remain outstanding, so this
+release continues the existing prerelease channel.
+
 v1.3.8 preview: 51 relevant regression tests passed. Reproduced recursive update_idletasks calls on the user's
 255-cue sidecar in an isolated copy. Idle-coalesced field redraws remove that
 recursion. Regression tests cover 255-cue review construction, edited manual

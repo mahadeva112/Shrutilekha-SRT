@@ -176,18 +176,53 @@ class ApiSettingsPanel(tk.Frame):
         self.lift()
         font = colors["font"]
         bar = tk.Frame(self, bg=colors["bg"])
-        bar.pack(fill="x", padx=24, pady=(14, 10))
-        self._button(bar, "‹  Back to captions", self.close).pack(side="left")
-        tk.Label(bar, text="SETTINGS  /  API CONNECTION", bg=colors["bg"],
-                 fg=colors["muted"], font=(font, -12)).pack(side="right")
-        space = ConnectionBackdrop(self, colors)
-        space.pack(fill="both", expand=True, padx=24, pady=(0, 18))
+        bar.pack(fill="x", padx=28, pady=(18, 12))
+        self._button(bar, "‹  Back", self.close, subtle=True).pack(side="left")
+        tk.Label(bar, text="SETTINGS  /  CONNECTION", bg=colors["bg"],
+                 fg=colors["muted"], font=(font, -12, "bold")).pack(side="right")
+        heading = tk.Frame(self, bg=colors["bg"])
+        heading.pack(fill="x", padx=36, pady=(0, 22))
+        tk.Label(heading, text="Account connection", bg=colors["bg"],
+                 fg=colors["text"], font=(font, -30, "bold")).pack(anchor="w")
+        tk.Label(heading, text="Set up the voice behind your captions.", bg=colors["bg"],
+                 fg=colors["muted"], font=(font, -15)).pack(anchor="w", pady=(6, 0))
+        space = tk.Frame(self, bg=colors["bg"])
+        space.pack(fill="both", expand=True, padx=36, pady=(0, 24))
+        self._connection_space = space
+        intro = tk.Frame(space, bg=colors["bg"])
+        self._connection_intro = intro
+        def intro_label(text, size=14, muted=False, bold=False):
+            item = tk.Label(intro, text=text, bg=colors["bg"],
+                            fg=colors["muted"] if muted else colors["text"],
+                            font=(font, -size, "bold" if bold else "normal"),
+                            justify="left", anchor="w", wraplength=300)
+            item.pack(fill="x", pady=(0, 12))
+            return item
+        intro_label("ONE CONNECTION.\nREADY FOR EVERY STORY.", 13, bold=True)
+        intro_label("Your audio,\nyour account.", 28, bold=True)
+        intro_label("Srutilekha uses ElevenLabs to turn timeline audio into captions.", 15, muted=True)
+        tk.Frame(intro, bg=colors["border"], height=1).pack(fill="x", pady=(8, 24))
+        for number, title_text, detail in (
+            ("01", "Bring your key", "Create an API key in your ElevenLabs account."),
+            ("02", "Check the connection", "Test access before starting your next caption run."),
+            ("03", "Return to your timeline", "Save once. Use it whenever you generate captions.")):
+            row = tk.Frame(intro, bg=colors["bg"])
+            row.pack(fill="x", pady=(0, 20))
+            tk.Label(row, text=number, bg=colors["bg"], fg=colors["accent"],
+                     font=(font, -13, "bold")).pack(side="left", anchor="n", padx=(0, 14))
+            copy = tk.Frame(row, bg=colors["bg"])
+            copy.pack(side="left", fill="x", expand=True)
+            tk.Label(copy, text=title_text, bg=colors["bg"], fg=colors["text"],
+                     font=(font, -15, "bold"), anchor="w").pack(fill="x")
+            tk.Label(copy, text=detail, bg=colors["bg"], fg=colors["muted"],
+                     font=(font, -13), wraplength=260, justify="left", anchor="w").pack(fill="x", pady=(5, 0))
         card = RoundedSurface(space, colors["bg"], colors["card"],
-                              colors["border"], radius=22, padding=30)
-        card.place(relx=.5, rely=.5, anchor="center", width=600)
+                              colors["border"], radius=16, padding=28)
+        self._connection_card = card
+        card.place(relx=.5, rely=.48, anchor="center", width=600)
         body = card.body
         provider = tk.Frame(body, bg=colors["card"])
-        provider.pack(fill="x", pady=(0, 22))
+        provider.pack(fill="x", pady=(0, 26))
         mark = tk.Canvas(provider, width=42, height=42, bg=colors["card"],
                          highlightthickness=0)
         mark.pack(side="left", padx=(0, 12))
@@ -205,26 +240,27 @@ class ApiSettingsPanel(tk.Frame):
                  font=(font, -16, "bold"), anchor="w").pack(anchor="w")
         tk.Label(provider_text, text="Speech-to-text provider", bg=colors["card"],
                  fg=colors["muted"], font=(font, -13)).pack(anchor="w", pady=(2, 0))
-        badge = RoundedAction(provider, "Personal account", lambda: None, colors,
-                              fill="#343126", ink=colors["accent"], height=28,
-                              interactive=False)
-        badge.pack(side="right")
-        title = tk.Label(body, text="Connect your account", bg=colors["card"],
-                        fg=colors["text"], font=(font, -27, "bold"), anchor="w")
+        title = tk.Label(body, text="Connect ElevenLabs", bg=colors["card"],
+                        fg=colors["text"], font=(font, -25, "bold"), anchor="w")
         title.pack(fill="x")
-        description = tk.Label(body, text="Bring your own API key to generate captions.",
+        description = tk.Label(body, text="Paste your API key to enable transcription.",
                                bg=colors["card"], fg=colors["muted"],
                                font=(font, -14), anchor="w")
-        description.pack(fill="x", pady=(5, 16))
-        tk.Label(body, text="ELEVENLABS API KEY", bg=colors["card"],
-                 fg=colors["muted"], font=(font, -13, "bold"), anchor="w").pack(fill="x", pady=(0, 7))
+        description.pack(fill="x", pady=(7, 24))
+        key_label = tk.Label(body, text="ELEVENLABS API KEY", bg=colors["card"],
+                            fg=colors["muted"], font=(font, -13, "bold"), anchor="w")
+        key_label.pack(fill="x", pady=(0, 7))
         self.value = tk.StringVar(master=self)
         load_error = False
         try:
             self.value.set(credentials.get_key())
         except Exception:
             load_error = True
-        field = tk.Canvas(body, height=46, width=80, bg=colors["card"],
+        self.connection_badge = RoundedAction(provider, "Key saved" if self.value.get() else "Not configured",
+                              lambda: None, colors, fill=colors["field"], ink=colors["muted"],
+                              height=28, interactive=False)
+        self.connection_badge.pack(side="right")
+        field = tk.Canvas(body, height=54, width=80, bg=colors["card"],
                           highlightthickness=0)
         field.pack(fill="x")
         row = tk.Frame(field, bg=colors["field"])
@@ -237,25 +273,26 @@ class ApiSettingsPanel(tk.Frame):
         self.reveal_button = RoundedAction(row, "Show", self._toggle_reveal, colors,
                                            fill=colors["field"], height=28, width=54)
         self.reveal_button.pack(side="right", padx=(8, 0))
-        row_id = field.create_window(14, 23, window=row, anchor="w")
+        row_id = field.create_window(16, 27, window=row, anchor="w")
         def draw_field(event=None):
             width = field.winfo_width()
             field.delete("outline")
-            outline = rounded_rect(field, 1, 1, width-1, 45, 9,
+            outline = rounded_rect(field, 1, 1, width-1, 53, 9,
                          fill=colors["field"], outline=(colors["accent"]
                          if self.entry.focus_get() is self.entry else colors["border"]))
             field.addtag_withtag("outline", outline)
             field.tag_lower("outline")
-            field.itemconfigure(row_id, width=max(1, width-28))
+            field.itemconfigure(row_id, width=max(1, width-32))
         field.bind("<Configure>", draw_field)
         field.bind("<Button-1>", lambda e: self.entry.focus_set())
         self.entry.bind("<FocusIn>", draw_field)
         self.entry.bind("<FocusOut>", draw_field)
         self.status = tk.StringVar(master=self, value=(
             "Saved key could not be read. Paste your key again." if load_error else
-            "Encrypted on this device. Your key stays saved through updates."))
+            "Key saved on this device. Test to check account access." if self.value.get() else
+            "Paste a key, then test the connection."))
         note = tk.Frame(body, bg=colors["card"])
-        note.pack(fill="x", pady=(12, 16))
+        note.pack(fill="x", pady=(14, 20))
         shield = tk.Canvas(note, width=18, height=20, bg=colors["card"], highlightthickness=0)
         shield.pack(side="left", anchor="n", padx=(0, 8))
         def draw_shield(event=None):
@@ -269,21 +306,34 @@ class ApiSettingsPanel(tk.Frame):
                                 justify="left", wraplength=480)
         status_label.pack(side="left", fill="x", expand=True)
         note.bind("<Configure>", lambda e: status_label.configure(wraplength=max(1, e.width-26)))
-        tk.Frame(body, bg=colors["border"], height=1).pack(fill="x", pady=(0, 16))
+        tk.Frame(body, bg=colors["border"], height=1).pack(fill="x", pady=(0, 20))
         actions = tk.Frame(body, bg=colors["card"])
         actions.pack(fill="x")
         self._button(actions, "Remove key", self.remove, subtle=True).pack(side="left")
-        self._button(actions, "Save key  →", self.save, primary=True).pack(side="right")
+        self._button(actions, "Save & return", self.save, primary=True).pack(side="right")
         self.test_button = self._button(actions, "Test connection", self.test)
         self.test_button.pack(side="right", padx=(0, 10))
+        privacy = tk.Label(body, text="Encrypted locally  ·  Preserved through app updates", bg=colors["card"],
+                           fg=colors["muted"], font=(font, -12), anchor="w")
+        privacy.pack(fill="x", pady=(18, 0))
         def fit(event):
-            card.place_configure(width=min(600, max(1, event.width-4)))
-            compact = event.height < 410
+            wide = event.width >= 940 and event.height >= 540
+            if wide:
+                intro.place(x=0, rely=.48, anchor="w", width=300)
+                card.place_configure(relx=1, rely=.48, anchor="e", width=min(600, event.width-340))
+            else:
+                intro.place_forget()
+                card.place_configure(relx=.5, rely=.5, anchor="center", width=min(600, max(1, event.width)))
+            compact = event.height < 540
             if compact:
                 provider.pack_forget()
+                privacy.pack_forget()
+                description.pack_forget()
             elif not provider.winfo_manager():
-                provider.pack(fill="x", pady=(0, 22), before=title)
-            card.set_padding(18 if compact else 30)
+                provider.pack(fill="x", pady=(0, 26), before=title)
+                privacy.pack(fill="x", pady=(18, 0))
+                description.pack(fill="x", pady=(7, 24), before=key_label)
+            card.set_padding(18 if compact else 28)
         space.bind("<Configure>", fit, add='+')
         self._binding_ids["<Return>"] = parent.bind("<Return>", self.save)
         self._binding_ids["<Escape>"] = parent.bind("<Escape>", self.close)
@@ -351,6 +401,7 @@ class ApiSettingsPanel(tk.Frame):
         try:
             credentials.delete_key()
             self.value.set("")
+            self.connection_badge.set_text("Not configured")
             self.status.set("Saved API key removed.")
         except Exception:
             self.status.set("Could not remove the saved key. Try again.")
