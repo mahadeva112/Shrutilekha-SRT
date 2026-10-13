@@ -34,7 +34,7 @@ Setup offers the packaged Lua launcher for Resolve 21.0 and earlier, or the
 Lua bridge for Resolve 21.1+ Free or Studio, with an optional Studio-only
 Python launcher. It detects the usual Windows installation
 path to preselect an option; users can override it for custom installations.
-The bridge starts in Resolve; select Connect in the desktop app to open the
+The bridge starts in Resolve; open the desktop app to automatically open the
 bundled form/worker. Legacy Lua launching and SRT timeline import were
 verified in Resolve 21.0.4.5; see [validation details](validation.md). The Python
 launcher requires a working Python scripting host in Resolve. The bundled app

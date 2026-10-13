@@ -179,6 +179,14 @@ class BridgeClient:
             self.cache.clear()
 
 
+def probe_connection():
+    """Read-only handshake, avoiding the mailbox while captions are active."""
+    directory = user_dir() / 'resolve-bridge'
+    with mailbox_lock(directory / 'workflow.lock'):
+        info, _ = BridgeClient(timeout=1).connect()
+    return info
+
+
 def run_workflow():
     directory = user_dir() / 'resolve-bridge'
     with mailbox_lock(directory / 'workflow.lock'):

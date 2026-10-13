@@ -2,7 +2,7 @@
 
 Windows standalone installer: [download stable v1.3.0](https://github.com/mahadeva112/Shrutilekha-SRT/releases/tag/v1.3.0), or see [build, API settings and release instructions](docs/windows-release.md).
 The installer bundles Python, adds the Resolve launcher and stores each user's own API key encrypted.
-Resolve 21.0 and earlier use the legacy Lua launcher. Resolve 21.1+ Free requires the [v1.3.1 preview Lua bridge](docs/resolve-bridge.md). Python menu scripting on 21.1+ requires Studio.
+Resolve 21.0 and earlier use the legacy Lua launcher. Resolve 21.1+ Free requires the [v1.3.2 preview Lua bridge](docs/resolve-bridge.md). Start the Lua script once per Resolve session, then open the desktop app; it connects automatically. Python menu scripting on 21.1+ requires Studio.
 Lua launching and SRT import were verified in Resolve 21.0.4.5. See [validation scope](docs/validation.md) for remaining checks. Public stable releases appear through the app's update checker. Use Check for updates, then Install update.
 
 Transcribe a DaVinci Resolve timeline and import the result back as a styled
@@ -244,7 +244,7 @@ third-party package — just a data file loaded lazily on the first Latin word.
 - **A run fails silently inside Resolve.** Check `logs/audio_to_srt.log` first.
 - **The menu entry is missing on Resolve 21.1 Free.** Install the preview using
   the Free/Studio Lua bridge option and restart Resolve when your work is saved.
-  Start the script once, then select Connect in the desktop app.
+  Start the script once, then open the desktop app; it connects automatically.
 
 ### Running the worker standalone
 

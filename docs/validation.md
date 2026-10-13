@@ -1,5 +1,13 @@
 # Windows release validation
 
+v1.3.2 preview: 32 checks passed. New GUI event-loop tests verify automatic
+caption launch without a click, waiting when the bridge is absent, and avoiding
+duplicate workflows. Packaged runtime and the installed upgrade passed smoke
+checks; encrypted key and preset/settings bytes were preserved. The actual
+waiting screen was visually inspected with Resolve closed. The bridge-ready
+automatic launch was tested with an isolated handshake; real 21.1 import and
+styling remain unverified. No project edits or paid transcription were performed.
+
 v1.3.1 preview: 29 checks passed, including mailbox encoding, response errors,
 timeout cleanup, lock exclusion, rejected styling writes, clip speed/range
 mapping and import isolation from existing cues. Actual Lua handshake and

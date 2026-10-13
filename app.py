@@ -54,7 +54,7 @@ def main():
     import threading
     root = tk.Tk()
     root.title("Srutilekha")
-    root.geometry("620x470")
+    root.geometry("620x510")
     root.configure(bg="#17191e")
     style = ttk.Style(root)
     style.theme_use("clam")
@@ -68,17 +68,37 @@ def main():
     body.pack(fill="both", expand=True)
     ttk.Label(body, text="Srutilekha", font=("Segoe UI", -27, "bold")).pack(anchor="w")
     ttk.Label(body, text="Timeline audio → captions", font=("Segoe UI", 12)).pack(anchor="w", pady=8)
-    ttk.Label(body, text="Resolve 21.1+: start Workspace → Scripts → Srutilekha once,\nthen connect here. Supports Free and Studio editions.\nResolve 21.0 or earlier: launch Srutilekha from the Scripts menu.", wraplength=560).pack(anchor="w", pady=16)
+    ttk.Label(body, text="Resolve 21.1+: captions open automatically when connected.\nStart Workspace → Scripts → Srutilekha once per Resolve session.\nResolve 21.0 or earlier: launch from the Scripts menu.", wraplength=560).pack(anchor="w", pady=16)
     def connect_resolve():
         import subprocess
         command = [str(install_dir() / "Srutilekha.exe"), "--bridge-run"] if getattr(sys, "frozen", False) else [sys.executable, str(resources() / "app.py"), "--bridge-run"]
         subprocess.Popen(command, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        root.destroy()
     ttk.Button(body, text="Connect to Resolve", command=connect_resolve).pack(anchor="w", pady=(0, 10))
     ttk.Button(body, text="API settings", command=lambda: show_settings(root)).pack(anchor="w")
+    connection_status = tk.StringVar(value="Connecting to Resolve…")
+    ttk.Label(body, textvariable=connection_status, wraplength=550).pack(anchor="w", pady=(10, 0))
     status = tk.StringVar(value="v" + release_updater.VERSION)
     ttk.Label(body, textvariable=status, wraplength=520).pack(anchor="w", pady=14)
     events = queue.Queue()
-    state = {"info": None, "busy": False}
+    state = {"info": None, "busy": False, "bridge_checking": False}
+
+    def probe():
+        if state["bridge_checking"]:
+            return
+        if getattr(root, "_api_settings_panel", None) is not None:
+            root.after(2000, probe)
+            return
+        state["bridge_checking"] = True
+        def work():
+            from resolve_bridge import probe_connection, BridgeError
+            try:
+                events.put(("bridge_ready", probe_connection()))
+            except BridgeError as exc:
+                events.put(("bridge_wait", str(exc)))
+            except Exception:
+                events.put(("bridge_wait", ""))
+        threading.Thread(target=work, daemon=True).start()
 
     def check():
         if state["busy"]:
@@ -117,6 +137,18 @@ def main():
     def poll():
         try:
             kind, result = events.get_nowait()
+            if kind.startswith("bridge_"):
+                state["bridge_checking"] = False
+                if kind == "bridge_ready" and getattr(root, "_api_settings_panel", None) is None:
+                    connect_resolve()
+                    return
+                if "Another Srutilekha operation" in str(result):
+                    connection_status.set("Your caption window is already open. Close it to reconnect here.")
+                else:
+                    connection_status.set("Waiting for Resolve. Start Workspace → Scripts → Srutilekha; this app will connect automatically.")
+                root.after(2000, probe)
+                root.after(100, poll)
+                return
             state["busy"] = False
             if kind == "checked":
                 state["info"] = result
@@ -139,6 +171,10 @@ def main():
         if missing:
             show_settings(root)
         check()
+        if "--home" not in sys.argv:
+            probe()
+        else:
+            connection_status.set("Automatic connection paused. Use Connect when ready.")
     root.after(200, first_run)
     root.mainloop()
 

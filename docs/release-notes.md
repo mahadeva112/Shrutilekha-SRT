@@ -1,4 +1,13 @@
-v1.3.1 preview: Resolve 21.1 Free/Studio Lua bridge.
+v1.3.2 preview: automatic desktop connection to the Resolve Lua bridge.
+
+- Opening the desktop app automatically opens captions when the Lua bridge is available.
+- If the bridge is not ready, the app waits and connects after Workspace > Scripts > Srutilekha is started.
+- Existing caption workflows are detected so automatic connection does not launch duplicates.
+- No automatic Generate, Sync, Undo, transcription or timeline changes.
+- Start the Lua script once per Resolve session. Free edition cannot bootstrap it from the desktop app.
+- Real caption import/styling on Resolve 21.1 remains unverified; this is a prerelease.
+
+v1.3.1 preview introduced:
 
 - Fixes the installer choosing Studio-only Python scripting for Free edition.
 - Start Workspace > Scripts > Srutilekha once, then Connect in the desktop app.
