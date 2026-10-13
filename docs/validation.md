@@ -1,3 +1,22 @@
+v1.3.8 preview: 51 relevant regression tests passed. Reproduced recursive update_idletasks calls on the user's
+255-cue sidecar in an isolated copy. Idle-coalesced field redraws remove that
+recursion. Regression tests cover 255-cue review construction, edited manual
+splits, deleted words remaining deleted, immediate Apply after a split-setting
+change, completion signaling and bridge API failure reporting. Import tests require
+AppendToTimeline clip-info dictionaries as documented by the installed 21.1
+Scripting README, while retaining pre-existing cues and tracks. In an isolated
+native preview, clicking Readable changed 255 cues to 176, and clicking Apply
+wrote local captions and reached the completion screen. The preview's Resolve
+handoff was disabled, so no timeline was changed. DPI tests include logical
+scroll regions and existing four-scale control bounds. Real Resolve import
+and styling remain untested; no paid transcription was performed. Frozen
+and installed EXE checks also passed a 255-cue review, re-split and Apply
+handshake. The upgrade retained the encrypted key and recovered SRT/word
+timing files. The orphaned completed run was cancelled with code 130 after
+its output was backed up; logs confirm no captions were applied. Concurrent
+API-page edits are left uncommitted and excluded from this release; archive
+inspection confirmed its packaged API module matches the committed version.
+
 v1.3.7 preview: 48 tests passed. Regression tests cover Resolve 21.1 Lua collections with
 __flags, empty collections, retained clip-property dictionaries and surfaced
 media API errors. Live read-only probes of Resolve 21.1.1.10 Free found one

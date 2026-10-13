@@ -646,11 +646,16 @@ class RoundedField(tk.Canvas):
         self._right_child = None  # optional right-side widget (e.g. chevron)
         self._child_win = None
         self._right_win = None
+        self._redraw_job = None
         self.bind("<Configure>", lambda e: self._redraw())
+        self.bind('<Destroy>', self._cancel_redraw, add='+')
 
     def set_child(self, child, right_child=None):
         self._child = child
         self._right_child = right_child
+        child.bind('<Configure>', lambda e: self._redraw(), add='+')
+        if right_child is not None:
+            right_child.bind('<Configure>', lambda e: self._redraw(), add='+')
         self._redraw()
 
     def set_border(self, color):
@@ -672,14 +677,19 @@ class RoundedField(tk.Canvas):
         self._redraw()
 
     def _redraw(self):
-        if getattr(self, "_drawing", False):
-            return
-        self._drawing = True
-        try:
-            self.update_idletasks()
-            self._redraw_field()
-        finally:
-            self._drawing = False
+        # Batch geometry work at idle instead of draining the event queue
+        # recursively for every input in a long review list.
+        if self._redraw_job is None:
+            self._redraw_job = self.after_idle(self._flush_redraw)
+
+    def _flush_redraw(self):
+        self._redraw_job = None
+        self._redraw_field()
+
+    def _cancel_redraw(self, event):
+        if event.widget is self and self._redraw_job is not None:
+            self.after_cancel(self._redraw_job)
+            self._redraw_job = None
 
     def _redraw_field(self):
         self.delete("bg")
@@ -2505,9 +2515,10 @@ class ReelPreview(tk.Canvas):
                         5, fill=self._blend(pill, "#0a0c10", 1.0), outline="")
 
         if shadow_on:
-            for hx, hy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                self.create_text(cx + sdx + hx, cy + sdy + hy, text=self.SAMPLE, justify="center",
-                                 font=font, fill=scol_soft)
+            if not getattr(self, "studio_illustration", False):
+                for hx, hy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    self.create_text(cx + sdx + hx, cy + sdy + hy, text=self.SAMPLE, justify="center",
+                                     font=font, fill=scol_soft)
             self.create_text(cx + sdx, cy + sdy, text=self.SAMPLE, justify="center",
                              font=font, fill=scol_core)
         if outline_on:
@@ -5238,7 +5249,9 @@ class App:
                     msg = f.read().strip()
             except Exception:
                 msg = "Done."
-            self._build_done(msg)
+            failed = msg.startswith('ERROR\n')
+            self.exit_code = 1 if failed else 0
+            self._build_done(msg[6:] if failed else msg, failed=failed)
             return
         if self._result_timed_out():
             self.exit_code = 1
@@ -5404,7 +5417,9 @@ class App:
                     msg = f.read().strip()
             except Exception:
                 msg = "Done."
-            self._build_done(msg)
+            failed = msg.startswith('ERROR\n')
+            self.exit_code = 1 if failed else 0
+            self._build_done(msg[6:] if failed else msg, failed=failed)
             return
         if self._result_timed_out():
             self._build_done(
@@ -5862,6 +5877,8 @@ class App:
         """Regroup the cached words into segment dicts using the current split
         settings. Pure/local — never touches the network."""
         import transcribe as _T
+        if hasattr(self, '_review_rows'):
+            self._review_words = self._flatten_words(self._snapshot_segs())
         s = self._split_settings()
         cues = _T.build_cues(self._review_words, s["max_chars"], s["max_lines"],
                              s["max_secs"], include_punct="1", cps=s["cps"],
@@ -6435,12 +6452,14 @@ class App:
     def _do_resplit(self):
         self._resplit_after = None
         if not self._review_alive():
-            return
+            return False
         try:
             segs, s = self._resplit_segments()
-        except Exception:
-            return
+        except Exception as exc:
+            self._review_status.set('Could not re-split: %s' % exc)
+            return False
         self._rebuild_review_rows(segs, s)
+        return True
 
     def _review_alive(self):
         """Is the review list still on screen?
@@ -6460,10 +6479,11 @@ class App:
         """(Re)paint the cue cards for ``segs`` and refresh the status line."""
         if not self._review_alive():
             return
-        for child in list(self._review_lst.winfo_children()):
-            child.destroy()
+        old_children = list(self._review_lst.winfo_children())
         self._review_rows = []
         self._sel_desc = None
+        for child in old_children:
+            child.destroy()
         # The inspector is repainted from whatever cue is selected, which can
         # happen long after this rebuild; it needs the settings this cut used.
         self._insp_settings = s
@@ -6657,12 +6677,13 @@ class App:
                 return
             import transcribe as _T
             nxt = self._review_rows[i + 1]
+            current, following = self._live_segment(desc), self._live_segment(nxt)
             combined = (ent.get().strip() + " " + nxt["text"].get().strip()).strip()
             merged_text = _T.wrap(" ".join(combined.split()),
                                   s["max_chars"], s["max_lines"],
                                   s.get("lang"))
-            new_seg = {"s": seg["s"], "e": nxt["seg"]["e"], "spk": seg.get("spk"),
-                       "words": seg.get("words", []) + nxt["seg"].get("words", []),
+            new_seg = {"s": current["s"], "e": following["e"], "spk": current.get("spk"),
+                       "words": current.get("words", []) + following.get("words", []),
                        "text": merged_text}
             # Snapshot every OTHER row's live text first. Reading d["seg"] alone
             # discarded any cue the user had already retyped, because seg["text"]
@@ -6680,7 +6701,8 @@ class App:
             if desc not in self._review_rows:
                 return
             i = self._review_rows.index(desc)
-            words_list = seg.get("words", [])
+            current = self._live_segment(desc)
+            words_list = current.get("words", [])
             if len(words_list) < 2:
                 return
             import transcribe as _T
@@ -6709,11 +6731,11 @@ class App:
                 left_end = cut - 0.001  # absorb the pause, same rule as the SRT
             # Both halves stay non-degenerate and ordered even when the ASR
             # hands back overlapping or zero-length words.
-            left_end = max(seg["s"] + 0.001, min(left_end, cut - 0.001))
-            seg_left = {"s": seg["s"], "e": left_end,
-                        "spk": seg.get("spk"), "words": left_words, "text": left_text}
-            seg_right = {"s": cut, "e": max(seg["e"], cut + 0.001),
-                         "spk": seg.get("spk"), "words": right_words, "text": right_text}
+            left_end = max(current["s"] + 0.001, min(left_end, cut - 0.001))
+            seg_left = {"s": current["s"], "e": left_end,
+                        "spk": current.get("spk"), "words": left_words, "text": left_text}
+            seg_right = {"s": cut, "e": max(current["e"], cut + 0.001),
+                         "spk": current.get("spk"), "words": right_words, "text": right_text}
             segs = self._snapshot_segs()
             segs[i:i + 1] = [seg_left, seg_right]
             self._rebuild_review_rows(segs, s)
@@ -6756,10 +6778,26 @@ class App:
         for d in self._review_rows:
             if d is skip:
                 continue
-            seg = dict(d["seg"])
-            seg["text"] = d["text"].get().strip()
+            seg = self._live_segment(d)
             out.append(seg)
         return out
+
+    @staticmethod
+    def _live_segment(desc):
+        """Carry current edits into local splitting, preserving word timing."""
+        seg = dict(desc['seg'])
+        seg['text'] = desc['text'].get().strip()
+        tokens = seg['text'].split()
+        words = seg.get('words', [])
+        if len(tokens) == len(words):
+            seg['words'] = [(start,end,text) for (start,end,_),text in zip(words,tokens)]
+        elif tokens:
+            step = max(.001,seg['e']-seg['s']) / len(tokens)
+            seg['words'] = [(seg['s']+i*step,seg['s']+(i+1)*step,text)
+                            for i,text in enumerate(tokens)]
+        else:
+            seg['words'] = []
+        return seg
 
     @staticmethod
     def _cue_stats(seg, s):
@@ -6863,6 +6901,8 @@ class App:
         _bind(outer)
 
     def _select_review(self, desc):
+        if desc not in getattr(self, '_review_rows', []):
+            return
         prev = self._sel_desc
         self._sel_desc = desc
         if prev is not None and prev is not desc:
@@ -6918,15 +6958,16 @@ class App:
             pass
 
     def _apply_review(self, srt_path, cap_path, header):
-        # Drop any debounced re-split before the rows are read: letting it land
-        # would replace the list we are about to write with a freshly re-cut one,
-        # discarding the user's edits at the last moment.
+        # Finish a pending cut using the current edits before writing, so an
+        # immediate Apply uses the settings the user just chose.
         if getattr(self, "_resplit_after", None):
             try:
                 self.root.after_cancel(self._resplit_after)
             except Exception:
                 pass
             self._resplit_after = None
+            if not self._do_resplit():
+                return
         final = [seg for seg in self._snapshot_segs() if seg["text"]]
         if not final:
             messagebox.showerror(

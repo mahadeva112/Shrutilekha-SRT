@@ -224,4 +224,25 @@ def _run_workflow():
             text += '\n\nResolve did not accept some caption styling properties. Text and timing were imported; review the style in Resolve.'
         return original_report(run, text)
     audio_to_srt.Run.report = report
-    audio_to_srt.main()
+    original_launch = audio_to_srt.Run.launch_loader
+    active = []
+    def launch(run):
+        ok = original_launch(run)
+        if ok:
+            active.append(run)
+        return ok
+    audio_to_srt.Run.launch_loader = launch
+    try:
+        audio_to_srt.main()
+    except Exception as exc:
+        audio_to_srt.log('Resolve workflow failed: %s' % exc)
+        if not active:
+            raise
+        run = active[-1]
+        run.report('ERROR\nResolve could not finish the caption workflow.\n\n%s\n\n'
+                   'Check the timeline before retrying; some captions may already have been applied.' % exc)
+        run.cleanup()
+    finally:
+        audio_to_srt.apply_styles = original_style
+        audio_to_srt.Run.report = original_report
+        audio_to_srt.Run.launch_loader = original_launch

@@ -199,7 +199,7 @@ class LogicalTk:
             if sub=='screenwidth':return self.logical(self.work[2])
             if sub=='screenheight':return self.logical(self.work[3])
             result=self.raw.call(*a)
-            if sub in ('width','height','reqwidth','reqheight','x','y','rootx','rooty','vrootx','vrooty','vrootwidth','vrootheight','pixels'):
+            if sub in ('width','height','reqwidth','reqheight','x','y','rootx','rooty','pointerx','pointery','vrootx','vrooty','vrootwidth','vrootheight','pixels'):
                 return self.logical(result)
             if sub=='fpixels':return float(result)/self.scale
             return result
@@ -225,6 +225,7 @@ class LogicalTk:
                 result=self.raw.call(*a)
                 key=str(a[2])
                 if key=='-font':return self.font(result,True)
+                if key=='-scrollregion':return tuple(self.logical(v) for v in self.raw.splitlist(result))
                 if key in PIXELS or key in ('-width','-height') and kind in BOXES:return self.distance(result,True)
                 return result
         result=self.raw.call(*a)

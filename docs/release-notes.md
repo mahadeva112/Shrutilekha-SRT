@@ -1,3 +1,16 @@
+v1.3.8 preview: repair large caption review, splitting and Apply.
+
+- Rounded fields coalesce layout work at idle, preventing recursive Tk event-draining when large review lists open.
+- Master Studio refits when embedded inputs settle; existing compact layouts and 100/125/150/200% render-scale checks are retained.
+- Re-splitting and manual split/merge preserve edited words and deletions, with timing retained or redistributed within the original cue.
+- Apply finishes a pending local cut before writing captions and signaling Resolve.
+- SRT appends use clip-info dictionaries, the supported Resolve 21.1 API format, instead of the deprecated bare-item overload.
+- Scroll regions and pointer coordinates use consistent logical DPI units.
+- Unexpected Resolve workflow failures report back to the caption window instead of leaving it waiting; existing caption tracks remain protected by the import diff.
+- English demos, all settings, saved presets and encrypted keys are retained.
+- Large-list review/split/Apply tests use local files and mocked Resolve imports; no paid transcription or current-project mutations are performed.
+- This remains a prerelease; real Resolve 21.1 caption import/styling still awaits validation.
+
 v1.3.7 preview: Resolve 21.1 audio-track compatibility and refined account pages.
 
 - Resolve 21.1 Lua clip collections include internal __flags metadata. The bridge now returns real clip lists, so existing audio sources are recognized.

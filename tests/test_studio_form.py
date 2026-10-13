@@ -11,6 +11,48 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 
 class StudioFormTests(unittest.TestCase):
+    def test_large_review_split_edits_and_apply_handshake(self):
+        self.root.withdraw()
+        p=Path(self.scratch.name);srt=str(p/'large.srt');cap=srt+'.cap'
+        segs=[{'s':i*2.,'e':i*2.+1.8,'spk':0,'text':'Original story',
+               'words':[(i*2.,i*2.+.7,'Original'),(i*2.+.8,i*2.+1.8,'story')]}
+              for i in range(255)]
+        self.app._write_srt_cap(srt,cap,[],segs)
+        self.app._build_review(srt,cap,[],segs);self.root.update()
+        self.assertEqual(len(self.app._review_rows),255)
+        text=self.app._review_rows[0]['text'].text
+        text.delete('1.0','end');text.insert('1.0','Edited story today')
+        text.mark_set('insert','1.6')
+        self.app._review_rows[0]['split']();self.root.update()
+        self.assertEqual(len(self.app._review_rows),256)
+        self.assertIn('Edited',self.app._snapshot_segs()[0]['text'])
+        # Delete a cue then change cut settings: deleted words must stay gone.
+        snapshot=self.app._snapshot_segs()
+        snapshot[2]['text']='RemoveMe';snapshot[2]['words']=[(4.,5.8,'RemoveMe')]
+        self.app._rebuild_review_rows(snapshot,self.app._split_settings());self.root.update()
+        self.app._rebuild_review_rows(self.app._snapshot_segs()[3:],self.app._split_settings())
+        remaining=self.app._snapshot_segs()
+        self.assertNotIn('RemoveMe',' '.join(seg['text'] for seg in remaining))
+        self.app.settings_vars[0].set('30')
+        # Apply before the debounce timer runs must use this latest cut.
+        self.app._apply_review(srt,cap,[]);self.root.update()
+        self.assertEqual(Path(self.app.done_path).read_text(),'0')
+        self.assertNotIn('RemoveMe',Path(cap).read_text())
+        self.assertTrue(Path(srt).stat().st_size)
+        self.assertFalse(self.errors,self.errors)
+
+    def test_resplit_keeps_manual_word_edits(self):
+        self.root.withdraw()
+        p=Path(self.scratch.name);srt=str(p/'edit.srt');cap=srt+'.cap'
+        segs=[{'s':0.,'e':3.,'spk':0,'text':'Original story',
+               'words':[(0.,1.,'Original'),(1.,3.,'story')]}]
+        self.app._build_review(srt,cap,[],segs);self.root.update()
+        text=self.app._review_rows[0]['text'].text
+        text.delete('1.0','end');text.insert('1.0','Edited story today')
+        self.app.settings_vars[0].set('30');self.app._do_resplit();self.root.update()
+        self.assertEqual(' '.join(w[2] for seg in self.app._snapshot_segs() for w in seg['words']),
+                         'Edited story today')
+
     def test_source_preparation_error_shows_in_window_without_launching_worker(self):
         self.app._build_progress()
         Path(self.app.result_path).write_text('Audio source unavailable\nNo transcription was started.',encoding='utf-8')

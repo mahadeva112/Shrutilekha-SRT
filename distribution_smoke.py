@@ -71,6 +71,23 @@ def run(output):
         panel.save()
         assert credentials.get_key() == "distribution-test-key"
         assert all(root.bind(key) == script for key, script in bindings.items())
+        ui_errors=[]
+        root.report_callback_exception=lambda kind,value,tb:ui_errors.append(str(value))
+        # Large reviews formerly recursively drained Tk's event queue and
+        # failed only after transcription had completed in the packaged app.
+        segments=[{'s':i*2.,'e':i*2.+1.8,'spk':0,'text':'A clear story',
+                   'words':[(i*2.,i*2.+.5,'A'),(i*2.+.6,i*2.+1.,'clear'),(i*2.+1.1,i*2.+1.8,'story')]}
+                  for i in range(255)]
+        srt=str(p/'review.srt');cap=srt+'.cap'
+        app._build_review(srt,cap,[],segments)
+        root.update_idletasks()
+        assert len(app._review_rows)==255
+        app.settings_vars[0].set('30')
+        app._apply_review(srt,cap,[])
+        root.update_idletasks()
+        assert (p/'done').read_text()=='0'
+        assert Path(srt).stat().st_size
+        assert not ui_errors,ui_errors
         root.destroy()
         worker = subprocess.run([str(install_dir() / "Srutilekha-worker.exe"), "--self-test"],
                                 capture_output=True, text=True, encoding="utf-8", timeout=30,
@@ -79,5 +96,6 @@ def run(output):
             raise RuntimeError(worker.stdout + worker.stderr)
         report = {"gui": "ok", "resolve_form": "ok", "master_studio": "all sections", "demo_languages": "independent", "encrypted_key": "ok", "api_settings": "in-window",
                   "tray": "native icon and menu", "dpi": "PerMonitorV2 and native pixel fonts",
+                  "review": "255 cues, local re-split and Apply handshake",
                   "worker": worker.stdout.strip()}
         Path(output).write_text(json.dumps(report, indent=2), encoding="utf-8")

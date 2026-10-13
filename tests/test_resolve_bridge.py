@@ -11,6 +11,25 @@ from resolve_bridge import BridgeClient, BridgeError, RemoteObject, lua_value, m
 import audio_to_srt as workflow
 
 class BridgeTests(unittest.TestCase):
+    def test_apply_api_failure_reports_to_window_and_restores_workflow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_client=SimpleNamespace(connect=lambda:({},object()),rejected_style_properties=0)
+            def failing_main():
+                run=workflow.Run()
+                run.launch_loader()
+                raise BridgeError('AppendToTimeline unavailable')
+            with patch('resolve_bridge.BridgeClient',return_value=fake_client), \
+                 patch.object(workflow,'LOGS_DIR',tmp),patch.object(workflow,'log'), \
+                 patch.object(workflow,'main',side_effect=failing_main), \
+                 patch.object(workflow.Run,'launch_loader',return_value=True) as launch, \
+                 patch.object(workflow.Run,'report') as report,patch.object(workflow.Run,'cleanup') as cleanup:
+                from resolve_bridge import _run_workflow
+                _run_workflow()
+                self.assertTrue(report.call_args.args[1].startswith('ERROR\n'))
+                self.assertIn('AppendToTimeline unavailable',report.call_args.args[1])
+                cleanup.assert_called_once()
+                self.assertIs(workflow.Run.launch_loader,launch)
+
     def test_resolve_21_flagged_collections_map_real_clips(self):
         with tempfile.TemporaryDirectory() as tmp:
             client=BridgeClient(tmp,Path(tmp)/'prefs')
@@ -95,7 +114,9 @@ class BridgeTests(unittest.TestCase):
         old=SimpleNamespace(GetStart=lambda:0);new=SimpleNamespace(GetStart=lambda:24)
         tracks={1:[old]}
         def add(kind):tracks[2]=[];return True
-        def append(items):tracks[1].append(new);return True
+        def append(items):
+            self.assertEqual(set(items[0]),{'mediaPoolItem'})
+            tracks[1].append(new);return True
         timeline=SimpleNamespace(GetTrackCount=lambda kind:len(tracks),GetItemListInTrack=lambda kind,i:tracks[i],AddTrack=add,DeleteTrack=lambda kind,i:tracks.pop(i),SetCurrentTimecode=lambda tc:True)
         pool=SimpleNamespace(ImportMedia=lambda paths:[object()],AppendToTimeline=append)
         with patch.object(workflow,'log'):

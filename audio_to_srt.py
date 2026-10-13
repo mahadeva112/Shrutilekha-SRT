@@ -698,7 +698,9 @@ def import_srt_to_new_track(timeline, mp, srt_file, timecode):
         drop_added()
         return False, None, None, False, \
             "Resolve could not import the SRT file."
-    if not mp.AppendToTimeline([imported[0]]):
+    # Resolve 21.1 documents clip-info dictionaries as the supported append
+    # form; the older bare MediaPoolItem overload is deprecated.
+    if not mp.AppendToTimeline([{"mediaPoolItem": imported[0]}]):
         drop_added()
         return False, None, None, False, \
             "Resolve could not append the SRT to the timeline."

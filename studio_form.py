@@ -423,7 +423,8 @@ def build_form(app):
         fit_job["id"] = None
         if not heading.winfo_exists():
             return
-        compact = app.root.winfo_height() < 800
+        compact = (app.root.winfo_height() < 800
+                   or getattr(app.root.tk, 'scale', 1) < 1)
         padding, gap = (8, 6) if compact else (12, 12)
         heading.pack_configure(pady=(12, 10) if compact else (18, 16))
         workspace.pack_configure(pady=(0, 12 if compact else 18))
@@ -457,7 +458,12 @@ def build_form(app):
                 surface.configure(height=surface.body.winfo_reqheight()+surface.padding*2)
         app.root.after_idle(size_sections)
     def schedule_fit(event=None):
-        if event is not None and event.widget is not app.root:
+        # Hosted inputs settle their requested sizes asynchronously. Refit
+        # when their child geometry changes as well as on a root resize.
+        if event is not None and event.widget is not app.root and not any(
+                event.widget is surface.body for surface in surfaces.values()) and not any(
+                event.widget is getattr(control, '_child', None)
+                or event.widget is control for control in app.studio_controls.values()):
             return
         if fit_job["id"] is None and heading.winfo_exists():
             fit_job["id"] = app.root.after_idle(fit_spacing)

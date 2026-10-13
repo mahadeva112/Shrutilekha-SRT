@@ -43,7 +43,7 @@ class DpiTests(unittest.TestCase):
             check(page)
 
     def test_four_render_scales_have_native_font_pixels_and_no_clipped_controls(self):
-        for factor in (1,1.25,1.5,2):
+        for factor in (.8,1,1.25,1.5,2):
             with self.subTest(scale=factor):
                 root,context,app,p=self.make_app(factor)
                 self.assertEqual(int(context.raw.call('winfo','width',root._w)),round(root.winfo_width()*factor))
@@ -75,6 +75,10 @@ class DpiTests(unittest.TestCase):
         root,context,app,p=self.make_app(1.5)
         canvas=tk.Canvas(root,width=100,height=100);canvas.pack();root.update()
         item=canvas.create_line(10,20,40,50,width=2)
+        canvas.configure(scrollregion=(0,0,100,500))
+        self.assertEqual(canvas.cget('scrollregion'),(0,0,100,500))
+        self.assertEqual(context.raw.splitlist(context.raw.call(canvas._w,'cget','-scrollregion')),
+                         ('0','0','150','750'))
         self.assertEqual(canvas.coords(item),[10.,20.,40.,50.])
         self.assertEqual(context.raw.call(canvas._w,'coords',item),(15.,30.,60.,75.))
         events=[];canvas.bind('<Motion>',lambda e:events.append((e.x,e.y)))
