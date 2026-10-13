@@ -34,7 +34,7 @@ def run(output):
                         str(p / "log"), "unused", "unused", str(p / "result"), str(p / "ack"))
         root.update_idletasks()
         assert app.lang_var.get() == "Auto-detect"
-        assert set(app.studio_pages) == {"Audio", "Timing", "Script", "Presets"}
+        assert set(app._studio_sections) == {"Audio", "Timing", "Files", "Presets", "Style"}
         assert app._scroll_canvas is None
         from studio_form import DEMO_CAPTIONS
         assert app.demo_language_var.get() == "English"
@@ -43,8 +43,9 @@ def run(output):
         assert app._preview.SAMPLE == DEMO_CAPTIONS["Tamil"]
         assert app.lang_var.get() == "Auto-detect"
         app._set_task("Sync Existing")
-        assert app.studio_tab_var.get() == "Script"
+        assert app.studio_controls["sync_srt"].entry.cget("state") == "normal"
         app._set_task("Generate")
+        assert app.studio_controls["sync_srt"].entry.cget("state") == "disabled"
         from settings_ui import ApiSettingsPanel
         bindings = {key: root.bind(key) for key in ("<Return>", "<Escape>")}
         panel = ApiSettingsPanel(root)
@@ -59,6 +60,6 @@ def run(output):
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         if worker.returncode:
             raise RuntimeError(worker.stdout + worker.stderr)
-        report = {"gui": "ok", "resolve_form": "ok", "studio_tabs": "ok", "demo_languages": "independent", "encrypted_key": "ok", "api_settings": "in-window",
+        report = {"gui": "ok", "resolve_form": "ok", "master_studio": "all sections", "demo_languages": "independent", "encrypted_key": "ok", "api_settings": "in-window",
                   "worker": worker.stdout.strip()}
         Path(output).write_text(json.dumps(report, indent=2), encoding="utf-8")

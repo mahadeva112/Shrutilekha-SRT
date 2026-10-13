@@ -1,9 +1,9 @@
 {
-  "version": "1.2.2",
+  "version": "1.3.0",
   "notes": [
-    "Neutral English preview by default, with demos for all 14 supported languages.",
-    "Separate demo language selector leaves transcription settings unchanged.",
-    "Rounded preview stage and cleaner caption placement display.",
+    "Master Studio shows preview, audio, timing, scripts, presets and styling together.",
+    "Caption font, style, size, colour, outline and shadow are directly editable.",
+    "English demo captions by default, independent of transcription language.",
     "Existing caption workflows, saved presets and encrypted API keys preserved."
   ],
   "mandatory": false,

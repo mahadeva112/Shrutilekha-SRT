@@ -1,11 +1,14 @@
 Public stable release: standalone Windows x64 installer for Srutilekha.
 
+- Master Studio puts preview, audio, timing, script/files, presets and caption style in one workspace.
+- Font, style, point size, colour, outline and shadow are directly editable with live sample feedback.
+- Generate and Sync retain the same settings; the existing-SRT row stays visible and enables in Sync mode.
 - English demo captions by default, independent of transcription language and saved presets.
 - A separate Demo language selector offers examples for all 14 supported languages.
 - Rounded preview stage, centred multiline captions and cleaner placement display.
-- Refined Studio typography: 27 px bold heading, readable 14–15 px controls, stronger labels and consistent colours.
-- Larger illustrated caption samples, softer artwork and horizontal preview controls.
-- Audio, Timing, Script/Files and Presets tabs retain existing caption workflows.
+- Refined Studio typography: 27 px bold heading, readable 13–15 px controls and consistent colours.
+- Larger illustrated caption samples, softer artwork and linked placement controls.
+- Existing preset JSON format, caption processing and review workflows are retained.
 - Setup controls fit without scrolling at supported desktop window sizes.
 - Generate has no sparkle icon. Existing transcription and Resolve workflow are retained.
 - Bundled Python runtime and transcription worker; no separate Python install.
@@ -25,11 +28,11 @@ Lua launching and SRT timeline import were tested in Resolve 21.0.4.5.
 Resolve 21.1+ remains untested and needs a working Resolve Python scripting
 host. This app does not configure that host.
 
-Validated for v1.2.2: twenty-two automated checks, all demo languages isolated
-from output settings, setup controls at 1040 × 780
-and 920 × 640, preset round-trip, Generate/Sync settings payload, caption
+Validated for v1.3.0: twenty-three automated checks, all setup sections visible
+at 1180 × 820, 1040 × 780 and 1040 × 720, demo languages isolated from
+output settings, preset round-trip, Generate/Sync and styling payload, caption
 editing/local re-split, frozen GUI/form/worker without external Python, upgrade
-from v1.2.1, reinstall, key/preset preservation and bundled FFmpeg decoding. The earlier v1.1.1 runtime also passed clean Windows CI.
+from v1.2.2, reinstall, key/preset preservation and bundled FFmpeg decoding. The earlier v1.1.1 runtime also passed clean Windows CI.
 The native desktop uses the existing Tkinter runtime; font rendering differs
 slightly from the browser mock. The illustrated preview is not a live Resolve
 video frame. Its sample text is explicitly enlarged for readability; real cue

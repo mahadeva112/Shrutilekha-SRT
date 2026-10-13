@@ -2277,7 +2277,8 @@ class ReelPreview(tk.Canvas):
     def __init__(self, parent, srt_posy_var, srt_size_var,
                  color_var=None, outline_var=None, shadow_var=None,
                  safe_zone_var=None, width=170, bg_parent=BG,
-                 aspect=9.0 / 16.0, srt_posy_default=None, frame_height=None):
+                 aspect=9.0 / 16.0, srt_posy_default=None, frame_height=None,
+                 font_var=None, font_style_var=None):
         # `aspect` is width/height. The widget is laid out to a fixed area
         # rather than a fixed width, so switching between a reel and an HD
         # frame doesn't make the stage column jump: a 9:16 frame is tall and
@@ -2294,12 +2295,13 @@ class ReelPreview(tk.Canvas):
         self.outline_var = outline_var
         self.shadow_var = shadow_var
         self.safe_zone_var = safe_zone_var
+        self.font_var, self.font_style_var = font_var, font_style_var
         self._srt_posy_default = srt_posy_default or (lambda: 0.28)
         self._frame_height = frame_height or (lambda: None)
         self._pad = 7            # phone bezel thickness
 
         for v in (srt_posy_var, srt_size_var, color_var, outline_var,
-                  shadow_var, safe_zone_var):
+                  shadow_var, safe_zone_var, font_var, font_style_var):
             if v is None:
                 continue
             try:
@@ -2519,19 +2521,24 @@ class ReelPreview(tk.Canvas):
         # a caption, so in Segoe UI every Indic preview came out with its vowel
         # signs detached onto dotted circles. See cue_font_family().
         fam = cue_font_family()
+        if self.font_var and self.font_var.get() and not self.font_var.get().startswith("Auto"):
+            fam = self.font_var.get()
+        style = self.font_style_var.get() if self.font_style_var else "Auto"
+        weight = "bold" if style in ("Auto", "SemiBold", "Bold", "Black", "Bold Italic") else "normal"
+        slant = "italic" if "Italic" in style else "roman"
         try:
-            font = _font(fam, -fontpx, "bold")
+            font = _font(fam, -fontpx, weight, slant)
             sample_lines = self.SAMPLE.splitlines() or [""]
             tw = max(font.measure(line) for line in sample_lines)
             th = font.metrics("linespace") * len(sample_lines)
             avail = sw * 0.90
             if tw > avail and tw > 0:
                 fontpx = max(7, int(fontpx * avail / tw))
-                font = _font(fam, -fontpx, "bold")
+                font = _font(fam, -fontpx, weight, slant)
                 tw = max(font.measure(line) for line in sample_lines)
                 th = font.metrics("linespace") * len(sample_lines)
         except Exception:
-            font = (fam, 9, "bold")
+            font = (fam, 9, weight, slant)
             tw, th = fontpx * 8, fontpx
 
         half_w, half_h = tw / 2 + 5, th / 2 + 3
@@ -2902,6 +2909,16 @@ class ComfortMeter(tk.Canvas):
             return
         self.delete("all")
         w = max(self.winfo_width(), 2)
+        if getattr(self, "compact", False):
+            verdict, col, frac, hint = self._grade()
+            self.create_text(0, 10, anchor="w", text="Reading comfort", fill=FG_DIM,
+                             font=(UI_FONT, -12))
+            self.create_text(w, 10, anchor="e", text=verdict, fill=col,
+                             font=(UI_FONT, -12))
+            height = self.winfo_height()
+            self.create_rectangle(0, height-2, w, height, fill=BORDER, outline="")
+            self.create_rectangle(0, height-2, w*frac, height, fill=col, outline="")
+            return
         h = self.H
         _round_rect(self, 0, 0, w, h, 8, fill=DIVIDER, outline=DIVIDER)
         _round_rect(self, 1, 1, w - 1, h - 1, 7, fill=BG_CARD, outline=BG_CARD)
@@ -3655,22 +3672,13 @@ class App:
         except Exception:
             pass
 
-        # Single flat card window. Height is set by the tallest fixed thing in
-        # it — the 9:16 preview in the stage — plus the title and action bars;
-        # the tabs mean no single tab needs more vertical room than that, so
-        # the window no longer has to be tall enough for every control at once.
-        # Clamped to the screen, and the action bar is packed first so it can
-        # never be pushed off the bottom.
+        # Master Studio keeps the preview and all setup groups visible.
+        # Clamp to the display; compact spacing supports shorter screens.
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
-        # Sized to the page rather than to a round number. With the hints in
-        # tooltips the settings need 610px of the scroll port, and the two
-        # columns read comfortably at ~290 each. A Resolve panel is compact,
-        # and a window larger than its contents was one of the things that
-        # made this read as a guest in its own host.
-        W = min(1040, sw - 80)
-        H = min(780, sh - 70)
-        self._min_w, self._min_h = min(920, sw - 40), min(640, sh - 70)
+        W = min(1180, sw - 40)
+        H = min(820, sh - 70)
+        self._min_w, self._min_h = min(1040, sw - 40), min(720, sh - 70)
         root.geometry("%dx%d+%d+%d" % (W, H, (sw - W) // 2, max(20, (sh - H) // 2)))
         root.configure(bg=BG)
         self._maximized = False
@@ -4663,10 +4671,17 @@ class App:
         # One row across both columns: pick on the left of the control group,
         # name and the two verbs after it. Two stacked rows cost 110px of a
         # page that has to fit the window, for a group nobody opens twice.
-        slot = self._row(
-            c, "Preset", stacked=getattr(self, "_studio_form", False),
-            hint="Everything on this page except the track choices, so a "
-                 "preset survives being loaded on a different timeline.")
+        master = getattr(self, "_master_studio", False)
+        if master:
+            tk.Label(c.rows, text="Saved settings", bg=BG_CARD, fg=FG_DIM,
+                     font=(UI_FONT, -13)).pack(anchor="w", pady=(0, 4))
+            slot = tk.Frame(c.rows, bg=BG_CARD)
+            slot.pack(fill="x")
+        else:
+            slot = self._row(
+                c, "Preset", stacked=getattr(self, "_studio_form", False),
+                hint="Everything on this page except the track choices, so a "
+                     "preset survives being loaded on a different timeline.")
         preset_dd = self._pick(slot, _list_presets() or ["(none saved)"],
                                self.preset_pick_var, width=176, fill=getattr(self, "_studio_form", False))
 
@@ -4722,7 +4737,10 @@ class App:
             except Exception:
                 pass
 
-        name = PillEntry(slot, self.preset_name_var, placeholder="Save as…",
+        if master:
+            actions = tk.Frame(slot, bg=BG_CARD)
+            actions.pack(fill="x", pady=(9, 0))
+        name = PillEntry(actions if master else slot, self.preset_name_var, placeholder="Save as…",
                          bg_parent=BG_CARD, height=34)
         studio = getattr(self, "_studio_form", False)
         self._preset_actions = {"save": _save_preset, "remove": _remove_preset, "apply": _apply_preset}
@@ -4730,11 +4748,14 @@ class App:
             preset_dd._label.configure(font=(UI_FONT, -15, "bold"))
             preset_dd.studio_menu_font = (UI_FONT, -14)
             preset_dd._r = 10
-            preset_dd.set_height(42)
+            preset_dd.set_height(34 if master else 42)
             name.entry.configure(font=(UI_FONT, -15))
             name._r = 10
-            name.set_height(42)
-        if studio:
+            name.set_height(34 if master else 42)
+        if master:
+            self.studio_controls["preset"] = preset_dd
+            self.studio_controls["preset_name"] = name
+        elif studio:
             name.pack(fill="x", pady=(14, 0))
             actions = tk.Frame(slot, bg=BG_CARD)
             actions.pack(fill="x", pady=(12, 0))
@@ -4742,7 +4763,14 @@ class App:
             name.configure(width=150)
             name.pack(side="left", padx=(7, 0))
             actions = slot
-        if studio:
+        if master:
+            from settings_ui import RoundedAction
+            RoundedAction(actions, "Remove", _remove_preset, self._studio_theme,
+                          height=34).pack(side="right")
+            RoundedAction(actions, "Save", _save_preset, self._studio_theme,
+                          height=34).pack(side="right", padx=(7, 7))
+            name.pack(side="left", fill="x", expand=True)
+        elif studio:
             from settings_ui import RoundedAction
             RoundedAction(actions, "Save preset", _save_preset, self._studio_theme).pack(side="left")
             RoundedAction(actions, "Remove", _remove_preset, self._studio_theme).pack(side="left", padx=(8, 0))
@@ -5030,7 +5058,7 @@ class App:
         if handle is None:
             return
         handle.set_visible(self.task_var.get() == "Sync Existing")
-        if getattr(self, "_studio_form", False):
+        if getattr(self, "_studio_form", False) and not getattr(self, "_master_studio", False):
             self._studio_tabs["Script"].set_text("Files" if self.task_var.get() == "Sync Existing" else "Script")
             self._select_studio_tab("Script" if self.task_var.get() == "Sync Existing" else "Audio")
 

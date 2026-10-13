@@ -34,15 +34,17 @@ class StudioFormTests(unittest.TestCase):
         self.addCleanup(close_root)
     def tearDown(self):
         self.assertFalse(self.errors,self.errors)
-    def test_controls_and_tabs_fit_at_minimum_window(self):
+    def test_all_master_controls_are_visible_and_fit(self):
         self.assertEqual(set(self.app.studio_controls),{'track','language','punctuation','speakers','review',
             'safe_zone','position','max_chars','max_lines','min_secs','max_secs','cps','max_words',
-            'reference_script','sync_srt'})
+            'reference_script','sync_srt','preset','preset_name','font','font_style',
+            'text_size','color','outline','shadow','demo_language'})
         self.assertIsNone(self.app._scroll_canvas)
-        for width,height in [(1040,780),(920,640)]:
+        self.assertFalse(hasattr(self.app,'_studio_tabs'))
+        for width,height in [(1180,820),(1040,780),(1040,720),(1040,698),(984,698)]:
             self.root.geometry(f'{width}x{height}');self.root.update()
-            for tab,page in self.app.studio_pages.items():
-                self.app._select_studio_tab(tab);self.root.update()
+            for tab,page in self.app._studio_sections.items():
+                self.assertTrue(page.winfo_ismapped(),tab)
                 bottom=page.winfo_rooty()+page.winfo_height()
                 def check(widget):
                     for child in widget.winfo_children():
@@ -51,17 +53,33 @@ class StudioFormTests(unittest.TestCase):
                             self.assertLessEqual(child.winfo_rootx()+child.winfo_width(),page.winfo_rootx()+page.winfo_width()+2,(tab,str(child)))
                             check(child)
                 check(page)
+            for key,control in self.app.studio_controls.items():
+                self.assertTrue(control.winfo_ismapped(),key)
     def test_sync_reveals_file_without_losing_values(self):
         self.app.settings_vars[0].set('27');self.app.lang_var.set('Hindi')
         self.app._set_task('Sync Existing');self.root.update()
-        self.assertEqual(self.app.studio_tab_var.get(),'Script')
         self.assertTrue(self.app.studio_controls['sync_srt'].winfo_ismapped())
+        self.assertEqual(self.app.studio_controls['sync_srt'].entry.cget('state'),'normal')
+        self.app.sync_srt_path_var.set('saved.srt')
         self.app._set_task('Generate');self.root.update()
         self.assertEqual(self.app.settings_vars[0].get(),'27')
         self.assertEqual(self.app.lang_var.get(),'Hindi')
-        self.assertFalse(self.app.studio_controls['sync_srt'].winfo_ismapped())
+        self.assertTrue(self.app.studio_controls['sync_srt'].winfo_ismapped())
+        self.assertEqual(self.app.studio_controls['sync_srt'].entry.cget('state'),'disabled')
+        self.assertEqual(self.app.sync_srt_path_var.get(),'saved.srt')
+        self.app._set_task('Sync Existing');self.root.update()
+        self.assertEqual(self.app.studio_controls['sync_srt'].entry.get(),'saved.srt')
+        with patch.object(self.app,'_build_progress'),patch('threading.Thread'):
+            self.app._on_submit('sync')
+        selection=json.loads((Path(self.scratch.name)/'selection').read_text())
+        self.assertEqual(selection['action'],'sync')
+        self.assertEqual(selection['srt_input_path'],'saved.srt')
+        self.assertEqual(selection['lang'],'Hindi')
+        self.assertEqual(selection['settings'],'27,1,2')
     def test_presets_keep_full_legacy_configuration(self):
         self.app.font_var.set('Arial');self.app.textsize_var.set('64')
+        self.app.font_style_var.set('Bold Italic');self.app.color_var.set('#f0ca80')
+        self.app.lang_var.set('Bengali')
         self.app.settings_vars[0].set('29');self.app.preset_name_var.set('Studio test')
         self.app._preset_actions['save']()
         stored=json.loads((Path(self.scratch.name)/'presets/Studio test.json').read_text())
@@ -70,6 +88,9 @@ class StudioFormTests(unittest.TestCase):
         self.assertIn('outline',stored);self.assertIn('shadow',stored);self.assertIn('srt_posy',stored)
         self.app.font_var.set('Auto');self.app._preset_actions['apply']('Studio test')
         self.assertEqual(self.app.font_var.get(),'Arial')
+        self.assertEqual(self.app.font_style_var.get(),'Bold Italic')
+        self.assertEqual(self.app.color_var.get(),'#f0ca80')
+        self.assertEqual(self.app.demo_language_var.get(),'English')
         self.app._preset_actions['remove']()
         self.assertFalse((Path(self.scratch.name)/'presets/Studio test.json').exists())
     def test_submission_keeps_resolve_wire_fields(self):
@@ -84,7 +105,7 @@ class StudioFormTests(unittest.TestCase):
         self.assertEqual(selection['ref_script'],'reference.txt')
     def test_frame_switch_and_position_keep_preview_in_bounds(self):
         self.app.srt_posy_var.set('.31')
-        for geometry in ('1040x780','920x640'):
+        for geometry in ('1180x820','1040x720'):
             self.root.geometry(geometry);self.root.update()
             for aspect,ratio in [('HD',16/9),('Reel',9/16)]:
                 self.app.aspect_var.set(aspect);self.root.update()
@@ -105,6 +126,25 @@ class StudioFormTests(unittest.TestCase):
         self.assertIn('Your story',self.app._preview.SAMPLE)
         # Changing sample language leaves the real caption point size untouched.
         self.assertEqual(self.app.textsize_var.get(),'55')
+
+    def test_style_controls_use_real_output_variables(self):
+        color=self.app.studio_controls['color']
+        with patch('studio_form.colorchooser.askcolor',return_value=((12,34,56),'#0c2238')):
+            color.choose()
+        self.assertEqual(self.app.color_var.get(),'#0c2238')
+        color.reset();self.assertEqual(self.app.color_var.get(),'')
+        self.app.font_var.set('Arial');self.app.font_style_var.set('Italic')
+        self.app.textsize_var.set('68');self.app.color_var.set('#cceeff')
+        self.app.outline_var.set(0);self.app.shadow_var.set(1)
+        with patch.object(self.app,'_build_progress'),patch('threading.Thread'):
+            self.app._on_submit('generate')
+        selection=json.loads((Path(self.scratch.name)/'selection').read_text())
+        self.assertEqual(selection['font'],'Arial')
+        self.assertEqual(selection['font_style'],'Italic')
+        self.assertEqual(selection['text_size'],'68')
+        self.assertEqual(selection['color'],'#cceeff')
+        self.assertEqual(selection['outline'],0)
+        self.assertEqual(selection['shadow'],1)
 
     def test_demo_languages_are_complete_and_do_not_change_output(self):
         from studio_form import DEMO_CAPTIONS

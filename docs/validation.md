@@ -76,3 +76,20 @@ The locally built installer passed upgrade from v1.2.1, reinstall, uninstall,
 encrypted-key/preset preservation and frozen runtime checks without external
 Python on PATH. The frozen report confirms `demo_languages: independent`.
 Existing Resolve launchers and the installation pointer were restored.
+
+v1.3.0 Master Studio: twenty-three checks passed. All setup sections and
+controls stay mapped and within their panels at 1180 × 820, 1040 × 780,
+1040 × 720, 1040 × 698 and 984 × 698. Generate/Sync retains values and writes the existing
+selection protocol, including SRT input path and caption style. Named presets
+round-trip the original font/style/colour and timing fields. The colour picker
+can return to automatic colour. English remains the default demo when a saved
+caption preset selects Bengali. Caption review/edit/local re-split checks pass.
+Native screenshot capture was unavailable: the capture helper reported the
+isolated Tk validation window as minimized, despite its normal Tk state.
+Layout validation used mapped widget bounds; a visual pixel comparison remains
+unverified. Paid transcription was not repeated for this presentation change.
+The locally built installer passed upgrade from v1.2.2, reinstall, uninstall,
+encrypted-key/preset preservation, frozen GUI/form/worker checks without
+external Python on PATH and bundled FFmpeg trimming/decoding. The frozen
+report confirms `master_studio: all sections`. Existing Resolve launcher files
+and the installation pointer were restored.
