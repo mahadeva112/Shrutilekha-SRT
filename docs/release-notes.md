@@ -6,6 +6,7 @@ v1.3.3 preview: resident Windows tray helper.
 - Tray menu includes Open captions, API settings, Updates, Start with Windows and Quit helper.
 - Windows startup can be disabled in the tray menu or home settings; upgrades preserve that choice.
 - Idle helper checks local launch markers and does not send Resolve API requests. Old markers from previous Resolve sessions are ignored.
+- Live script-click opening and reopening confirmed on Resolve 21.1.1 Free; subsequent clicks reused the resident bridge, with one caption form active.
 - Existing features, encrypted keys and presets are retained. No automatic Generate, Sync, Undo or paid API calls.
 - This remains a prerelease: real Resolve 21.1 caption import/styling awaits validation.
 

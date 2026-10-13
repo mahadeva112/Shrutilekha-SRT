@@ -12,10 +12,14 @@ home startup checkbox was visually checked and closing home left one helper
 running (about 49 MB RSS on the development machine). Pystray source and license
 texts are shipped as replaceable files outside the executable archive.
 
-Resolve stayed closed during this validation, so the new live script-click
-and bridge-reuse paths were not exercised in Resolve. Earlier v1.3.1 read-only
-connection tests remain applicable; real 21.1 caption import/styling remains
-unverified. No project edits or paid API requests were made. This is a prerelease.
+Live follow-up on Resolve 21.1.1.10 Free: the user clicked the Workspace script
+and confirmed the caption window opened automatically. Logs show cancellation
+and reopening, and process inspection found one helper, one caption workflow
+and one caption form. A later launch marker differed from the active server
+session, verifying that subsequent script clicks reused the resident bridge.
+Read-only probes found the current project, timeline and two audio tracks.
+No project switch/save, caption import or paid API request was performed.
+Real 21.1 caption import/styling remains unverified, so this is a prerelease.
 
 v1.3.2 preview: 32 checks passed. New GUI event-loop tests verify automatic
 caption launch without a click, waiting when the bridge is absent, and avoiding
