@@ -2,6 +2,13 @@ Srutilekha includes Python, Tcl/Tk, ElevenLabs SDK, truststore, PyInstaller
 runtime and FFmpeg. Applicable third-party licenses remain in force.
 Package metadata and available license files are included in the runtime.
 
+The tray helper includes pystray 0.19.5 (LGPLv3), psutil 7.2.2 (BSD-3-Clause),
+Pillow 12.3.0 (MIT-CMU) and six (MIT). Their license texts are shipped in
+_internal package metadata. Unmodified pystray Python source is supplied in
+_internal/pystray, outside the executable archive. Users may replace that
+folder with a compatible version and run the modified library with Srutilekha.
+Source: https://github.com/moses-palmer/pystray/tree/v0.19.5
+
 FFmpeg 7.1.1 is built from unmodified upstream source with native components,
 without GPL components or external codec libraries, under LGPL 2.1 or later.
 The license is installed as _internal/licenses/COPYING.LGPLv2.1.

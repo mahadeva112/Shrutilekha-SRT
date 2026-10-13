@@ -1,5 +1,22 @@
 # Windows release validation
 
+v1.3.3 preview: 39 tests passed. Tray tests cover one launch per script-click
+marker, reopening on a new marker, raising an active caption window, ignoring
+old Resolve sessions, opening the app before the script, single-helper locking,
+startup settings and quitting without terminating caption jobs. The native
+Windows tray icon/menu passed frozen and installed smoke tests. Upgrade and
+reinstall retained encrypted-key/preset bytes; disabling Windows startup
+survived reinstall and the original startup choice was restored. Duplicate
+helper starts, quit and restart were verified against the installed EXE. The
+home startup checkbox was visually checked and closing home left one helper
+running (about 49 MB RSS on the development machine). Pystray source and license
+texts are shipped as replaceable files outside the executable archive.
+
+Resolve stayed closed during this validation, so the new live script-click
+and bridge-reuse paths were not exercised in Resolve. Earlier v1.3.1 read-only
+connection tests remain applicable; real 21.1 caption import/styling remains
+unverified. No project edits or paid API requests were made. This is a prerelease.
+
 v1.3.2 preview: 32 checks passed. New GUI event-loop tests verify automatic
 caption launch without a click, waiting when the bridge is absent, and avoiding
 duplicate workflows. Packaged runtime and the installed upgrade passed smoke

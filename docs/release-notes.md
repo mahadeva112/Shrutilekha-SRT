@@ -1,4 +1,15 @@
-v1.3.2 preview: automatic desktop connection to the Resolve Lua bridge.
+v1.3.3 preview: resident Windows tray helper.
+
+- Setup starts a single tray helper and enables per-user Windows startup.
+- Click Workspace > Scripts > Srutilekha to open captions; repeated clicks reopen or raise the existing caption window.
+- Closing captions keeps the helper available. Quit helper leaves any active caption job running.
+- Tray menu includes Open captions, API settings, Updates, Start with Windows and Quit helper.
+- Windows startup can be disabled in the tray menu or home settings; upgrades preserve that choice.
+- Idle helper checks local launch markers and does not send Resolve API requests. Old markers from previous Resolve sessions are ignored.
+- Existing features, encrypted keys and presets are retained. No automatic Generate, Sync, Undo or paid API calls.
+- This remains a prerelease: real Resolve 21.1 caption import/styling awaits validation.
+
+v1.3.2 introduced automatic desktop connection:
 
 - Opening the desktop app automatically opens captions when the Lua bridge is available.
 - If the bridge is not ready, the app waits and connects after Workspace > Scripts > Srutilekha is started.

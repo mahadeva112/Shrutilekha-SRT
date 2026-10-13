@@ -1,7 +1,7 @@
 {
-  "version": "1.3.2",
+  "version": "1.3.3",
   "notes": [
-    "Preview: automatic Resolve connection when opening the desktop app.",
+    "Preview: resident tray helper opens captions from Resolve Scripts.",
     "Existing Master Studio controls, English demos and workflows preserved.",
     "Reports unsupported caption styling properties.",
     "Connection verified; real Resolve 21.1 caption import awaits validation."

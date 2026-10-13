@@ -14,10 +14,15 @@ def run(output):
     with tempfile.TemporaryDirectory() as scratch:
         os.environ["SRUTILEKHA_USER_DIR"] = scratch
         import resolve_bridge
+        import tray_helper
         import audio_to_srt
         assert callable(resolve_bridge.run_workflow)
         assert callable(audio_to_srt.import_srt_to_new_track)
         assert (resources() / 'resolve_bridge.lua').is_file()
+        tray_report = Path(scratch) / 'tray-test.json'
+        subprocess.run([str(install_dir() / 'Srutilekha.exe'), '--tray-self-test', str(tray_report)],
+                       check=True, timeout=20, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        assert json.loads(tray_report.read_text())['visible']
         import credentials
         credentials.save_key("distribution-test-key")
         assert credentials.get_key() == "distribution-test-key"
@@ -66,5 +71,6 @@ def run(output):
         if worker.returncode:
             raise RuntimeError(worker.stdout + worker.stderr)
         report = {"gui": "ok", "resolve_form": "ok", "master_studio": "all sections", "demo_languages": "independent", "encrypted_key": "ok", "api_settings": "in-window",
+                  "tray": "native icon and menu",
                   "worker": worker.stdout.strip()}
         Path(output).write_text(json.dumps(report, indent=2), encoding="utf-8")

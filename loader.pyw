@@ -35,7 +35,7 @@ import time
 import unicodedata
 import tkinter as tk
 from tkinter import ttk, messagebox, font as tkfont
-from app_runtime import frozen, install_dir, data_dir
+from app_runtime import frozen, install_dir, data_dir, user_dir
 from settings_ui import show_settings
 import credentials
 
@@ -7032,6 +7032,17 @@ def main():
               run_id=a.run_id, run_marker=a.run_marker)
     root.update_idletasks()
     root.deiconify()
+    def raise_when_requested():
+        flag = user_dir() / 'raise-caption.flag'
+        if flag.exists():
+            try:
+                flag.unlink()
+                root.deiconify()
+                _steal_focus(root)
+            except (OSError, tk.TclError):
+                pass
+        root.after(500, raise_when_requested)
+    root.after(500, raise_when_requested)
     # deiconify on an overrideredirect toplevel does not always activate it;
     # _steal_focus (queued by App at +60ms) finishes the job.
     try:

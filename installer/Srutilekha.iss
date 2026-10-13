@@ -36,7 +36,10 @@ Type: files; Name: "{userappdata}\Blackmagic Design\DaVinci Resolve\Support\Fusi
 Type: files; Name: "{userappdata}\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Utility\Srutilekha.py"; Check: UseBridgeLauncher
 [Dirs]
 Name: "{localappdata}\Srutilekha\logs"
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Srutilekha"; ValueData: """{app}\Srutilekha.exe"" --tray"; Flags: uninsdeletevalue; Check: EnableTrayStartup
 [Run]
+Filename: "{app}\Srutilekha.exe"; Parameters: "--tray"; Flags: nowait runhidden; Check: UseBridgeLauncher
 Filename: "{app}\Srutilekha.exe"; Description: "Open Srutilekha and enter your API key"; Flags: nowait postinstall skipifsilent
 [Code]
 var ResolvePage: TInputOptionWizardPage;
@@ -51,6 +54,10 @@ end;
 function UseBridgeLauncher: Boolean;
 begin
   Result := ResolvePage.SelectedValueIndex = 1;
+end;
+function EnableTrayStartup: Boolean;
+begin
+  Result := UseBridgeLauncher and not FileExists(ExpandConstant('{localappdata}\Srutilekha\tray-startup-disabled.flag'));
 end;
 procedure InitializeWizard;
 var MS, LS: Cardinal; DefaultBridge: Boolean;

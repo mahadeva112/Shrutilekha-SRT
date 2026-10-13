@@ -9,6 +9,23 @@ if not prefs or not rv or not loadfile or not bmd or not bmd.wait then
 end
 local session = tostring({}):gsub("[^%w]", "") .. tostring(os.time())
 local owner_key = "Global.SrutilekhaBridgeOwner"
+local function announce(token)
+    prefs:SetPrefs('Global.SrutilekhaBridgeLaunch', token)
+    prefs:SetPrefs('Global.SrutilekhaBridgeLaunchTime', os.time())
+    prefs:SavePrefs()
+end
+local existing = prefs:GetPrefs(owner_key)
+if existing and existing ~= '' then
+    prefs:SetPrefs('Global.SrutilekhaBridgeProbe', session)
+    for i=1,10 do
+        bmd.wait(.1)
+        if prefs:GetPrefs('Global.SrutilekhaBridgeProbeAck') == session then
+            announce(session)
+            print('Srutilekha: opening captions through the tray helper.')
+            return
+        end
+    end
+end
 prefs:SetPrefs(owner_key, session)
 local refs, ids, next_ref = {}, {}, 0
 local function register(value)
@@ -119,9 +136,16 @@ local function dispatch(req)
     if type(method)~='function' then error('Resolve API unavailable: '..req.method) end
     return method(target, unpack(args,1,req.argc or #args))
 end
-print('Srutilekha bridge ready. Open the Srutilekha desktop app and choose Connect to Resolve.')
+announce(session)
+print('Srutilekha bridge ready. The tray helper will open captions automatically.')
 local last_id=nil
+local last_probe=nil
 while prefs:GetPrefs(owner_key)==session do
+    local probe=prefs:GetPrefs('Global.SrutilekhaBridgeProbe')
+    if probe and probe~=last_probe then
+        last_probe=probe
+        prefs:SetPrefs('Global.SrutilekhaBridgeProbeAck', probe)
+    end
     local chunk=loadfile(mailbox .. '/request.lua')
     if chunk then
         local ok,req=pcall(chunk)
@@ -135,5 +159,5 @@ while prefs:GetPrefs(owner_key)==session do
             prefs:SavePrefs()
         end
     end
-    bmd.wait(.05)
+    bmd.wait(.1)
 end

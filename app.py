@@ -15,6 +15,18 @@ def main():
         sys.stderr = open(os.devnull, "w", encoding="utf-8")
     if "--resolve" in sys.argv:
         sys.argv.remove("--resolve")
+    if "--tray-self-test" in sys.argv:
+        from tray_helper import self_test
+        self_test(sys.argv[sys.argv.index("--tray-self-test") + 1])
+        return
+    if "--tray" in sys.argv:
+        from tray_helper import run
+        run()
+        return
+    if "--tray-stop" in sys.argv:
+        from tray_helper import queue_command
+        queue_command('stop')
+        return
     if "--bridge-run" in sys.argv:
         from resolve_bridge import run_workflow
         try:
@@ -45,6 +57,10 @@ def main():
     if "--prompt" in sys.argv:
         runpy.run_path(str(resources() / "loader.pyw"), run_name="__main__")
         return
+    if "--home" not in sys.argv:
+        from tray_helper import request_open
+        request_open()
+        return
     import tkinter as tk
     from tkinter import ttk, messagebox
     from settings_ui import show_settings
@@ -54,12 +70,18 @@ def main():
     import threading
     root = tk.Tk()
     root.title("Srutilekha")
-    root.geometry("620x510")
+    root.geometry("620x550")
+    try:
+        root.iconbitmap(str(resources() / 'icon.ico'))
+    except tk.TclError:
+        pass
     root.configure(bg="#17191e")
     style = ttk.Style(root)
     style.theme_use("clam")
     style.configure("TFrame", background="#17191e")
     style.configure("TLabel", background="#17191e", foreground="#dce1eb", font=("Segoe UI", -14))
+    style.configure("TCheckbutton", background="#17191e", foreground="#dce1eb", font=("Segoe UI", -13))
+    style.map("TCheckbutton", background=[("active", "#17191e")])
     style.configure("TButton", background="#2b303a", foreground="#f1f2f5",
                     font=("Segoe UI", -14), padding=(12, 8), borderwidth=0)
     style.map("TButton", background=[("active", "#3c424f")],
@@ -76,6 +98,10 @@ def main():
         root.destroy()
     ttk.Button(body, text="Connect to Resolve", command=connect_resolve).pack(anchor="w", pady=(0, 10))
     ttk.Button(body, text="API settings", command=lambda: show_settings(root)).pack(anchor="w")
+    from tray_helper import startup_enabled, set_startup
+    startup = tk.BooleanVar(value=startup_enabled())
+    ttk.Checkbutton(body, text="Start quietly with Windows", variable=startup,
+                    command=lambda: set_startup(startup.get())).pack(anchor="w", pady=(10, 0))
     connection_status = tk.StringVar(value="Connecting to Resolve…")
     ttk.Label(body, textvariable=connection_status, wraplength=550).pack(anchor="w", pady=(10, 0))
     status = tk.StringVar(value="v" + release_updater.VERSION)
@@ -168,13 +194,13 @@ def main():
             missing = not credentials.get_key()
         except Exception:
             missing = True
-        if missing:
+        if missing or "--api-settings" in sys.argv:
             show_settings(root)
         check()
         if "--home" not in sys.argv:
             probe()
         else:
-            connection_status.set("Automatic connection paused. Use Connect when ready.")
+            connection_status.set("Start the Resolve script; the tray helper will open captions. You can also use Connect here.")
     root.after(200, first_run)
     root.mainloop()
 
