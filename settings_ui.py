@@ -316,15 +316,16 @@ class ApiSettingsPanel(tk.Frame):
         privacy = tk.Label(body, text="Encrypted locally  ·  Preserved through app updates", bg=colors["card"],
                            fg=colors["muted"], font=(font, -12), anchor="w")
         privacy.pack(fill="x", pady=(18, 0))
-        def fit(event):
-            wide = event.width >= 940 and event.height >= 540
+        def fit(event=None):
+            width, height = space.winfo_width(), space.winfo_height()
+            wide = width >= 940 and height >= 540
             if wide:
                 intro.place(x=0, rely=.48, anchor="w", width=300)
-                card.place_configure(relx=1, rely=.48, anchor="e", width=min(600, event.width-340))
+                card.place_configure(relx=1, rely=.48, anchor="e", width=min(600, width-340))
             else:
                 intro.place_forget()
-                card.place_configure(relx=.5, rely=.5, anchor="center", width=min(600, max(1, event.width)))
-            compact = event.height < 540
+                card.place_configure(relx=.5, rely=.5, anchor="center", width=min(600, max(1, width)))
+            compact = height < 540
             if compact:
                 provider.pack_forget()
                 privacy.pack_forget()
@@ -333,8 +334,13 @@ class ApiSettingsPanel(tk.Frame):
                 provider.pack(fill="x", pady=(0, 26), before=title)
                 privacy.pack(fill="x", pady=(18, 0))
                 description.pack(fill="x", pady=(7, 24), before=key_label)
-            card.set_padding(18 if compact else 28)
+            # Windows can constrain a 200%-scaled window below its requested
+            # height. Fit the settled content, including actual font metrics,
+            # instead of assuming that the nominal compact padding will fit.
+            available_padding = (height - body.winfo_reqheight() - 4) // 2
+            card.set_padding(max(6, min(18 if compact else 28, available_padding)))
         space.bind("<Configure>", fit, add='+')
+        body.bind("<Configure>", fit, add='+')
         self._binding_ids["<Return>"] = parent.bind("<Return>", self.save)
         self._binding_ids["<Escape>"] = parent.bind("<Escape>", self.close)
         self.grab_set()
