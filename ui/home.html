@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Srutilekha</title>
+<link rel="stylesheet" href="common.css">
+<link rel="stylesheet" href="home.css">
+</head>
+<body>
+<header class="titlebar pywebview-drag-region">
+  <div class="brand"><span class="mark">শ্রু</span><span class="name">Srutilekha</span><span class="pill" id="version">v—</span></div>
+  <div class="chrome">
+    <button class="icon-btn" id="openKey" title="API settings" data-icon="key"></button>
+    <button class="icon-btn" id="minimize" title="Minimize" data-icon="min"></button>
+    <button class="icon-btn close" id="close" title="Close" data-icon="x"></button>
+  </div>
+</header>
+
+<main>
+  <section class="banner" id="banner">
+    <span class="dot"></span>
+    <div class="banner-text">
+      <strong id="statusTitle">Ready when Resolve is</strong>
+      <span id="statusText">Start Workspace → Scripts → Srutilekha; captions open automatically.</span>
+    </div>
+    <button class="btn primary" id="connect">Connect to Resolve <span data-icon="arrow"></span></button>
+  </section>
+
+  <section class="hero card" id="heroCard" tabindex="0">
+    <div class="hero-copy">
+      <span class="kicker">CAPTION STUDIO</span>
+      <h1>Every word, in its place.</h1>
+      <p>Generate, sync and review captions straight from your Resolve timeline.</p>
+      <div class="chips"><span>Generate</span><span>Sync SRT</span><span>Review</span><span>14 languages</span></div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="frame">
+        <div class="caption"><span>সব কথা</span> <span>ঠিক জায়গায়</span></div>
+      </div>
+      <div class="track sub"><i style="left:4%;width:22%"></i><i style="left:29%;width:30%"></i><i style="left:62%;width:26%"></i></div>
+      <div class="track wave" id="wave"></div>
+      <div class="playhead"></div>
+    </div>
+  </section>
+
+  <section class="tiles">
+    <button class="card tile" id="keyTile">
+      <span class="tile-icon" data-icon="key"></span>
+      <span class="tile-body"><strong>ElevenLabs connection</strong><small id="keyState">Checking…</small></span>
+      <span class="badge" id="keyBadge">—</span>
+    </button>
+    <button class="card tile" id="updateTile">
+      <span class="tile-icon" data-icon="refresh"></span>
+      <span class="tile-body"><strong>Updates</strong><small id="updateState">Checking GitHub releases…</small></span>
+      <span class="badge" id="updateBadge">…</span>
+    </button>
+    <label class="card tile">
+      <span class="tile-icon" data-icon="power"></span>
+      <span class="tile-body"><strong>Start with Windows</strong><small>Keeps the Resolve helper ready in the tray.</small></span>
+      <input type="checkbox" class="switch" id="startup">
+    </label>
+  </section>
+
+  <p class="foot">Resolve 21.1+: captions open automatically when connected · Resolve 21.0 or earlier: launch from the Scripts menu.</p>
+</main>
+
+<script src="common.js"></script>
+<script src="home.js"></script>
+</body>
+</html>

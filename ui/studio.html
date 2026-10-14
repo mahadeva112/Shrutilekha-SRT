@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Srutilekha · Caption studio</title>
+<link rel="stylesheet" href="common.css">
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<header class="titlebar pywebview-drag-region">
+  <div class="brand"><span class="mark">শ্রু</span><span class="name">Srutilekha</span><span class="crumb" id="crumb"></span></div>
+  <div class="chrome">
+    <button class="pill" id="versionPill" title="Check for updates">v—</button>
+    <button class="icon-btn" id="openKey" title="API settings" data-icon="key"></button>
+    <button class="icon-btn" id="minimize" title="Minimize" data-icon="min"></button>
+    <button class="icon-btn" id="maximize" title="Maximize" data-icon="max"></button>
+    <button class="icon-btn close" id="close" title="Cancel and close" data-icon="x"></button>
+  </div>
+</header>
+
+<div class="view" id="formView">
+<section class="heading">
+  <div>
+    <h1 id="pageTitle">Caption studio</h1>
+    <p id="pageLead">Your audio. Clear, readable captions.</p>
+  </div>
+  <div class="segments" role="tablist" id="taskSeg">
+    <button data-task="Generate" class="active">Generate</button>
+    <button data-task="Sync Existing">Sync existing SRT</button>
+    <i class="seg-thumb"></i>
+  </div>
+</section>
+
+<div class="workspace">
+  <!-- ── preview ─────────────────────────────────────────── -->
+  <section class="panel preview-panel">
+    <div class="panel-head">
+      <span class="sec-icon" data-icon="sparkle"></span><h3>Caption preview</h3>
+      <span class="badge warn">Demo</span>
+    </div>
+    <div class="segments small" id="frameSeg">
+      <button data-frame="Reel">Reel 9:16</button>
+      <button data-frame="HD">HD 16:9</button>
+      <i class="seg-thumb"></i>
+    </div>
+    <label class="inline">Demo language <select id="demoLang"></select></label>
+    <div class="viewport" id="viewport">
+      <div class="frame" id="frame" title="Drag to place captions">
+        <div class="scene"><i class="sun"></i><i class="hill a"></i><i class="hill b"></i></div>
+        <div class="safe reel"><i></i><i></i><i></i><i></i><b></b></div>
+        <div class="safe hd"></div>
+        <div class="baseline" id="baseline"></div>
+        <div class="cap" id="cap"></div>
+      </div>
+      <span class="viewport-note">Demo only · enlarged text</span>
+    </div>
+    <div class="plate" id="plate"></div>
+    <div class="row-toggle"><span id="safeLabel">Platform safe zone</span><input type="checkbox" class="switch" data-key="safe_zone"></div>
+    <div class="position">
+      <span>Position</span>
+      <input type="range" id="posRange" min="0" max="1" step="0.001">
+      <b id="posLabel">28%</b>
+    </div>
+  </section>
+
+  <!-- ── settings ────────────────────────────────────────── -->
+  <div class="settings">
+    <section class="panel">
+      <div class="panel-head"><span class="sec-icon" data-icon="wave"></span><h3>Audio &amp; language</h3></div>
+      <div class="pair">
+        <label class="fld"><span>Audio track</span><select data-key="chosen" id="trackSel"></select></label>
+        <label class="fld" title="Auto-detect follows the audio; a fixed language pins the transcript to its script"><span>Language</span><select data-key="lang" id="langSel"></select></label>
+      </div>
+      <div class="row-toggle" title="Adds commas and full stops to the transcript"><span>Punctuation</span><input type="checkbox" class="switch" data-key="punct"></div>
+      <div class="row-toggle" title="Colours each voice differently"><span>Separate speakers</span><input type="checkbox" class="switch" data-key="diarize"></div>
+      <hr>
+      <div class="row-toggle" title="Stop to read and edit the cues, and re-split them without transcribing again"><span>Review captions first</span><input type="checkbox" class="switch" data-key="review"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><span class="sec-icon" data-icon="clock"></span><h3>Timing &amp; readability</h3></div>
+      <div class="num-grid" id="numGrid"></div>
+      <div class="comfort" id="comfort" title="Reading comfort reflects the selected reading speed. Lower CPS allows more time per cue.">
+        <div><span>Reading comfort</span><b id="comfortVerdict">—</b></div>
+        <i><em id="comfortBar"></em></i>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><span class="sec-icon" data-icon="file"></span><h3>Script &amp; files</h3></div>
+      <label class="fld" title="Use a .docx, .txt or .srt script to match spellings and punctuation.">
+        <span>Reference script · optional</span>
+        <div class="path"><input data-key="ref_script" placeholder="Choose a file or paste its path…" spellcheck="false"><button class="btn sm" data-browse="script">Browse</button></div>
+      </label>
+      <label class="fld" id="syncField" title="The file whose text is right but whose timing is wrong. Its words are kept; only the timings are rebuilt.">
+        <span>Existing SRT · Sync mode</span>
+        <div class="path"><input data-key="sync_srt" placeholder="Choose a file or paste its path…" spellcheck="false"><button class="btn sm" data-browse="srt">Browse</button></div>
+      </label>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><span class="sec-icon" data-icon="bookmark"></span><h3>Presets</h3></div>
+      <label class="fld" title="Everything on this page except the track choices, so a preset survives being loaded on a different timeline.">
+        <span>Saved settings</span><select id="presetSel"></select>
+      </label>
+      <div class="path"><input id="presetName" placeholder="Save as…" spellcheck="false"><button class="btn sm" id="savePreset">Save</button><button class="btn sm ghost danger" id="removePreset">Remove</button></div>
+    </section>
+
+    <section class="panel style-panel">
+      <div class="panel-head"><span class="sec-icon" data-icon="type"></span><h3>Caption style</h3></div>
+      <div class="style-row">
+        <label class="fld grow3"><span>Font</span><select data-key="font" id="fontSel"></select></label>
+        <label class="fld grow2"><span>Style</span><select data-key="font_style" id="styleSel"></select></label>
+        <label class="fld size"><span>Size · pt</span><div class="num"><input data-key="text_size" inputmode="decimal"></div></label>
+        <div class="fld colour" title="Choose caption colour, or Auto for automatic colour">
+          <span>Colour</span>
+          <div class="colour-box">
+            <label class="swatch" id="swatch"><input type="color" id="colorPick"></label>
+            <button class="btn sm" id="colorAuto">Auto</button>
+          </div>
+        </div>
+        <div class="effects">
+          <label class="mini-toggle"><span>Outline</span><input type="checkbox" class="switch" data-key="outline"></label>
+          <label class="mini-toggle"><span>Shadow</span><input type="checkbox" class="switch" data-key="shadow"></label>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<footer class="actionbar">
+  <span class="summary" id="summary"></span>
+  <button class="btn ghost" id="cancelBtn">Cancel</button>
+  <button class="btn" id="undoBtn"><span data-icon="undo"></span>Undo last captions</button>
+  <button class="btn primary go" id="goBtn"><span id="goText">Generate captions</span><span data-icon="arrow"></span></button>
+</footer>
+</div>
+
+<!-- ── review & split ─────────────────────────────────────── -->
+<div class="view review-view" id="reviewView" hidden>
+  <section class="heading">
+    <div>
+      <h1>Review &amp; split</h1>
+      <p>Drag any value to re-cut instantly — the transcript is reused, nothing is re-transcribed.</p>
+    </div>
+    <span class="badge ok local-badge" title="Re-cuts run on this PC. No API call."><span data-icon="check"></span>Re-cuts run locally · no API call</span>
+  </section>
+  <div class="review-grid">
+    <aside class="panel split-panel">
+      <div class="panel-head"><span class="sec-icon" data-icon="clock"></span><h3>Split</h3></div>
+      <div class="recipes" id="recipes" title="Three starting points for the cut. They set the six values below and nothing else — your saved presets are untouched."></div>
+      <div class="split-fields" id="splitFields"></div>
+    </aside>
+
+    <section class="cue-column">
+      <div class="cue-tools">
+        <div class="chips" id="filterChips"></div>
+        <label class="search"><span data-icon="search"></span><input id="cueSearch" placeholder="Find in cues…" spellcheck="false"></label>
+      </div>
+      <canvas class="wave" id="wave" hidden title="Click to jump to a cue"></canvas>
+      <div class="cue-list" id="cueList"></div>
+      <div class="cue-foot">
+        <span id="cueStatus"></span>
+        <span class="keys"><kbd>Enter</kbd> split <kbd>Ctrl M</kbd> merge <kbd>Ctrl Del</kbd> delete</span>
+      </div>
+    </section>
+
+    <aside class="panel inspect-panel">
+      <div class="panel-head"><span class="sec-icon" data-icon="sparkle"></span><h3 id="inspTitle">No cue selected</h3></div>
+      <div class="mini-viewport" id="miniViewport">
+        <div class="frame" id="miniFrame">
+          <div class="scene"><i class="sun"></i><i class="hill a"></i><i class="hill b"></i></div>
+          <div class="safe reel"><i></i><i></i><i></i><i></i><b></b></div>
+          <div class="safe hd"></div>
+          <div class="cap" id="miniCap"></div>
+        </div>
+      </div>
+      <dl class="insp" id="insp"></dl>
+      <div class="insp-actions">
+        <button class="btn sm" id="inspSplit">Split at caret</button>
+        <button class="btn sm" id="inspMerge">Merge into previous</button>
+      </div>
+    </aside>
+  </div>
+  <footer class="actionbar">
+    <span class="summary" id="reviewSummary"></span>
+    <button class="btn ghost" id="reviewCancel">Cancel</button>
+    <button class="btn primary go" id="applyBtn"><span id="applyText">Apply captions</span><span data-icon="arrow"></span></button>
+  </footer>
+</div>
+
+<!-- ── progress / done ─────────────────────────────────────── -->
+<div class="view run-view" id="runView" hidden>
+  <section class="run-card" id="progressCard">
+    <div class="orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+    <span class="kicker" id="runKicker">WORKING</span>
+    <h2 id="runTitle">Transcribing audio</h2>
+    <div class="run-pct"><b id="runPct">0%</b><span id="runMsg">Preparing…</span></div>
+    <div class="run-bar"><i id="runBar"></i></div>
+    <ol class="stages" id="runStages"></ol>
+    <div class="run-foot">
+      <span class="elapsed" id="runElapsed">0s</span>
+      <button class="btn ghost" id="runCancel">Cancel</button>
+    </div>
+  </section>
+
+  <section class="run-card done-card" id="doneCard" hidden>
+    <div class="done-mark" id="doneMark">
+      <svg viewBox="0 0 52 52" class="tick"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-16"/></svg>
+      <svg viewBox="0 0 52 52" class="warn"><circle cx="26" cy="26" r="24"/><path d="M26 15v14m0 7v1"/></svg>
+    </div>
+    <h2 id="doneTitle">Done</h2>
+    <p class="done-head" id="doneHeadline"></p>
+    <ul class="done-body" id="doneBody"></ul>
+    <dl class="done-meta" id="doneMeta"></dl>
+    <div class="done-foot">
+      <span class="elapsed" id="doneElapsed"></span>
+      <button class="btn primary" id="doneClose">Close</button>
+    </div>
+  </section>
+</div>
+
+<script src="common.js"></script>
+<script src="studio.js"></script>
+<script src="review.js"></script>
+</body>
+</html>
