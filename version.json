@@ -1,10 +1,9 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "notes": [
-    "New WebView2 interface: home, Caption Studio, progress, review editor and results run in one smooth window.",
-    "Review editor with waveform, live reading-speed meters, filters, split/merge/delete and instant local re-cuts.",
-    "Selection files, presets, cues and SRT/.cap output are byte-identical to the previous editor (covered by tests).",
-    "The classic interface remains as a fallback. Real Resolve and ElevenLabs runs of the new interface are not yet verified."
+    "Fixes caption preview wrapping: demo and review captions now use the full frame width instead of breaking every word onto its own line.",
+    "Includes everything from v1.4.0: the new WebView2 interface for Caption Studio, progress, review and results.",
+    "Saved keys, presets and caption settings are preserved. If anything misbehaves, set SRUTILEKHA_CLASSIC_UI=1 to use the previous interface."
   ],
   "mandatory": false,
   "min_version": ""
