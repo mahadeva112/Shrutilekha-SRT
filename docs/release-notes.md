@@ -1,3 +1,8 @@
+v1.4.1: caption preview fix.
+
+- Captions in the Caption Studio preview and the review editor's preview now use the full frame width. Previously they could use only half of it, so captions such as the Bengali demo broke onto one word per line.
+- Includes everything from v1.4.0. Saved keys, presets and caption settings are preserved.
+
 v1.4.0 preview: the caption workflow moves to a WebView2 interface.
 
 - Home, Caption Studio, progress, review and the done report open in one window built with pywebview and Microsoft WebView2, with animated progress, blurred dialogs and smooth transitions.
