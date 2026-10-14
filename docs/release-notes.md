@@ -1,3 +1,11 @@
+v1.4.0 preview: the caption workflow moves to a WebView2 interface.
+
+- Home, Caption Studio, progress, review and the done report open in one window built with pywebview and Microsoft WebView2, with animated progress, blurred dialogs and smooth transitions.
+- The review editor adds a clickable waveform, per-cue reading-speed meters, All / Needs attention / Edited filters, search, Enter/Ctrl+M/Ctrl+Delete shortcuts and an inspector with split and merge.
+- Selection files, presets, re-cuts, split/merge results and written SRT/.cap files are tested to match the previous Tkinter editor exactly.
+- Without WebView2, or with SRUTILEKHA_CLASSIC_UI=1, the previous Tkinter interface is used.
+- This is a prerelease: the new interface has not yet been run against a live Resolve session or a paid ElevenLabs transcription.
+
 v1.3.9 preview: redesigned account connection and cumulative Studio improvements.
 
 - Replaces the API settings page with clear page and provider headings, a larger key field, saved-key status and distinct Test connection / Save & return actions.
