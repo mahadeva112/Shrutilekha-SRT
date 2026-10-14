@@ -4,6 +4,7 @@ import tkinter as tk
 import unittest
 from unittest.mock import patch
 import credentials
+from dpi import attach
 from settings_ui import ApiSettingsPanel
 
 class SettingsTests(unittest.TestCase):
@@ -66,6 +67,31 @@ class SettingsTests(unittest.TestCase):
             panel.save()
         self.assertTrue(panel.winfo_exists())
         self.assertIn('Could not save',panel.status.get())
+
+    def test_connection_layout_fits_compact_and_studio_windows_at_native_scales(self):
+        context = attach(self.root, factor=1, watch=False)
+        for scale in (.8, 1, 1.25, 1.5, 2):
+            context.rescale(scale, (0, 0, 3840, 2160))
+            for width, height in ((620, 500), (620, 550), (1040, 720), (1180, 820)):
+                with self.subTest(scale=scale, size=(width, height)):
+                    self.root.geometry(f'{width}x{height}')
+                    self.root.deiconify()
+                    panel = ApiSettingsPanel(self.root)
+                    try:
+                        self.root.update()
+                        card = panel._connection_card
+                        space = panel._connection_space
+                        self.assertGreaterEqual(card.winfo_y(), 0)
+                        self.assertLessEqual(card.winfo_y()+card.winfo_height(), space.winfo_height()+2)
+                        self.assertLessEqual(card.winfo_x()+card.winfo_width(), space.winfo_width()+2)
+                        body = card.body
+                        for child in body.winfo_children():
+                            if child.winfo_ismapped():
+                                self.assertLessEqual(child.winfo_y()+child.winfo_height(), body.winfo_height()+2)
+                        self.assertEqual(panel.entry.cget('show'), '•')
+                        self.assertEqual(panel.connection_badge.text, 'Not configured')
+                    finally:
+                        panel.close()
 
 if __name__=='__main__':
     unittest.main()

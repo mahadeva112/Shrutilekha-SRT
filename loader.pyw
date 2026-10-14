@@ -3558,7 +3558,8 @@ class App:
 
     def __init__(self, root, prompt_data, selection_path, args_path,
                  done_path, log_path, python_exe, script_path,
-                 result_path, ack_path, run_id=None, run_marker=None):
+                 result_path, ack_path, run_id=None, run_marker=None,
+                 prefill=None):
         from dpi import attach
         attach(root)
         self.root = root
@@ -3688,6 +3689,34 @@ class App:
             root.after(1200, self._poll_superseded)
         if updater is not None:
             self._start_update_check()
+        # The web studio already collected the form: go straight to its action.
+        if prefill:
+            self._prefill(prefill["values"])
+            self._on_submit(prefill["action"])
+
+    def _prefill(self, values):
+        """Load the values chosen in the web studio into the form variables.
+
+        Aspect before height: switching the frame retunes a default height.
+        """
+        def put(var, key, cast=str):
+            if values.get(key) is not None:
+                var.set(cast(values[key]))
+        self._set_task(values.get("task") or "Generate")
+        for var, key in ((self.combo_var, "chosen"), (self.lang_var, "lang"),
+                         (self.sync_srt_path_var, "sync_srt"), (self.ref_script_var, "ref_script"),
+                         (self.min_var, "min_secs"), (self.cps_var, "cps"),
+                         (self.words_per_var, "words_per"), (self.textsize_var, "text_size"),
+                         (self.color_var, "color"), (self.font_var, "font"),
+                         (self.font_style_var, "font_style"), (self.aspect_var, "aspect"),
+                         (self.srt_posy_var, "srt_posy")):
+            put(var, key)
+        for var, key in zip(self.settings_vars, ("max_chars", "max_lines", "max_secs")):
+            put(var, key)
+        for var, key in ((self.punct_var, "punct"), (self.diarize_var, "diarize"),
+                         (self.outline_var, "outline"), (self.shadow_var, "shadow"),
+                         (self.safe_zone_var, "safe_zone"), (self.review_var, "review")):
+            put(var, key, int)
 
     # ── Rounded corners ─────────────────────────────────────────────────
     def _apply_corners(self):
@@ -6992,6 +7021,38 @@ class App:
         self._finish_after_transcribe(0)
 
 
+def _run_web_studio(prompt, a):
+    """Show the WebView2 studio form. None means: use the Tk form instead."""
+    try:
+        import web_studio
+        import web_ui
+        from studio_form import DEMO_CAPTIONS
+    except ImportError:
+        return None
+    if not web_ui.available():
+        return None
+    # Installed fonts need a Tk interpreter; ask once, before the web window.
+    try:
+        probe = tk.Tk()
+        probe.withdraw()
+        families = [f for f in tkfont.families(probe) if not f.startswith("@")]
+        srt_fonts = encode_subtitle_fonts(resolve_subtitle_fonts())
+        probe.destroy()
+    except Exception:
+        families, srt_fonts = [], ""
+    ctx = dict(languages=LANGUAGES, language_codes=LANGUAGE_CODES, frames=FRAME_FORMATS,
+               default_frame=DEFAULT_FRAME, caption_fonts=CAPTION_FONTS,
+               font_styles=FONT_STYLES, families=families, srt_fonts=srt_fonts,
+               demo_captions=DEMO_CAPTIONS, updater=updater, frozen=frozen(),
+               run_id=a.run_id, run_marker=a.run_marker,
+               paths=dict(selection=a.selection, args=a.args_file, done=a.done, log=a.log,
+                          result=a.result, ack=a.ack, python=a.python, script=a.script))
+    try:
+        return web_studio.run(prompt, ctx)
+    except Exception:
+        return None
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--prompt",    required=True)
@@ -7012,6 +7073,23 @@ def main():
     with open(a.prompt, "r", encoding="utf-8") as f:
         prompt = json.load(f)
 
+    # WebView2 studio first; the Tk form remains the fallback and the Tk window
+    # still runs progress, review and the Resolve handshake.
+    web = _run_web_studio(prompt, a)
+    if web is not None and web["action"] in ("cancel", "superseded"):
+        sentinels = [(a.done, "130")]
+        if web["action"] == "cancel":
+            sentinels.append((a.ack, "cancel"))
+        for path, text in sentinels:
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+            except Exception:
+                pass
+        sys.exit(130)
+    if web is not None and web["action"] == "finished":
+        sys.exit(web["code"])
+
     root = tk.Tk()
     try:
         root.iconbitmap(default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico"))
@@ -7027,7 +7105,7 @@ def main():
     root.withdraw()
     app = App(root, prompt, a.selection, a.args_file, a.done, a.log,
               a.python, a.script, a.result, a.ack,
-              run_id=a.run_id, run_marker=a.run_marker)
+              run_id=a.run_id, run_marker=a.run_marker, prefill=web)
     root.update_idletasks()
     root.deiconify()
     def raise_when_requested():

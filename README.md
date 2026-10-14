@@ -228,7 +228,9 @@ third-party package — just a data file loaded lazily on the first Latin word.
 | --- | --- |
 | [audio_to_srt.py](audio_to_srt.py) | Runs inside Resolve. Reads tracks and clip ranges, drives the UI and worker, imports and styles the SRT, owns Undo and Sync. Installed as `Srutilekha.py`. |
 | [audio_to_srt.lua](audio_to_srt.lua) | Lua equivalent for Resolve 21.0 and earlier. Not installed by setup. |
-| [loader.pyw](loader.pyw) | Tkinter UI — settings form, live preview, cue review/editor, progress. |
+| [loader.pyw](loader.pyw) | Tkinter UI — settings form (fallback), live preview, cue review/editor, progress. |
+| [web_studio.py](web_studio.py), [web_home.py](web_home.py), [web_ui.py](web_ui.py) | WebView2 windows for the Studio form and the home page; pages live in `ui/`. Set `SRUTILEKHA_CLASSIC_UI=1` to use the Tkinter UI instead. |
+| [web_run.py](web_run.py), [web_review.py](web_review.py) | Tk-free job runner (selection, worker, Resolve handshake) and review logic behind the WebView2 studio. |
 | [transcribe.py](transcribe.py) | Worker. Calls Scribe, normalizes and transliterates, builds cues, writes the SRT and `.cap` sidecar. |
 | [dialog.py](dialog.py) | Dark-themed alert/pick/input dialogs used by the Lua script. |
 | [updater.py](updater.py) | Version check and in-place install. Standard library only. |

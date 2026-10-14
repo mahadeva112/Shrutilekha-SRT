@@ -63,6 +63,10 @@ def main():
         from tray_helper import request_open
         request_open()
         return
+    import web_home
+    if web_home.run():
+        return
+    # Classic Tk home: used when WebView2 is missing or SRUTILEKHA_CLASSIC_UI=1.
     import tkinter as tk
     from tkinter import ttk, messagebox
     from settings_ui import show_settings

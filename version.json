@@ -1,10 +1,10 @@
 {
-  "version": "1.3.8",
+  "version": "1.4.0",
   "notes": [
-    "Refined Master Studio cards, semantic section marks and rounded controls.",
-    "Existing Master Studio controls, English demos and workflows preserved.",
-    "Reports unsupported caption styling properties.",
-    "Connection verified; real Resolve 21.1 caption import awaits validation."
+    "New WebView2 interface: home, Caption Studio, progress, review editor and results run in one smooth window.",
+    "Review editor with waveform, live reading-speed meters, filters, split/merge/delete and instant local re-cuts.",
+    "Selection files, presets, cues and SRT/.cap output are byte-identical to the previous editor (covered by tests).",
+    "The classic interface remains as a fallback. Real Resolve and ElevenLabs runs of the new interface are not yet verified."
   ],
   "mandatory": false,
   "min_version": ""

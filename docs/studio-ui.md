@@ -1,9 +1,18 @@
 # Master Studio UI feature mapping
 
-The Studio form uses the existing Tkinter runtime and controls. Its presentation
-is separated into `studio_form.py`; transcription, Resolve communication, worker
-cancellation, progress and caption review remain in `loader.pyw` and the existing
-worker. Browser and native font rendering are not pixel-identical.
+The Studio form opens as a WebView2 page (`ui/studio.*`, driven by
+`web_studio.py`) when pywebview and WebView2 are available. It collects the same
+values as the Tkinter form. `web_run.py` then writes the same selection file,
+runs the worker, shows progress and the done report in the same window, and
+exchanges the done/result/ack files with Resolve exactly as `App` does. When
+"Review captions first" is on, the same window shows the review editor
+(`ui/review.js`); every re-cut, split, merge, delete and Apply goes through
+`web_review.py`, a Tk-free port of the Tkinter editor's logic that tests pin to
+the same cues and the same SRT/.cap bytes. Presets use the same JSON files in
+both forms. Without
+WebView2, or with `SRUTILEKHA_CLASSIC_UI=1`, the Tkinter form in
+`studio_form.py` is shown instead. Browser and native font rendering are not
+pixel-identical.
 
 | Existing feature | Studio location |
 | --- | --- |
