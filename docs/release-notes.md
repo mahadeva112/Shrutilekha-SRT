@@ -1,3 +1,11 @@
+v1.4.2: multi-line captions and pause-based cue breaks.
+
+- "Lines per cue" is respected: 2- and 3-line settings now produce 2- and 3-line captions. The review step used to rebuild each cue's text without its line breaks, so Apply wrote every cue as one line.
+- Cues break where the speaker pauses. The cue-balancing pass could pull words across a pause to fill a short cue; it no longer does.
+- A phrase-ending word (है, হল, ছিল …) moves to the next free line together with the word it completes, instead of overflowing line 1. Bengali হল, হলো, হলাম and হলেন are now treated as phrase-ending words.
+- Changing only line breaks in the review keeps the real word timings.
+- Checked by re-splitting five cached real transcripts: cues spanning a pause fell from 1–14 per file to 0 in four files and 3–4 in the fifth, where a pause sits before है or तो. Not yet run against a live Resolve session.
+
 v1.4.1: caption preview fix.
 
 - Captions in the Caption Studio preview and the review editor's preview now use the full frame width. Previously they could use only half of it, so captions such as the Bengali demo broke onto one word per line.

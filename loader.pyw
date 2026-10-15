@@ -5824,7 +5824,8 @@ class App:
             cap.append("SEG %.3f %.3f %d" % (seg["s"], seg["e"], seg["spk"]))
             orig = " ".join(w[2] for w in seg["words"])
             new_words = seg["text"].split()
-            if seg["text"].strip() == orig.strip() and seg["words"]:
+            # Word by word: a line break is a wrap, not an edit.
+            if new_words == orig.split() and seg["words"]:
                 for ws, we, txt in seg["words"]:
                     cap.append("WRD %.3f %.3f %s" % (ws, we, txt))
             elif new_words:
@@ -5842,6 +5843,10 @@ class App:
     def _begin_review(self):
         srt_path, cap_path = self._transcribe_paths()
         header, segs = self._parse_cap(cap_path)
+        # The sidecar has no line breaks; take the wrapped text from the SRT
+        # so "Lines per cue" survives the review (see web_review.wrapped_texts).
+        import web_review
+        segs = web_review.wrapped_texts(srt_path, segs)
         if not segs:
             # No sidecar (shouldn't happen) — skip review, apply as-is.
             self._finish_after_transcribe(0)
