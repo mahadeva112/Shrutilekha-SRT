@@ -1,9 +1,10 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "notes": [
-    "Fixes caption preview wrapping: demo and review captions now use the full frame width instead of breaking every word onto its own line.",
-    "Includes everything from v1.4.0: the new WebView2 interface for Caption Studio, progress, review and results.",
-    "Saved keys, presets and caption settings are preserved. If anything misbehaves, set SRUTILEKHA_CLASSIC_UI=1 to use the previous interface."
+    "Lines per cue now works: a 2- or 3-line setting produces 2- or 3-line captions, including after the review step. Previously review and Apply flattened every cue to one line.",
+    "Captions break where the speaker pauses: a cue no longer joins words from both sides of a pause.",
+    "A phrase-ending word (है, হল, ছিল …) moves to the next line with the word it completes instead of making line 1 too long. Bengali হল/হলো/হলাম/হলেন are now recognised.",
+    "Editing line breaks in the review no longer resets word timings. Saved keys, presets and caption settings are preserved."
   ],
   "mandatory": false,
   "min_version": ""
