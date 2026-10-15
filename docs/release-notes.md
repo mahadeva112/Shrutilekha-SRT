@@ -1,3 +1,11 @@
+v1.4.3: captions use the number of lines you choose.
+
+- Each caption is split evenly into the "Lines per cue" you set. Previously line 1 was filled up to Max characters before line 2 started, so with a large Max characters (e.g. 60) every caption stayed on one line.
+- Line breaks prefer punctuation, phrase ends and clause starts (कि, और, কিন্তু …) and put the shorter line on top. A line never starts with a phrase-completing word (है, का, সাথে …) or ends on a conjunction.
+- Captions shorter than about 16 letters stay on one line rather than being split into fragments.
+- Review, split and merge use the same line splitting.
+- Checked on five cached real transcripts at 60 characters, 2 lines, 3 seconds: 222 of 535 captions now use two lines (v1.4.2: none). Not yet run against a live Resolve session.
+
 v1.4.2: multi-line captions and pause-based cue breaks.
 
 - "Lines per cue" is respected: 2- and 3-line settings now produce 2- and 3-line captions. The review step used to rebuild each cue's text without its line breaks, so Apply wrote every cue as one line.

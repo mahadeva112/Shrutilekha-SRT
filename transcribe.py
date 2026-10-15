@@ -183,67 +183,107 @@ def _vlen(text):
     return n
 
 
+# Balanced wrapping. A cue is set in the number of lines the user chose, split
+# as evenly as the words allow — not filled line by line, which left every cue
+# shorter than max_chars on one line however many lines were asked for. Only a
+# cue too short to give each line about _MIN_LINE_CHARS stays on fewer lines:
+# "लेकिन / बात" reads worse than one short line.
+_MIN_LINE_CHARS = 8
+_LW_OVER     = 1000.0   # per character a multi-word line runs past max_chars
+_LW_BIND_BK  = 100.0    # a line opens with a phrase-completing word
+_LW_BIND_FWD = 40.0     # a line closes on a clause-opening word
+_LW_FEWER    = 60.0     # per line short of the number asked for
+_LW_PUNCT    = 15.0     # bonus: the line ends at punctuation
+_LW_CLAUSE   = 12.0     # bonus: the next line opens a clause ("कि", "और" …)
+_LW_PHRASE   = 15.0     # bonus: the line ends on a phrase-completing word
+# Subtitle convention: when two lines cannot be equal, the shorter one goes on
+# top ("तो शायद / पाँच दिन टिकेंगे।", not "तो शायद पाँच / दिन टिकेंगे।"). Each
+# line's target length is tilted by this fraction, rising from top to bottom.
+_LINE_TILT   = 0.15
+
+
 def wrap(text, max_chars, max_lines, lang=None):
-    """Greedy word-wrap into at most ``max_lines`` lines of ``max_chars``.
+    """Wrap ``text`` into ``max_lines`` lines of at most ``max_chars``, balanced.
 
-    Never drops words: once the line budget is exhausted, remaining words
-    overflow onto the final line. A slightly long line is always better than
-    silently losing text (the old version broke out of the loop and dropped
-    every word past the last line).
+    Every way of cutting the words into 1..n lines is scored and the best is
+    kept: lines as close to equal length as possible, ending at punctuation
+    where there is some, and respecting grammatical cohesion —
+      • a bind-back word (auxiliary, copula, postposition — "है", "सकता",
+        "ছিল", "ہے", etc.) does not open a line; it stays with the word it
+        completes;
+      • a bind-forward word (conjunction, subordinator — "और", "लेकिन",
+        "কিন্তু", "اور", etc.) does not close a line; it goes down with the
+        clause it introduces.
+    Fewer lines than asked for are used only when the grammar leaves no good
+    cut, or the cue is too short to fill them (see _MIN_LINE_CHARS).
 
-    When ``lang`` is set (or the text is in a recognised Indic script), the
-    wrapper also respects grammatical cohesion:
-      • A bind-back word (auxiliary, copula, postposition — "है", "सकता",
-        "ছিল", "ہے", etc.) never opens a new line; it stays with the word
-        it completes, even if the line overflows a little.
-      • A bind-forward word (conjunction, subordinator — "और", "लेकिन",
-        "কিন্তু", "اور", etc.) never closes a line; it moves to the next
-        line so it stays with the clause it introduces."""
+    Never drops words: a line runs past ``max_chars`` only when the words
+    cannot fit otherwise. A slightly long line is always better than
+    silently losing text."""
     words = text.split()
     if not words:
         return ""
-    lines = []
-    current = ""
-    for i, word in enumerate(words):
-        candidate = (current + " " + word).strip() if current else word
-        if not current or _vlen(candidate) <= max_chars:
-            current = candidate
-        elif _binds_back(word, lang):
-            # This word completes the previous phrase, so it may not open a
-            # line on its own. While a line is still free, the whole phrase —
-            # its head word plus the words binding back to it — moves down
-            # together ("দেখা হল"); keeping everything on line 1 left a
-            # "2 lines" cue as one over-long line. With no line left, or
-            # when the phrase IS the line, it overflows rather than orphaning.
-            cur_words = current.split()
-            j = len(cur_words)
-            while j > 0 and _binds_back(cur_words[j - 1], lang):
-                j -= 1
-            j -= 1                                   # the head goes too
-            if j > 1 and _binds_fwd(cur_words[j - 1], lang):
-                j -= 1                               # and a conjunction before it
-            if len(lines) + 1 < max_lines and j > 0:
-                lines.append(" ".join(cur_words[:j]))
-                current = " ".join(cur_words[j:] + [word])
-            else:
-                current = candidate
-        elif len(lines) + 1 < max_lines:
-            # About to break here.  Check whether the last word of the
-            # current line is a bind-forward word.  If so, move it to the
-            # new line so it stays with the clause it introduces.
-            cur_words = current.split()
-            if cur_words and _binds_fwd(cur_words[-1], lang):
-                carry = cur_words.pop()       # pull the conjunction off
-                current = " ".join(cur_words) if cur_words else ""
-                word = carry + " " + word     # prepend it to the new line
-            if current:
-                lines.append(current)
-            current = word
-        else:
-            current = candidate        # budget spent → overflow, never drop
-    if current:
-        lines.append(current)
-    return "\n".join(lines)
+    lens = [_vlen(w) for w in words]
+    total = sum(lens) + len(words) - 1
+    needed = -(-total // max(1, max_chars))
+    n = min(max(1, max_lines), len(words),
+            max(needed, total // _MIN_LINE_CHARS, 1))
+    if n <= 1:
+        return " ".join(words)
+
+    nw = len(words)
+    starts = [0]
+    for ln in lens:
+        starts.append(starts[-1] + ln)
+
+    def width(i, j):
+        return starts[j] - starts[i] + (j - i - 1)
+
+    def line_cost(i, j, target):
+        w = width(i, j)
+        cost = (w - target) ** 2
+        if w > max_chars and j - i > 1:
+            cost += _LW_OVER * (w - max_chars)
+        if i > 0 and _binds_back(words[i], lang):
+            cost += _LW_BIND_BK
+        if j < nw:
+            if _binds_fwd(words[j - 1], lang):
+                cost += _LW_BIND_FWD
+            if (_ends_with(words[j - 1], _STRONG_END)
+                    or _ends_with(words[j - 1], _WEAK_END)):
+                cost -= _LW_PUNCT
+            if _binds_fwd(words[j], lang):
+                cost -= _LW_CLAUSE
+            if _binds_back(words[j - 1], lang):
+                cost -= _LW_PHRASE
+        return cost
+
+    # Fewest-cost split into exactly k lines, for each k up to n.
+    best, best_cost = None, None
+    inf = float("inf")
+    for k in range(1, n + 1):
+        avg = total / float(k)
+        tilt = _LINE_TILT / (k - 1) if k > 1 else 0.0
+        targets = [avg * (1 + tilt * (2 * m - k - 1)) for m in range(1, k + 1)]
+        dp = [[inf] * (k + 1) for _ in range(nw + 1)]
+        back = [[0] * (k + 1) for _ in range(nw + 1)]
+        dp[0][0] = 0.0
+        for m in range(1, k + 1):
+            for j in range(m, nw - (k - m) + 1):
+                for i in range(m - 1, j):
+                    if dp[i][m - 1] == inf:
+                        continue
+                    c = dp[i][m - 1] + line_cost(i, j, targets[m - 1])
+                    if c < dp[j][m]:
+                        dp[j][m], back[j][m] = c, i
+        cost = dp[nw][k] + _LW_FEWER * (n - k)
+        if best_cost is None or cost < best_cost:
+            cuts, j = [], nw
+            for m in range(k, 0, -1):
+                cuts.append((back[j][m], j))
+                j = back[j][m]
+            best, best_cost = cuts[::-1], cost
+    return "\n".join(" ".join(words[i:j]) for i, j in best)
 
 
 # ── Script detection ────────────────────────────────────────────────────────
@@ -1107,27 +1147,21 @@ def _best_cut(buf, next_text, next_start, cap, pauses, lang):
     return best_j
 
 
-def _append_word(cue_text, word, max_chars, max_lines):
+def _append_word(cue_text, word, max_chars, max_lines, lang=None):
     """Append ``word`` to an already-wrapped cue without violating the
     char/line budget.
 
-    Adds to the last line when it still fits, else starts a new line while one
-    is available, else returns None — there is nowhere left to put the word
-    within budget, so the caller must not force the merge (unlike wrap(),
-    which is building a single cue from scratch and has no "leave it out"
-    option, here the word already has a perfectly good home: staying in its
-    own cue)."""
-    lines = cue_text.split("\n")
-    last = lines[-1]
-    if not last:
-        lines[-1] = word
-    elif _vlen(last) + 1 + _vlen(word) <= max_chars:
-        lines[-1] = last + " " + word
-    elif len(lines) < max_lines:
-        lines.append(word)
-    else:
-        return None
-    return "\n".join(lines)
+    The cue is re-wrapped with the word added, so its lines stay balanced, and
+    the result is refused (None) when any multi-word line would run past
+    max_chars — there is nowhere left to put the word within budget, so the
+    caller must not force the merge (unlike wrap(), which is building a single
+    cue from scratch and has no "leave it out" option, here the word already
+    has a perfectly good home: staying in its own cue)."""
+    text = wrap(" ".join(cue_text.split() + [word]), max_chars, max_lines, lang)
+    for line in text.split("\n"):
+        if _vlen(line) > max_chars and len(line.split()) > 1:
+            return None
+    return text
 
 
 def _reattach_clitics(cues, max_chars, max_lines, max_words=0, max_secs=None,
@@ -1172,7 +1206,7 @@ def _reattach_clitics(cues, max_chars, max_lines, max_words=0, max_secs=None,
                     or (max_words > 0 and len(pwords) >= max_words)
                     or (max_secs is not None and head[2] - ps > max_secs)):
                 break
-            merged = _append_word(ptext, head[0], max_chars, max_lines)
+            merged = _append_word(ptext, head[0], max_chars, max_lines, lang)
             if merged is None:
                 break
             out[-1] = (pidx, ps, head[2], merged, pwords + [head])
