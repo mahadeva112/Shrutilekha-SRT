@@ -36,7 +36,30 @@ def fmt_ts(sec):
     return "%02d:%02d:%02d,%03d" % (h, m, s, ms)
 
 
-def parse_cap(cap_path):
+def wrapped_texts(srt_path, segs):
+    """Give each segment the line-wrapped text transcribe.py wrote to the SRT.
+
+    The .cap sidecar stores one word per WRD line, so the text rebuilt from it
+    is a single line. Using that in the review dropped the wrap, and a
+    "Lines per cue: 2" run came out of Apply as one long line. The SRT holds
+    the wrapped text; it is used for every cue whose words match, cue for cue.
+    """
+    if not srt_path or not segs:
+        return segs
+    try:
+        import transcribe as T
+        cues = T.parse_srt(srt_path)
+    except Exception:
+        return segs
+    if len(cues) != len(segs):
+        return segs
+    for seg, (_s, _e, text) in zip(segs, cues):
+        if text.split() == seg["text"].split():
+            seg["text"] = text
+    return segs
+
+
+def parse_cap(cap_path, srt_path=None):
     """App._parse_cap: (header lines, segments) from the .cap sidecar."""
     header, segs, cur = [], [], None
     try:
@@ -58,7 +81,7 @@ def parse_cap(cap_path):
         return [], []
     for seg in segs:
         seg["text"] = " ".join(w[2] for w in seg["words"])
-    return header, segs
+    return header, wrapped_texts(srt_path, segs)
 
 
 def spk_colors(header):
@@ -87,7 +110,9 @@ def write_srt_cap(srt_path, cap_path, header, segs):
         cap.append("SEG %.3f %.3f %d" % (seg["s"], seg["e"], seg["spk"]))
         orig = " ".join(w[2] for w in seg["words"])
         new_words = seg["text"].split()
-        if seg["text"].strip() == orig.strip() and seg["words"]:
+        # Compared word by word: a line break in the text is a wrap, not an
+        # edit, and must not throw away the real word timings.
+        if new_words == orig.split() and seg["words"]:
             for ws, we, txt in seg["words"]:
                 cap.append("WRD %.3f %.3f %s" % (ws, we, txt))
         elif new_words:

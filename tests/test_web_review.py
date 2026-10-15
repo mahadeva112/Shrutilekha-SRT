@@ -112,6 +112,23 @@ class ReviewParityTest(unittest.TestCase):
         for name in ("a.srt", "a.cap"):
             self.assertEqual((web_dir / name).read_bytes(), (tk_dir / name).read_bytes(), name)
 
+    def test_two_line_cues_keep_their_wrap_through_review(self):
+        srt = self.dir / "out.srt"
+        srt.write_text("1\n00:00:00,000 --> 00:00:00,001\n \n\n"
+                       "2\n00:00:00,000 --> 00:00:01,900\nআমি আজ\nবাড়ি যাব।\n\n"
+                       "3\n00:00:02,400 --> 00:00:04,100\nতুমি কখন আসবে বলো?\n\n"
+                       "4\n00:00:04,600 --> 00:00:05,500\nঠিক\nআছে।\n", encoding="utf-8")
+        header, segs = web_review.parse_cap(str(self.cap), str(srt))
+        self.assertEqual([s["text"] for s in segs],
+                         ["আমি আজ\nবাড়ি যাব।", "তুমি কখন আসবে বলো?", "ঠিক\nআছে।"])
+        live = [web_review.live_segment(s) for s in segs]
+        out = self.dir / "web"
+        out.mkdir()
+        web_review.write_srt_cap(str(out / "a.srt"), str(out / "a.cap"), header, live)
+        self.assertIn("আমি আজ\nবাড়ি যাব।", (out / "a.srt").read_text(encoding="utf-8"))
+        # A wrap is not an edit: the real word timings survive.
+        self.assertIn("WRD 0.450 0.900 আজ", (out / "a.cap").read_text(encoding="utf-8"))
+
     def test_envelope_is_thinned_but_keeps_peaks(self):
         fake = types.SimpleNamespace(_audio_envelope=lambda path: [0.1, 0.9, 0.2, 0.3, 1.0, 0.0], _ENV_HOP=0.005)
         import sys

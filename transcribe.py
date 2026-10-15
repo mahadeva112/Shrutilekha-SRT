@@ -209,9 +209,24 @@ def wrap(text, max_chars, max_lines, lang=None):
         if not current or _vlen(candidate) <= max_chars:
             current = candidate
         elif _binds_back(word, lang):
-            # This word completes the previous phrase — keep it on the
-            # same line even if it overflows, rather than orphaning it.
-            current = candidate
+            # This word completes the previous phrase, so it may not open a
+            # line on its own. While a line is still free, the whole phrase —
+            # its head word plus the words binding back to it — moves down
+            # together ("দেখা হল"); keeping everything on line 1 left a
+            # "2 lines" cue as one over-long line. With no line left, or
+            # when the phrase IS the line, it overflows rather than orphaning.
+            cur_words = current.split()
+            j = len(cur_words)
+            while j > 0 and _binds_back(cur_words[j - 1], lang):
+                j -= 1
+            j -= 1                                   # the head goes too
+            if j > 1 and _binds_fwd(cur_words[j - 1], lang):
+                j -= 1                               # and a conjunction before it
+            if len(lines) + 1 < max_lines and j > 0:
+                lines.append(" ".join(cur_words[:j]))
+                current = " ".join(cur_words[j:] + [word])
+            else:
+                current = candidate
         elif len(lines) + 1 < max_lines:
             # About to break here.  Check whether the last word of the
             # current line is a bind-forward word.  If so, move it to the
@@ -1310,6 +1325,12 @@ def _rebalance_cues(cues, max_chars, max_lines, max_secs, max_words=0,
         #    clear the floor: past that point a boundary the audio or the
         #    punctuation agrees with beats another character of evenness.
         if a_len >= floor:
+            out.append(as_cue(words))
+            continue
+        # Nor across a pause the speaker actually made: moving the boundary
+        # would put words from both sides of that silence into one cue — a
+        # short cue that ends where the speaker stopped is correct as it is.
+        if gap >= pauses.split:
             out.append(as_cue(words))
             continue
         best, best_key = None, (min(a_len, b_len), False, min(a_len, b_len))

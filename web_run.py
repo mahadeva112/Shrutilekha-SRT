@@ -167,7 +167,7 @@ class RunController:
         import web_review
         with open(self.paths["args"], encoding="utf-8") as f:
             srt = [ln.rstrip("\r\n") for ln in f][1]
-        header, segs = web_review.parse_cap(srt + ".cap")
+        header, segs = web_review.parse_cap(srt + ".cap", srt)
         if not segs:
             self._finish(0)              # no sidecar: apply as transcribed
             return
