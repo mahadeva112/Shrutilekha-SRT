@@ -2,7 +2,7 @@
   "version": "1.4.3",
   "notes": [
     "Lines per cue now gives the number of lines you choose: each caption is split evenly into 2 or 3 lines instead of filling line 1 up to Max characters first.",
-    "Line breaks fall at natural points (punctuation, phrase ends, before कि/और/কিন্তু), with the shorter line on top. No line starts with है, का, সাথে and similar words.",
+    "Line breaks fall at natural points (punctuation, phrase ends, before \u0915\u093f/\u0914\u0930/\u0995\u09bf\u09a8\u09cd\u09a4\u09c1), with the shorter line on top. No line starts with \u0939\u0948, \u0915\u093e, \u09b8\u09be\u09a5\u09c7 and similar words.",
     "Very short captions (under about 16 letters) stay on one line.",
     "Saved keys, presets and caption settings are preserved."
   ],
