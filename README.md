@@ -51,8 +51,8 @@ splitting, timing, styling and placement all run locally.
   padded, merged and cached per window. Requires `ffmpeg` on `PATH`; without it
   the full source file is uploaded.
 - **Review step.** Optionally stop on an editable cue list before anything
-  touches the timeline, with a waveform, per-cue reading-speed bars, and
-  out-of-budget cues flagged. The waveform requires `ffmpeg`.
+  touches the timeline, with per-cue reading-speed bars and out-of-budget cues
+  flagged.
 - **Undo.** Removes the subtitle track the last run created, and only that
   track.
 - **Sync Existing.** Re-aligns an existing SRT's text against the audio without
@@ -67,7 +67,7 @@ splitting, timing, styling and placement all run locally.
 | DaVinci Resolve | 21.x recommended; 21.0 and earlier supported via the Lua script |
 | Python | 3.10+ with `tkinter` |
 | API key | [ElevenLabs](https://elevenlabs.io) |
-| Optional | `ffmpeg` on `PATH` — enables trimmed uploads and the review waveform |
+| Optional | `ffmpeg` on `PATH` — enables trimmed uploads |
 
 ## Installation
 

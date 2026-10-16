@@ -5,7 +5,6 @@ split, merge or Apply from the web page produces the same cues and the same
 SRT/.cap files as the Tk review editor. Segments travel to and from the page
 as {"s", "e", "spk", "words": [[start, end, text], ...], "text"}.
 """
-import os
 
 # (label, value key, lo, hi, step, format) — App._split_field_specs.
 SPLIT_FIELDS = (
@@ -23,7 +22,6 @@ RECIPES = (
     ("Readable", (12, 2, 2.5, 17, 0.8, 0)),
 )
 SETTINGS_DEFAULTS = ("15", "1", "2")
-WAVE_POINTS = 2400
 
 
 def fmt_ts(sec):
@@ -225,27 +223,3 @@ def merge(segs, i, s):
     del out[i + 1]
     return out
 
-
-def audio_path(args_path):
-    """App._audio_path: first line of the args file."""
-    try:
-        with open(args_path, encoding="utf-8") as f:
-            return f.readline().rstrip("\r\n") or None
-    except Exception:
-        return None
-
-
-def envelope(path, points=WAVE_POINTS):
-    """The peak envelope transcribe.py computes, thinned for drawing."""
-    if not path or not os.path.exists(path):
-        return None
-    try:
-        import transcribe as T
-        env, hop = T._audio_envelope(path), T._ENV_HOP
-    except Exception:
-        return None
-    if not env:
-        return None
-    step = max(1, -(-len(env) // points))
-    peaks = [round(max(env[i:i + step]), 3) for i in range(0, len(env), step)]
-    return {"env": peaks, "hop": hop * step, "dur": len(env) * hop}
