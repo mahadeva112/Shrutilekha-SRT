@@ -1,3 +1,12 @@
+v1.4.6: new look for every screen.
+
+- Setup page: Audio & language is a large card across the top, with Timing, Script & files and Presets below. The panels sit in the middle of the window instead of leaving an empty strip.
+- New dropdowns for audio track, language and presets: an icon on each, a gold tick on the current choice, each language shown in its own script, and a search box for languages. Arrow keys, Enter and Escape work inside the list.
+- Review & split: cue count, average reading speed and cues needing attention at the top; numbered cue badges; monospace timecodes; a labelled preview.
+- Progress: a ring shows the percentage, with the stages as a horizontal step line.
+- Done: summary tiles for captions imported, track and project saved.
+- Checked in a browser UI mock and with 84 tests. Not yet run in a live Resolve session.
+
 v1.4.5: setup page without caption style or preview.
 
 - The setup page no longer has the Caption preview (Reel/HD, demo language, title-safe area, position) or Caption style (font, style, size, colour, outline, shadow). Resolve's scripting API cannot style subtitle cues, so these settings never reached Resolve. Style the track in Resolve under Inspector > Track > Track Style.

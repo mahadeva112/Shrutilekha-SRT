@@ -1,9 +1,9 @@
 {
-  "version": "1.4.5",
+  "version": "1.4.6",
   "notes": [
-    "The setup page no longer shows Caption preview or Caption style. Resolve's scripting API cannot style subtitle cues, so those settings never reached Resolve. Style the track in Resolve under Inspector > Track > Track Style.",
-    "Review screen: cue preview and Split settings on the left, cue list on the right.",
-    "New title-bar icon. Saved keys and presets are preserved; old preset style fields are ignored."
+    "New look: Audio & language is a large card at the top of the setup page, and the panels sit in the middle of the window.",
+    "New dropdowns with icons, a gold tick on the current choice, languages in their own script, and language search.",
+    "Review shows cue count, average reading speed and cues needing attention; progress uses a ring and step line; Done shows summary tiles."
   ],
   "mandatory": false,
   "min_version": ""

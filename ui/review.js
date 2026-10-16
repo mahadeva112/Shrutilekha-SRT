@@ -137,12 +137,12 @@ const Review = {
   card(seg, i, last) {
     const el = document.createElement("div");
     el.className = "cue";
-    el.innerHTML = `<span class="stripe"></span><div><div class="cue-top"><span class="idx"></span><span class="tc"></span><span class="over"></span>
+    el.innerHTML = `<span class="stripe"></span><span class="num"></span><div><div class="cue-top"><span class="tc"></span><span class="over"></span>
       <span class="cue-acts"><button data-act="split" title="Split this cue where the caret is (Enter)">Split</button>${last ? "" : `<button data-act="merge" title="Merge this cue into the next (Ctrl+M)">Merge</button>`}<button data-act="delete" class="del" title="Delete this cue (Ctrl+Delete)">Delete</button></span></div>
       <textarea spellcheck="false"></textarea></div><div class="meter"><span></span><i><em></em></i></div>`;
     const color = this.colors[String(seg.spk || 0)];
     if (color) el.querySelector(".stripe").style.background = color;
-    el.querySelector(".idx").textContent = String(i + 1).padStart(2, "0");
+    el.querySelector(".num").textContent = String(i + 1).padStart(2, "0");
     el.querySelector(".tc").textContent = `${short(seg.s)} → ${short(seg.e)}`;
     const ta = el.querySelector("textarea");
     ta.value = seg.text;
@@ -206,6 +206,12 @@ const Review = {
       c.textContent = `${c.dataset.label} ${n[c.dataset.filter]}`;
       c.classList.toggle("on", c.dataset.filter === this.filter);
     });
+    const cps = this.rows.map((r) => this.stats(r).cps);
+    $("rvCues").textContent = n.all;
+    $("rvCps").textContent = cps.length ? Math.round(cps.reduce((a, b) => a + b, 0) / cps.length) : 0;
+    $("rvIssues").textContent = n.issue;
+    $("rvIssueBox").classList.toggle("warn", n.issue > 0);
+    $("rvIssueBox").classList.toggle("good", !n.issue);
     $("reviewSummary").textContent = `${V.lang} · ${n.all} cues` + (n.issue ? ` · ${n.issue} need attention` : "") + (n.edited ? ` · ${n.edited} edited` : "");
   },
 
