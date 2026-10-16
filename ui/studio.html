@@ -8,7 +8,7 @@
 </head>
 <body>
 <header class="titlebar pywebview-drag-region">
-  <div class="brand"><span class="mark">শ্রু</span><span class="name">Srutilekha</span><span class="crumb" id="crumb"></span></div>
+  <div class="brand"><span class="mark" title="Srutilekha"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="4"/><path d="M6.5 10.5v3M9 8.5v7M11.5 10v4"/><path d="M14.5 10h3.5M14.5 14h2.5"/></svg></span><span class="name">Srutilekha</span><span class="crumb" id="crumb"></span></div>
   <div class="chrome">
     <button class="pill" id="versionPill" title="Check for updates">v—</button>
     <button class="icon-btn" id="openKey" title="API settings" data-icon="key"></button>
@@ -32,37 +32,6 @@
 </section>
 
 <div class="workspace">
-  <!-- ── preview ─────────────────────────────────────────── -->
-  <section class="panel preview-panel">
-    <div class="panel-head">
-      <span class="sec-icon" data-icon="sparkle"></span><h3>Caption preview</h3>
-      <span class="badge warn">Demo</span>
-    </div>
-    <div class="segments small" id="frameSeg">
-      <button data-frame="Reel">Reel 9:16</button>
-      <button data-frame="HD">HD 16:9</button>
-      <i class="seg-thumb"></i>
-    </div>
-    <label class="inline">Demo language <select id="demoLang"></select></label>
-    <div class="viewport" id="viewport">
-      <div class="frame" id="frame" title="Drag to place captions">
-        <div class="scene"><i class="sun"></i><i class="hill a"></i><i class="hill b"></i></div>
-        <div class="safe reel"><i></i><i></i><i></i><i></i><b></b></div>
-        <div class="safe hd"></div>
-        <div class="baseline" id="baseline"></div>
-        <div class="cap" id="cap"></div>
-      </div>
-      <span class="viewport-note">Demo only · enlarged text</span>
-    </div>
-    <div class="plate" id="plate"></div>
-    <div class="row-toggle"><span id="safeLabel">Platform safe zone</span><input type="checkbox" class="switch" data-key="safe_zone"></div>
-    <div class="position">
-      <span>Position</span>
-      <input type="range" id="posRange" min="0" max="1" step="0.001">
-      <b id="posLabel">28%</b>
-    </div>
-  </section>
-
   <!-- ── settings ────────────────────────────────────────── -->
   <div class="settings">
     <section class="panel">
@@ -100,30 +69,10 @@
 
     <section class="panel">
       <div class="panel-head"><span class="sec-icon" data-icon="bookmark"></span><h3>Presets</h3></div>
-      <label class="fld" title="Everything on this page except the track choices, so a preset survives being loaded on a different timeline.">
+      <label class="fld" title="Language, timing and the toggles on this page, but not the track choices, so a preset survives being loaded on a different timeline.">
         <span>Saved settings</span><select id="presetSel"></select>
       </label>
       <div class="path"><input id="presetName" placeholder="Save as…" spellcheck="false"><button class="btn sm" id="savePreset">Save</button><button class="btn sm ghost danger" id="removePreset">Remove</button></div>
-    </section>
-
-    <section class="panel style-panel">
-      <div class="panel-head"><span class="sec-icon" data-icon="type"></span><h3>Caption style</h3></div>
-      <div class="style-row">
-        <label class="fld grow3"><span>Font</span><select data-key="font" id="fontSel"></select></label>
-        <label class="fld grow2"><span>Style</span><select data-key="font_style" id="styleSel"></select></label>
-        <label class="fld size"><span>Size · pt</span><div class="num"><input data-key="text_size" inputmode="decimal"></div></label>
-        <div class="fld colour" title="Choose caption colour, or Auto for automatic colour">
-          <span>Colour</span>
-          <div class="colour-box">
-            <label class="swatch" id="swatch"><input type="color" id="colorPick"></label>
-            <button class="btn sm" id="colorAuto">Auto</button>
-          </div>
-        </div>
-        <div class="effects">
-          <label class="mini-toggle"><span>Outline</span><input type="checkbox" class="switch" data-key="outline"></label>
-          <label class="mini-toggle"><span>Shadow</span><input type="checkbox" class="switch" data-key="shadow"></label>
-        </div>
-      </div>
     </section>
   </div>
 </div>
@@ -146,7 +95,15 @@
     <span class="badge ok local-badge" title="Re-cuts run on this PC. No API call."><span data-icon="check"></span>Re-cuts run locally · no API call</span>
   </section>
   <div class="review-grid">
-    <aside class="panel split-panel">
+    <aside class="panel side-panel">
+      <div class="panel-head"><span class="sec-icon" data-icon="sparkle"></span><h3 id="inspTitle">No cue selected</h3></div>
+      <div class="mini-viewport" id="miniViewport">
+        <div class="frame" id="miniFrame">
+          <div class="scene"><i class="sun"></i><i class="hill a"></i><i class="hill b"></i></div>
+          <div class="cap" id="miniCap"></div>
+        </div>
+      </div>
+      <hr>
       <div class="panel-head"><span class="sec-icon" data-icon="clock"></span><h3>Split</h3></div>
       <div class="recipes" id="recipes" title="Three starting points for the cut. They set the six values below and nothing else — your saved presets are untouched."></div>
       <div class="split-fields" id="splitFields"></div>
@@ -164,22 +121,6 @@
       </div>
     </section>
 
-    <aside class="panel inspect-panel">
-      <div class="panel-head"><span class="sec-icon" data-icon="sparkle"></span><h3 id="inspTitle">No cue selected</h3></div>
-      <div class="mini-viewport" id="miniViewport">
-        <div class="frame" id="miniFrame">
-          <div class="scene"><i class="sun"></i><i class="hill a"></i><i class="hill b"></i></div>
-          <div class="safe reel"><i></i><i></i><i></i><i></i><b></b></div>
-          <div class="safe hd"></div>
-          <div class="cap" id="miniCap"></div>
-        </div>
-      </div>
-      <dl class="insp" id="insp"></dl>
-      <div class="insp-actions">
-        <button class="btn sm" id="inspSplit">Split at caret</button>
-        <button class="btn sm" id="inspMerge">Merge into previous</button>
-      </div>
-    </aside>
   </div>
   <footer class="actionbar">
     <span class="summary" id="reviewSummary"></span>

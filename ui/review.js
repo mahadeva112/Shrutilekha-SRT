@@ -16,6 +16,7 @@ const Review = {
     this.buildControls();
     this.rebuild(r.segs, r.s);
     new ResizeObserver(() => { this.rows.forEach((r) => this.fit(r)); this.paintPreview(); }).observe($("cueList"));
+    new ResizeObserver(() => this.paintPreview()).observe($("miniViewport"));
   },
 
   /* ── split controls ─────────────────────────────────────── */
@@ -55,8 +56,6 @@ const Review = {
       return b;
     }));
     $("cueSearch").oninput = () => this.applyFilter();
-    $("inspSplit").onclick = () => this.splitAtCaret(this.sel, false);
-    $("inspMerge").onclick = () => { if (this.sel > 0) this.edit("merge", this.sel - 1, 0, this.sel - 1); };
     $("applyBtn").onclick = () => this.apply();
     $("reviewCancel").onclick = () => api.cancel();
     this.syncControls();
@@ -237,35 +236,11 @@ const Review = {
     this.paintPreview();
   },
 
-  /* ── inspector and preview ──────────────────────────────── */
+  /* ── preview ────────────────────────────────────────────── */
   inspect() {
-    const row = this.rows[this.sel], dl = $("insp");
-    $("inspMerge").disabled = !(this.sel > 0);
-    $("inspSplit").disabled = !row;
-    if (!row) { $("inspTitle").textContent = "No cue selected"; dl.replaceChildren(); return; }
-    $("inspTitle").textContent = "Cue " + String(this.sel + 1).padStart(2, "0");
-    const st = this.stats(row), s = this.s, budget = Math.max(1, s.max_chars * s.max_lines);
-    const [frac, col] = grade(st.cps, s.cps);
-    const items = [
-      ["In", short(row.seg.s)], ["Out", short(row.seg.e)],
-      ["Duration", Math.max(0, row.seg.e - row.seg.s).toFixed(2) + " s"],
-      ["Characters", `${st.chars} / ${budget}`, st.chars > budget ? "var(--gold)" : "", Math.min(1, st.chars / budget)],
-      ["Reading speed", Math.round(st.cps) + " cps", col, frac],
-      ["Lines", `${st.lines} / ${s.max_lines}`, st.overLines ? "var(--red)" : ""],
-    ];
-    dl.replaceChildren();
-    for (const [label, value, colour, bar] of items) {
-      const dt = document.createElement("dt"), dd = document.createElement("dd");
-      dt.textContent = label; dd.textContent = value;
-      if (colour) dd.style.color = colour;
-      dl.append(dt, dd);
-      if (bar !== undefined) {
-        const b = document.createElement("div");
-        b.className = "bar";
-        b.innerHTML = `<em style="width:${bar * 100}%;background:${colour || "var(--green)"}"></em>`;
-        dl.append(b);
-      }
-    }
+    // Cue timing, cps and split/merge already sit on each cue card; the
+    // preview panel only names the cue it shows.
+    $("inspTitle").textContent = this.rows[this.sel] ? "Cue " + String(this.sel + 1).padStart(2, "0") : "No cue selected";
   },
 
   paintPreview() {

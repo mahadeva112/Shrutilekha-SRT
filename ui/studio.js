@@ -12,9 +12,6 @@ const NUMBERS = [
   ["cps", "Reading speed", "cps", 8, 30],
   ["words_per", "Max words", "0 = off", 0, 12],
 ];
-const WEIGHTS = { Auto: [700, "normal"], Regular: [400, "normal"], Light: [300, "normal"],
-  Medium: [500, "normal"], SemiBold: [600, "normal"], Bold: [700, "normal"], Black: [900, "normal"],
-  Italic: [400, "italic"], "Bold Italic": [700, "italic"] };
 let pending = null;                 // action waiting for an API key
 
 /* ── small builders ──────────────────────────────────────── */
@@ -43,20 +40,8 @@ function moveThumb(seg) {
 
 /* ── value plumbing ──────────────────────────────────────── */
 const frame = () => init.frames[V.aspect] || init.frames.Reel;
-function posyFrac() {
-  const n = parseFloat(String(V.srt_posy || "").trim());
-  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : frame().srt_posy;
-}
-function retunePosy() {
-  // Follow the frame's professional default only while still on a default.
-  const cur = String(V.srt_posy || "").trim();
-  const defaults = new Set();
-  Object.values(init.frames).forEach((f) => { defaults.add(f.srt_posy.toFixed(3)); defaults.add(String(f.srt_posy)); });
-  if (!cur || defaults.has(cur)) V.srt_posy = frame().srt_posy.toFixed(3);
-}
 function set(key, value, quiet) {
   V[key] = value;
-  if (key === "aspect") retunePosy();
   if (!quiet) render();
 }
 
@@ -68,27 +53,12 @@ function bindControls() {
     else el.oninput = () => set(key, el.value);
   });
   document.querySelectorAll("#taskSeg button").forEach((b) => b.onclick = () => set("task", b.dataset.task));
-  document.querySelectorAll("#frameSeg button").forEach((b) => b.onclick = () => set("aspect", b.dataset.frame));
-  $("demoLang").onchange = render;
-  $("posRange").oninput = (e) => set("srt_posy", Number(e.target.value).toFixed(3));
-  $("colorPick").oninput = (e) => set("color", e.target.value);
-  $("colorAuto").onclick = () => set("color", "");
   document.querySelectorAll("[data-browse]").forEach((b) => b.onclick = async (e) => {
     e.preventDefault();
     const path = await api.pick_file(b.dataset.browse);
     if (path) set(b.dataset.browse === "script" ? "ref_script" : "sync_srt", path);
   });
 
-  // Drag inside the frame to set the caption baseline.
-  const f = $("frame");
-  const place = (e) => {
-    const r = f.getBoundingClientRect();
-    set("srt_posy", Math.max(0, Math.min(1, (r.bottom - e.clientY) / r.height)).toFixed(3));
-  };
-  f.onpointerdown = (e) => { f.setPointerCapture(e.pointerId); f.classList.add("dragging"); place(e); };
-  f.onpointermove = (e) => { if (f.hasPointerCapture(e.pointerId)) place(e); };
-  f.onpointerup = (e) => { f.releasePointerCapture(e.pointerId); f.classList.remove("dragging"); };
-  new ResizeObserver(layoutFrame).observe($("viewport"));
   window.addEventListener("resize", () => document.querySelectorAll(".segments").forEach(moveThumb));
 }
 
@@ -102,7 +72,6 @@ function render() {
   });
   const sync = V.task === "Sync Existing";
   document.querySelectorAll("#taskSeg button").forEach((b) => b.classList.toggle("active", b.dataset.task === V.task));
-  document.querySelectorAll("#frameSeg button").forEach((b) => b.classList.toggle("active", b.dataset.frame === V.aspect));
   document.querySelectorAll(".segments").forEach(moveThumb);
   $("syncField").querySelectorAll("input, button").forEach((el) => el.disabled = !sync);
   $("goText").textContent = sync ? "Sync timing" : "Generate captions";
@@ -115,8 +84,6 @@ function render() {
     box.classList.toggle("bad", String(V[box.dataset.num] ?? "").trim() !== "" && !Number.isFinite(n));
   });
   renderComfort();
-  renderColour();
-  renderPreview();
   renderSummary();
 }
 
@@ -134,50 +101,11 @@ function renderComfort() {
   $("comfortBar").style.background = col;
 }
 
-function renderColour() {
-  const c = String(V.color || "").trim();
-  $("swatch").classList.toggle("set", !!c);
-  $("swatch").style.setProperty("--swatch", c || "transparent");
-  if (/^#[0-9a-f]{6}$/i.test(c)) $("colorPick").value = c;
-  $("colorAuto").classList.toggle("active", !c);
-}
-
-function layoutFrame() {
-  const vp = $("viewport"), f = $("frame");
-  const w = vp.clientWidth - 24, h = vp.clientHeight - 38;
-  const aspect = frame().aspect;
-  let fw = w, fh = w / aspect;
-  if (fh > h) { fh = h; fw = h * aspect; }
-  f.style.width = Math.max(40, fw) + "px";
-  f.style.height = Math.max(40, fh) + "px";
-  renderPreview();
-}
-
-function renderPreview() {
-  const f = $("frame"), cap = $("cap");
-  const portrait = frame().aspect < 1;
-  f.classList.toggle("reel", portrait);
-  f.classList.toggle("hd", !portrait);
-  f.classList.toggle("safe-on", !!Number(V.safe_zone));
-  if (f.dataset.aspect !== V.aspect) { f.dataset.aspect = V.aspect; requestAnimationFrame(layoutFrame); }
-  const py = posyFrac();
-  cap.style.bottom = $("baseline").style.bottom = py * 100 + "%";
-  $("posRange").value = py;
-  $("posRange").style.setProperty("--fill", py * 100 + "%");
-  $("posLabel").textContent = Math.round(py * 100) + "%";
-
-  paintCaption(f, cap, init.demo[$("demoLang").value] || init.demo.English);
-
-  $("safeLabel").textContent = portrait ? "Platform safe zone" : "Title-safe area";
-  const bits = [frame().label];
-  const tl = init.timelineRes ? (init.timelineRes[1] > init.timelineRes[0] ? "Reel" : "HD") : null;
-  if (tl && tl !== V.aspect) bits.push("timeline " + init.frames[tl].label);
-  else if (init.fps) bits.push(init.fps + " fps");
-  $("plate").textContent = bits.join(" · ");
-}
-
+/* The review screen's preview of the selected cue. Resolve's scripting API
+   cannot style subtitle cues, so it draws Resolve's own default look at the
+   timeline's frame, rather than a font or position that would never arrive. */
 function fitFrame(box, f, padW, padH) {
-  // Largest frame of the current aspect inside the box.
+  // Largest frame of the timeline's aspect inside the box.
   const w = box.clientWidth - padW, h = box.clientHeight - padH, aspect = frame().aspect;
   let fw = w, fh = w / aspect;
   if (fh > h) { fh = h; fw = h * aspect; }
@@ -186,28 +114,18 @@ function fitFrame(box, f, padW, padH) {
   const portrait = aspect < 1;
   f.classList.toggle("reel", portrait);
   f.classList.toggle("hd", !portrait);
-  f.classList.toggle("safe-on", !!Number(V.safe_zone));
 }
 
 function paintCaption(f, cap, text) {
-  // The caption as the chosen style will draw it, at the chosen height.
+  // The cue at the frame's default caption height, in plain white.
   cap.textContent = text;
-  cap.style.bottom = posyFrac() * 100 + "%";
+  cap.style.bottom = frame().srt_posy * 100 + "%";
   const fh = parseFloat(f.style.height) || 300, fw = parseFloat(f.style.width) || 170;
-  const pt = parseFloat(V.text_size);
   const tlH = (init.timelineRes && init.timelineRes[1]) || 1080;
-  // Enlarged for legibility, as the Tk illustration was; labelled in the UI.
-  cap.style.fontSize = Math.max(10, Math.min(fw * 0.085, fh * ((Number.isFinite(pt) ? pt : 55) / tlH) * 1.6)) + "px";
-  const font = String(V.font || "");
-  cap.style.fontFamily = font.startsWith("Auto") ? "" : `"${font}", "Nirmala UI", sans-serif`;
-  const [weight, slant] = WEIGHTS[V.font_style] || WEIGHTS.Auto;
-  cap.style.fontWeight = weight;
-  cap.style.fontStyle = slant;
-  cap.style.color = String(V.color || "").trim() || "#fff4d5";
-  const shadows = [];
-  if (Number(V.outline)) for (const [x, y] of [[-1.5, 0], [1.5, 0], [0, -1.5], [0, 1.5], [-1, -1], [1, 1], [-1, 1], [1, -1]]) shadows.push(`${x}px ${y}px 0 #000`);
-  if (Number(V.shadow)) shadows.push("0 3px 8px #000c");
-  cap.style.textShadow = shadows.join(",") || "none";
+  // Enlarged for legibility, as the Tk illustration was.
+  cap.style.fontSize = Math.max(10, Math.min(fw * 0.085, fh * (55 / tlH) * 1.6)) + "px";
+  cap.style.color = "#fff";
+  cap.style.textShadow = "0 2px 6px #000c";
 }
 
 function renderSummary() {
@@ -438,16 +356,12 @@ window.addEventListener("pywebviewready", async () => {
   buildNumbers();
   fillSelect($("trackSel"), init.items.length ? init.items : [""], V.chosen);
   fillSelect($("langSel"), init.languages, V.lang);
-  fillSelect($("fontSel"), init.fonts, V.font);
-  fillSelect($("styleSel"), init.fontStyles, V.font_style);
-  fillSelect($("demoLang"), Object.keys(init.demo).sort(), "English");
   fillPresets(init.presets);
   UI.hydrateIcons();
   bindControls();
   wirePresets();
   wireActions();
   render();
-  layoutFrame();
   document.body.classList.add("ready");
   if (init.needsKey && !init.hasKey) UI.openModal("keyModal");
   UI.checkUpdates();
