@@ -1,3 +1,10 @@
+v1.4.4: review editor without the waveform.
+
+- The review editor no longer shows a waveform above the cue list. It never played audio; clicking it only selected the nearest cue. Use search and the All / Needs attention / Edited filters to find cues.
+- The review page opens faster because it no longer decodes the audio with ffmpeg. Caption timing still uses ffmpeg exactly as before.
+- The classic Tkinter review (used without WebView2 or with SRUTILEKHA_CLASSIC_UI=1) is unchanged.
+- Saved keys, presets and caption settings are preserved. Not yet run against a live Resolve session.
+
 v1.4.3: captions use the number of lines you choose.
 
 - Each caption is split evenly into the "Lines per cue" you set. Previously line 1 was filled up to Max characters before line 2 started, so with a large Max characters (e.g. 60) every caption stayed on one line.
