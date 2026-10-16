@@ -83,11 +83,11 @@ class WebStudioTest(unittest.TestCase):
     def test_presets_are_shared_with_the_tk_form(self):
         api = web_studio.StudioApi(PROMPT, self.ctx)
         values = web_studio.initial_values(PROMPT, self.ctx)
-        values.update(cps="18", font_style="Bold", outline=0, max_lines="2")
+        values.update(cps="18", diarize=1, max_lines="2")
         self.assertTrue(api.save_preset("Talk", values)["ok"])
         app = self.app()
         app._preset_actions["apply"]("Talk")
-        self.assertEqual((app.cps_var.get(), app.font_style_var.get(), app.outline_var.get()), ("18", "Bold", 0))
+        self.assertEqual((app.cps_var.get(), app.diarize_var.get()), ("18", 1))
         self.assertEqual(app.settings_vars[1].get(), "2")
         app.cps_var.set("21")
         app.preset_name_var.set("FromTk")
@@ -96,6 +96,23 @@ class WebStudioTest(unittest.TestCase):
         self.assertTrue(loaded["ok"])
         self.assertEqual(loaded["values"]["cps"], "21")
         self.assertEqual(api.remove_preset("Talk")["presets"], ["FromTk"])
+
+    def test_presets_leave_out_caption_style(self):
+        # Resolve cannot style subtitle cues, so presets neither save nor
+        # restore style, including the style fields of an older preset.
+        api = web_studio.StudioApi(PROMPT, self.ctx)
+        values = web_studio.initial_values(PROMPT, self.ctx)
+        values.update(font_style="Bold", color="#ffcc00", outline=0, srt_posy="0.3")
+        self.assertTrue(api.save_preset("Plain", values)["ok"])
+        stored = json.loads((Path(self.scratch.name) / "presets" / "Plain.json").read_text(encoding="utf-8"))
+        for key in ("font", "font_style", "text_size", "color", "outline", "shadow",
+                    "srt_posy", "aspect", "safe_zone"):
+            self.assertNotIn(key, stored)
+        stored.update(font_style="Bold", color="#ffcc00", outline=0)
+        (Path(self.scratch.name) / "presets" / "Plain.json").write_text(json.dumps(stored), encoding="utf-8")
+        loaded = api.load_preset("Plain")["values"]
+        self.assertEqual(loaded["cps"], values["cps"])
+        self.assertFalse({"font_style", "color", "outline"} & set(loaded))
 
     def test_preset_names_cannot_leave_the_presets_folder(self):
         api = web_studio.StudioApi(PROMPT, self.ctx)

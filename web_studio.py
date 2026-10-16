@@ -17,11 +17,13 @@ import threading
 import web_ui
 from app_runtime import data_dir, frozen, user_dir
 
-# Values the page edits, and what a preset stores. Preset files keep the Tk
-# form's format: these keys plus "_settings" = [max chars, lines, max secs].
-PRESET_KEYS = ("min_secs", "cps", "text_size", "lang", "punct", "diarize",
-               "outline", "shadow", "color", "words_per", "safe_zone",
-               "review", "font", "font_style", "srt_posy", "aspect")
+# What a preset stores. Preset files keep the Tk form's format: these keys
+# plus "_settings" = [max chars, lines, max secs]. Caption style (font, size,
+# colour, outline, shadow, position) is left out: Resolve's scripting API cannot
+# style subtitle cues, so the page no longer offers it and an older preset's
+# style fields are ignored on load.
+PRESET_KEYS = ("min_secs", "cps", "lang", "punct", "diarize", "words_per",
+               "review")
 SETTINGS_KEYS = ("max_chars", "max_lines", "max_secs")
 SETTINGS_DEFAULTS = ("15", "1", "2")
 TOGGLES = ("punct", "diarize", "outline", "shadow", "safe_zone", "review")

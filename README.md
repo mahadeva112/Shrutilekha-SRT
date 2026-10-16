@@ -101,13 +101,19 @@ Launch from Resolve: **Workspace → Scripts → Srutilekha**.
    | **Source** | Audio track, language, reference script, punctuation, separate speakers |
    | **Timing** | Max characters, lines per cue, max/min length, reading speed, max words, review-first, presets |
 
-4. Drag inside the live preview to set caption height in frame.
-5. Click **Generate captions**. The window becomes the progress view.
+4. Click **Generate captions**. The window becomes the progress view.
 
-### Frame presets
+### Caption style
 
-The preview switches between **Reel** (9:16) and **HD** (16:9) and opens on the
-timeline's actual shape. Caption size is a share of frame *height* and all
+Resolve's scripting API cannot set a subtitle cue's font, size, colour,
+outline, shadow or position, so the form does not offer them. Style the
+subtitle track in Resolve under **Inspector → Track → Track Style**; it applies
+to every cue on the track.
+
+### Frame presets (classic form)
+
+The classic Tkinter form's preview switches between **Reel** (9:16) and **HD**
+(16:9) and opens on the timeline's actual shape. Caption size is a share of frame *height* and all
 positions are frame-relative, so the default placement differs:
 
 | Frame | Height above bottom | Rationale |
@@ -168,8 +174,8 @@ the update with commit subjects in place of release notes.
 
 Cue styling is not exposed as a form. Font is selected per cue from the script
 it is written in; point size, outline, drop shadow and colour come from the
-`defaults` block in [audio_to_srt.py](audio_to_srt.py). Caption height is set by
-dragging inside the preview.
+`defaults` block in [audio_to_srt.py](audio_to_srt.py). Resolve does not apply
+these to subtitle cues; see [Caption style](#caption-style).
 
 | Setting | Where |
 | --- | --- |

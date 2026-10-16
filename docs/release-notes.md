@@ -1,3 +1,12 @@
+v1.4.5: setup page without caption style or preview.
+
+- The setup page no longer has the Caption preview (Reel/HD, demo language, title-safe area, position) or Caption style (font, style, size, colour, outline, shadow). Resolve's scripting API cannot style subtitle cues, so these settings never reached Resolve. Style the track in Resolve under Inspector > Track > Track Style.
+- Review screen layout: cue preview and Split settings stacked on the left, cue list on the right. The duplicate per-cue stats (In/Out/Duration/…) and Split at caret / Merge into previous buttons are gone; each cue card already has them.
+- New title-bar icon: a caption frame with a sound wave, replacing the শ্রু letter mark.
+- Presets keep language, timing and toggles. Style fields in older presets are ignored.
+- The classic Tkinter form is unchanged.
+- 84 tests passed and the screens were checked in a UI mock. Not yet run in a live Resolve session.
+
 v1.4.4: review editor without the waveform.
 
 - The review editor no longer shows a waveform above the cue list. It never played audio; clicking it only selected the nearest cue. Use search and the All / Needs attention / Edited filters to find cues.
