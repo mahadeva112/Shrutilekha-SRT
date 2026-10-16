@@ -34,7 +34,7 @@
 <div class="workspace">
   <!-- ── settings ────────────────────────────────────────── -->
   <div class="settings">
-    <section class="panel">
+    <section class="panel hero">
       <div class="panel-head"><span class="sec-icon" data-icon="wave"></span><h3>Audio &amp; language</h3></div>
       <div class="pair">
         <label class="fld"><span>Audio track</span><select data-key="chosen" id="trackSel"></select></label>
@@ -67,7 +67,7 @@
       </label>
     </section>
 
-    <section class="panel">
+    <section class="panel presets">
       <div class="panel-head"><span class="sec-icon" data-icon="bookmark"></span><h3>Presets</h3></div>
       <label class="fld" title="Language, timing and the toggles on this page, but not the track choices, so a preset survives being loaded on a different timeline.">
         <span>Saved settings</span><select id="presetSel"></select>
@@ -92,7 +92,14 @@
       <h1>Review &amp; split</h1>
       <p>Drag any value to re-cut instantly — the transcript is reused, nothing is re-transcribed.</p>
     </div>
-    <span class="badge ok local-badge" title="Re-cuts run on this PC. No API call."><span data-icon="check"></span>Re-cuts run locally · no API call</span>
+    <div class="review-meta">
+      <div class="rv-stats">
+        <div class="rv-stat gold"><b id="rvCues">0</b><span>cues</span></div>
+        <div class="rv-stat good" id="rvCpsBox"><b id="rvCps">0</b><span>avg cps</span></div>
+        <div class="rv-stat good" id="rvIssueBox"><b id="rvIssues">0</b><span>need attention</span></div>
+      </div>
+      <span class="badge ok local-badge" title="Re-cuts run on this PC. No API call."><span data-icon="check"></span>Re-cuts run locally · no API call</span>
+    </div>
   </section>
   <div class="review-grid">
     <aside class="panel side-panel">
@@ -132,11 +139,14 @@
 <!-- ── progress / done ─────────────────────────────────────── -->
 <div class="view run-view" id="runView" hidden>
   <section class="run-card" id="progressCard">
-    <div class="orbit" aria-hidden="true"><i></i><i></i><i></i></div>
     <span class="kicker" id="runKicker">WORKING</span>
+    <div class="ring" aria-hidden="true">
+      <svg viewBox="0 0 168 168"><defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3d18f"/><stop offset="1" stop-color="#c99d4a"/></linearGradient></defs>
+        <circle class="glow" cx="84" cy="84" r="74"/><circle class="track" cx="84" cy="84" r="74"/><circle class="val" id="runRing" cx="84" cy="84" r="74"/></svg>
+      <div class="ring-mid"><b id="runPct">0%</b><span>DONE</span></div>
+    </div>
     <h2 id="runTitle">Transcribing audio</h2>
-    <div class="run-pct"><b id="runPct">0%</b><span id="runMsg">Preparing…</span></div>
-    <div class="run-bar"><i id="runBar"></i></div>
+    <p class="run-msg" id="runMsg">Preparing…</p>
     <ol class="stages" id="runStages"></ol>
     <div class="run-foot">
       <span class="elapsed" id="runElapsed">0s</span>
@@ -151,6 +161,7 @@
     </div>
     <h2 id="doneTitle">Done</h2>
     <p class="done-head" id="doneHeadline"></p>
+    <div class="done-tiles" id="doneTiles"></div>
     <ul class="done-body" id="doneBody"></ul>
     <dl class="done-meta" id="doneMeta"></dl>
     <div class="done-foot">

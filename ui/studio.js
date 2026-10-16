@@ -85,6 +85,7 @@ function render() {
   });
   renderComfort();
   renderSummary();
+  Dropdown.syncAll();
 }
 
 function renderComfort() {
@@ -138,6 +139,106 @@ function renderSummary() {
   bits.push(Number(V.review) ? "review first" : "applied straight away");
   $("summary").textContent = bits.join("  ·  ");
 }
+
+/* ── dropdowns ───────────────────────────────────────────── */
+/* A styled button and list over each native select. The select stays in the
+   page (hidden) and keeps the value, so binding, render and presets are
+   unchanged; the dropdown only mirrors it. */
+const Dropdown = {
+  native: { Assamese: "অসমীয়া", Bengali: "বাংলা", Gujarati: "ગુજરાતી", Hindi: "हिन्दी", Kannada: "ಕನ್ನಡ", Malayalam: "മലയാളം",
+    Marathi: "मराठी", Nepali: "नेपाली", Odia: "ଓଡ଼ିଆ", Punjabi: "ਪੰਜਾਬੀ", Tamil: "தமிழ்", Telugu: "తెలుగు", Urdu: "اردو" },
+  icons: {
+    trackSel: '<path d="M3 12h2m3-5v10m4-13v16m4-11v6m4-3h1"/>',
+    langSel: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    presetSel: '<path d="M7 4h10v17l-5-4-5 4z"/>',
+  },
+  all: [], close: null,
+
+  label(sel, o) {
+    if (!o) return "";
+    const span = document.createElement("span");
+    span.textContent = o.text;
+    const native = sel.id === "langSel" && this.native[o.value];
+    return span.innerHTML + (native ? `<small>${native}</small>` : "");
+  },
+
+  enhance(sel) {
+    const svg = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;
+    const lang = sel.id === "langSel";
+    const dd = document.createElement("div");
+    dd.className = "dd";
+    sel.parentNode.insertBefore(dd, sel);
+    dd.append(sel);
+    sel.tabIndex = -1;
+    dd.insertAdjacentHTML("beforeend",
+      `<button type="button" class="dd-btn"><span class="dd-ico">${svg(this.icons[sel.id] || this.icons.presetSel)}</span><span class="dd-label"></span><span class="dd-chev">${svg('<path d="m6 9 6 6 6-6"/>')}</span></button>` +
+      `<div class="dd-pop">${lang ? `<label class="dd-search">${svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>')}<input placeholder="Search languages…" spellcheck="false"></label>` : ""}<div class="dd-list" role="listbox"></div></div>`);
+    const btn = dd.querySelector(".dd-btn"), list = dd.querySelector(".dd-list"), search = dd.querySelector(".dd-search input");
+    const tick = svg('<path d="m5 12 4 4L19 6"/>');
+
+    const sync = () => { dd.querySelector(".dd-label").innerHTML = this.label(sel, sel.options[sel.selectedIndex]) || "—"; };
+    const choose = (o) => { sel.value = o.value; sel.dispatchEvent(new Event("change")); close(); sync(); btn.focus(); };
+    const build = () => {
+      const q = (search ? search.value : "").trim().toLowerCase();
+      list.replaceChildren();
+      [...sel.options].forEach((o, i) => {
+        if (q && !(o.text + " " + (this.native[o.value] || "")).toLowerCase().includes(q)) return;
+        if (lang && i === 1 && !q) list.insertAdjacentHTML("beforeend", '<div class="dd-sep"></div>');
+        const row = document.createElement("div");
+        row.className = "dd-opt" + (o.value === sel.value ? " sel" : "") + (o.disabled ? " dis" : "");
+        row.innerHTML = `<span>${this.label(sel, o)}</span>${lang && i === 0 ? '<span class="tag">AUTO</span>' : ""}<span class="tick">${tick}</span>`;
+        row.onclick = () => choose(o);
+        row.option = o;
+        list.append(row);
+      });
+      if (!list.children.length) list.innerHTML = '<div class="dd-empty">No match</div>';
+    };
+    const rows = () => [...list.querySelectorAll(".dd-opt:not(.dis)")];
+    const highlight = (step) => {
+      const r = rows();
+      if (!r.length) return;
+      const cur = r.findIndex((x) => x.classList.contains("hi"));
+      const start = cur >= 0 ? cur : r.findIndex((x) => x.classList.contains("sel"));
+      const next = r[Math.max(0, Math.min(r.length - 1, (start < 0 ? -1 : start) + step))];
+      r.forEach((x) => x.classList.toggle("hi", x === next));
+      next.scrollIntoView({ block: "nearest" });
+    };
+    function close() { dd.classList.remove("open"); if (Dropdown.close === close) Dropdown.close = null; }
+    const open = () => {
+      if (this.close) this.close();
+      if (search) search.value = "";
+      build();
+      const r = dd.getBoundingClientRect();
+      dd.classList.toggle("up", window.innerHeight - r.bottom < 300 && r.top > 300);
+      dd.classList.add("open");
+      this.close = close;
+      if (search) setTimeout(() => search.focus(), 30);
+      list.querySelector(".sel")?.scrollIntoView({ block: "nearest" });
+    };
+    btn.onclick = (e) => { e.stopPropagation(); dd.classList.contains("open") ? close() : open(); };
+    dd.querySelector(".dd-pop").onclick = (e) => e.stopPropagation();
+    dd.addEventListener("keydown", (e) => {
+      const isOpen = dd.classList.contains("open");
+      if (!isOpen && (e.key === "ArrowDown" || e.key === "ArrowUp") && e.target === btn) { e.preventDefault(); open(); return; }
+      if (!isOpen) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); highlight(e.key === "ArrowDown" ? 1 : -1); }
+      else if (e.key === "Enter") {
+        // Never let Enter reach the page's Generate shortcut from inside the list.
+        e.preventDefault(); e.stopPropagation();
+        const hi = list.querySelector(".dd-opt.hi") || (search && rows()[0]);
+        if (hi) choose(hi.option);
+      } else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); btn.focus(); }
+      else if (e.key === "Tab") close();
+    });
+    if (search) search.oninput = build;
+    new MutationObserver(sync).observe(sel, { childList: true });
+    sync();
+    this.all.push(sync);
+  },
+
+  syncAll() { this.all.forEach((sync) => sync()); },
+};
+document.addEventListener("click", () => Dropdown.close && Dropdown.close());
 
 /* ── presets ─────────────────────────────────────────────── */
 function fillPresets(list, pick) {
@@ -267,7 +368,7 @@ const Run = {
     if (this.phase !== "progress") return;
     const gap = this.target - this.shown;
     this.shown = gap > 0 ? Math.min(this.target, this.shown + Math.max(0.25, gap * 0.12)) : this.target;
-    $("runBar").style.width = this.shown + "%";
+    $("runRing").style.strokeDashoffset = 465 * (1 - this.shown / 100);
     $("runPct").textContent = Math.round(this.shown) + "%";
     requestAnimationFrame(() => this.animate());
   },
@@ -315,6 +416,15 @@ const Run = {
       li.textContent = ln;
       return li;
     }));
+    const tiles = doneTiles(lines[0] || "", meta, saved, s.failed);
+    $("doneTiles").replaceChildren(...tiles.map(([value, label, tone]) => {
+      const t = document.createElement("div"), b = document.createElement("b"), sp = document.createElement("span");
+      t.className = "done-tile" + (tone ? " " + tone : "");
+      b.textContent = value; sp.textContent = label;
+      t.append(b, sp);
+      return t;
+    }));
+    if (tiles.length) { meta.splice(0, meta.length, ...meta.filter(([label]) => label !== "Timeline")); saved = false; }
     const dl = $("doneMeta");
     dl.replaceChildren();
     for (const [label, value] of meta) {
@@ -328,6 +438,19 @@ const Run = {
   },
 };
 
+function doneTiles(head, meta, saved, failed) {
+  // Three summary tiles for a finished import: count, track, saved. Any other
+  // report (undo, errors) keeps the plain lines.
+  const m = !failed && head.match(/^(\d+) subtitle cues (re-timed and )?imported/);
+  if (!m) return [];
+  const track = head.match(/subtitle track (\d+)/);
+  const timeline = (meta.find(([label]) => label === "Timeline") || [])[1];
+  const tiles = [[m[1], m[2] ? "captions re-timed" : "captions imported", "gold"]];
+  if (track) tiles.push(["Track " + track[1], timeline ? "on " + timeline : "subtitle track"]);
+  else if (timeline) tiles.push([timeline, "timeline"]);
+  if (saved) tiles.push(["Saved", "project saved", "green"]);
+  return tiles;
+}
 function doneMeta(line) {
   // "Label: value" rows from Resolve's report, as App._done_meta reads them.
   const i = line.indexOf(":");
@@ -357,6 +480,7 @@ window.addEventListener("pywebviewready", async () => {
   fillSelect($("trackSel"), init.items.length ? init.items : [""], V.chosen);
   fillSelect($("langSel"), init.languages, V.lang);
   fillPresets(init.presets);
+  ["trackSel", "langSel", "presetSel"].forEach((id) => Dropdown.enhance($(id)));
   UI.hydrateIcons();
   bindControls();
   wirePresets();
