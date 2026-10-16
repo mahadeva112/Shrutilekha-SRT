@@ -237,10 +237,6 @@ class StudioApi(web_ui.BaseApi):
             out = None
         return {"ok": out is not None, "segs": out}
 
-    def review_waveform(self):
-        import web_review
-        return web_review.envelope(web_review.audio_path(self._ctx["paths"]["args"]))
-
     def review_apply(self, segs):
         job = getattr(self, "_job", None)
         return job.apply_review(segs) if job else {"ok": False, "message": "Nothing to apply."}

@@ -4,7 +4,7 @@
    merge, delete) so the cues match what the Tk editor would produce. */
 const Review = {
   rows: [], s: null, colors: {}, fields: [], recipes: [], sel: -1,
-  filter: "all", ver: 0, timer: null, busy: false, wave: null,
+  filter: "all", ver: 0, timer: null, busy: false,
 
   async enter() {
     $("runView").hidden = true;
@@ -15,8 +15,7 @@ const Review = {
     Object.assign(this, { colors: r.colors, fields: r.fields, recipes: r.recipes });
     this.buildControls();
     this.rebuild(r.segs, r.s);
-    new ResizeObserver(() => { this.rows.forEach((r) => this.fit(r)); this.drawWave(); this.paintPreview(); }).observe($("cueList"));
-    api.review_waveform().then((w) => { if (w) { this.wave = w; $("wave").hidden = false; this.drawWave(); } });
+    new ResizeObserver(() => { this.rows.forEach((r) => this.fit(r)); this.paintPreview(); }).observe($("cueList"));
   },
 
   /* ── split controls ─────────────────────────────────────── */
@@ -56,7 +55,6 @@ const Review = {
       return b;
     }));
     $("cueSearch").oninput = () => this.applyFilter();
-    $("wave").onclick = (e) => this.seek(e);
     $("inspSplit").onclick = () => this.splitAtCaret(this.sel, false);
     $("inspMerge").onclick = () => { if (this.sel > 0) this.edit("merge", this.sel - 1, 0, this.sel - 1); };
     $("applyBtn").onclick = () => this.apply();
@@ -135,7 +133,6 @@ const Review = {
     this.sel = -1;
     this.counts();
     this.applyFilter(select);
-    this.drawWave();
   },
 
   card(seg, i, last) {
@@ -238,7 +235,6 @@ const Review = {
     if (this.rows[i]) this.rows[i].el.classList.add("sel");
     this.inspect();
     this.paintPreview();
-    this.drawWave();
   },
 
   /* ── inspector and preview ──────────────────────────────── */
@@ -276,61 +272,6 @@ const Review = {
     const row = this.rows[this.sel];
     fitFrame($("miniViewport"), $("miniFrame"), 16, 16);
     paintCaption($("miniFrame"), $("miniCap"), row ? row.ta.value.split(/\s+/).join(" ").trim() : "");
-  },
-
-  /* ── waveform ───────────────────────────────────────────── */
-  duration() {
-    const ends = this.rows.map((r) => r.seg.e);
-    return Math.max(this.wave ? this.wave.dur : 0, ...ends, 0);
-  },
-
-  drawWave() {
-    const c = $("wave");
-    if (!this.wave || c.hidden) return;
-    const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
-    c.width = w * dpr; c.height = h * dpr;
-    const g = c.getContext("2d");
-    g.scale(dpr, dpr);
-    g.clearRect(0, 0, w, h);
-    const dur = this.duration(), pad = 6, tickY = h - 9, env = this.wave.env, hop = this.wave.hop;
-    if (dur <= 0) return;
-    const x = (t) => pad + Math.max(0, Math.min(t, dur)) / dur * (w - pad * 2);
-    const sel = this.rows[this.sel];
-    let sx0 = null, sx1 = null;
-    if (sel) {
-      sx0 = x(sel.seg.s); sx1 = Math.max(sx0 + 2, x(sel.seg.e));
-      g.fillStyle = "#e9be6822";
-      g.beginPath(); g.roundRect(sx0, 4, sx1 - sx0, tickY - 7, 3); g.fill();
-    }
-    const mid = (tickY + 4) / 2, half = (tickY - 4) / 2 - 1;
-    for (let bx = pad; bx < w - pad; bx += 3) {
-      const t0 = (bx - pad) / (w - pad * 2) * dur, t1 = (bx + 3 - pad) / (w - pad * 2) * dur;
-      let pk = 0;
-      for (let k = Math.floor(t0 / hop); k <= Math.min(env.length - 1, Math.floor(t1 / hop)); k++) pk = Math.max(pk, env[k] || 0);
-      const bh = Math.max(1, pk * half);
-      g.fillStyle = sx0 !== null && bx >= sx0 - 1 && bx <= sx1 ? "#e9be68" : "#39404a";
-      g.fillRect(bx, mid - bh, 2, bh * 2);
-    }
-    for (const r of this.rows) for (const t of [r.seg.s, r.seg.e]) {
-      g.fillStyle = r === sel ? "#f3d18f" : "#3a4044";
-      g.fillRect(Math.round(x(t)), tickY, 1, 6);
-    }
-  },
-
-  seek(e) {
-    // Clicking the waveform is navigation: select the cue at (or nearest) t.
-    const rect = $("wave").getBoundingClientRect(), pad = 6;
-    const t = Math.max(0, Math.min(1, (e.clientX - rect.left - pad) / (rect.width - pad * 2))) * this.duration();
-    let best = 0, gap = Infinity;
-    this.rows.forEach((r, i) => {
-      const d = t < r.seg.s ? r.seg.s - t : t > r.seg.e ? t - r.seg.e : 0;
-      if (d < gap) { gap = d; best = i; }
-    });
-    if (this.rows[best]) {
-      if (this.rows[best].el.hidden) { this.filter = "all"; $("cueSearch").value = ""; this.applyFilter(best); }
-      this.select(best);
-      this.rows[best].el.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
   },
 
   /* ── apply ──────────────────────────────────────────────── */

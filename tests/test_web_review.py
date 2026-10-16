@@ -2,7 +2,6 @@ from pathlib import Path
 import runpy
 import tempfile
 import tkinter as tk
-import types
 import unittest
 
 import web_review
@@ -128,18 +127,6 @@ class ReviewParityTest(unittest.TestCase):
         self.assertIn("আমি আজ\nবাড়ি যাব।", (out / "a.srt").read_text(encoding="utf-8"))
         # A wrap is not an edit: the real word timings survive.
         self.assertIn("WRD 0.450 0.900 আজ", (out / "a.cap").read_text(encoding="utf-8"))
-
-    def test_envelope_is_thinned_but_keeps_peaks(self):
-        fake = types.SimpleNamespace(_audio_envelope=lambda path: [0.1, 0.9, 0.2, 0.3, 1.0, 0.0], _ENV_HOP=0.005)
-        import sys
-        real = sys.modules.get("transcribe")
-        sys.modules["transcribe"] = fake
-        try:
-            out = web_review.envelope(str(self.cap), points=3)
-        finally:
-            sys.modules["transcribe"] = real
-        self.assertEqual(out["env"], [0.9, 0.3, 1.0])
-        self.assertAlmostEqual(out["dur"], 0.03)
 
 
 if __name__ == "__main__":
