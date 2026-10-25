@@ -146,7 +146,7 @@ function renderSummary() {
    unchanged; the dropdown only mirrors it. */
 const Dropdown = {
   native: { Assamese: "অসমীয়া", Bengali: "বাংলা", Gujarati: "ગુજરાતી", Hindi: "हिन्दी", Kannada: "ಕನ್ನಡ", Malayalam: "മലയാളം",
-    Marathi: "मराठी", Nepali: "नेपाली", Odia: "ଓଡ଼ିଆ", Punjabi: "ਪੰਜਾਬੀ", Tamil: "தமிழ்", Telugu: "తెలుగు", Urdu: "اردو" },
+    Marathi: "मराठी", Nepali: "नेपाली", Odia: "ଓଡ଼ିଆ", Punjabi: "ਪੰਜਾਬੀ", Tamil: "தமிழ்", Telugu: "తెలుగు" },
   icons: {
     trackSel: '<path d="M3 12h2m3-5v10m4-13v16m4-11v6m4-3h1"/>',
     langSel: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',

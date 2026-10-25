@@ -18,8 +18,7 @@ that has a single owner, so it lives here.
 #
 # IMPORTANT: several codepoints sit inside a script's block but are shared —
 # danda ।(U+0964) / double danda ॥(U+0965) are used by nearly every Indic
-# script, the Vedic tone marks U+0951–U+0952 likewise, and the Arabic block
-# holds the punctuation Urdu shares with Arabic (، ؛ ؟ ۔). None of them may
+# script, and the Vedic tone marks U+0951–U+0952 likewise. None of them may
 # decide a token's script.
 SCRIPT_RANGES = (
     # Devanagari — Hindi, Marathi, Nepali, Sanskrit, Konkani, Maithili, Dogri,
@@ -35,9 +34,6 @@ SCRIPT_RANGES = (
     ("knda", ((0x0C80, 0x0CFF),)),                 # Kannada
     ("mlym", ((0x0D00, 0x0D7F),)),                 # Malayalam
     ("sinh", ((0x0D80, 0x0DFF),)),                 # Sinhala
-    # Arabic — Urdu, and Sindhi/Kashmiri when written in Perso-Arabic.
-    ("arab", ((0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF),
-              (0xFB50, 0xFDFF), (0xFE70, 0xFEFF))),
     ("mtei", ((0xAAE0, 0xAAFF), (0xABC0, 0xABFF))),     # Meetei Mayek
     ("olck", ((0x1C50, 0x1C7F),)),                 # Ol Chiki — Santali
 )
@@ -46,10 +42,6 @@ SCRIPT_RANGES = (
 NEUTRAL_CPS = frozenset((
     0x0964, 0x0965,          # danda, double danda — pan-Indic
     0x0951, 0x0952,          # Vedic tone marks — pan-Indic
-    0x060C, 0x061B, 0x061F,  # Arabic comma, semicolon, question mark
-    0x06D4,                  # Urdu full stop ۔
-    0x066B, 0x066C,          # Arabic decimal/thousands separators
-    0x0640,                  # tatweel — a joining glyph, not a letter
 ))
 
 # ── Conjunct width ──────────────────────────────────────────────────────────
@@ -210,13 +202,19 @@ TAML_NASAL_DEFAULT = "ம்"
 # Sentence-end punctuation across the supported scripts. A word ending in one
 # of these is a "strong" boundary — never carry past it into the same cue when
 # avoidable. Indic scripts share the danda ।/॥ (Devanagari, Bengali, Gurmukhi,
-# Gujarati, Odia; the southern four normally use the Latin full stop), while
-# Urdu has its own full stop ۔ and question mark ؟ — omitting those made every
-# Urdu cue boundary look unpunctuated to the splitter.
-STRONG_END = ("।", "॥", ".", "?", "!", "？", "！", "۔", "؟", "…")
-# Clause-level boundary — weaker, scored below a sentence end. Urdu again uses
-# its own comma ، and semicolon ؛.
-WEAK_END = (",", ";", ":", "—", "–", "،", "؛", "，", "、")
+# Gujarati, Odia; the southern four normally use the Latin full stop).
+STRONG_END = ("।", "॥", ".", "?", "!", "？", "！", "…")
+# Clause-level boundary — weaker, scored below a sentence end.
+WEAK_END = (",", ";", ":", "—", "–", "，", "、")
+
+# The language's own marks, swapped in for the Latin ones the ASR writes when
+# punctuation is on. Keyed by script: the danda scripts end a sentence with ।.
+# The southern four (and Gujarati) write the Latin full stop natively, so they
+# get only the curly quotes.
+NATIVE_STOP = {"dev": "।", "beng": "।", "guru": "।", "orya": "।"}
+# Languages written in a danda script that nonetheless end sentences with the
+# Latin full stop — modern Marathi does.
+LATIN_STOP_LANGS = ("mar",)
 
 # Trailing quotes/brackets to look past when testing a word's final character
 # ("वाक्य।"" still ends a sentence). Deliberately excludes the ellipsis, which
@@ -225,15 +223,13 @@ END_TRIM = "\"'”’»)]}"
 
 # ── Function-word normalization ─────────────────────────────────────────────
 # Characters to strip off a token before a function-word lookup.
-FW_STRIP = "।॥.?!,;:—–…،؛؟۔\"“”‘’'()[]{}«»-"
+FW_STRIP = "।॥.?!,;:—–…\"“”‘’'()[]{}«»-"
 
 # Characters to delete INSIDE a token before the lookup, so that the spelling
 # variants Scribe produces all reach the same table entry. Built from codepoints
 # because most of them are invisible in an editor:
 #   • zero-width joiners and bidi marks — emitted inconsistently around
-#     Devanagari, Bengali and Urdu words;
-#   • the Arabic vowel points and superscript alef, which Urdu normally omits but
-#     which do appear;
+#     Devanagari and Bengali words;
 #   • the nukta of every Indic script. This one is visible, and it is dropped
 #     because transcripts are inconsistent about it — "पड़ेगा" also arrives as
 #     "पडेगा", "হয়" as "হয". Dropping it on both sides of the comparison (the
@@ -242,10 +238,8 @@ FW_STRIP = "।॥.?!,;:—–…،؛؟۔\"“”‘’'()[]{}«»-"
 #     word by its nukta alone.
 FW_IGNORE = frozenset(
     [chr(c) for c in (0x200B, 0x200C, 0x200D,    # ZWSP, ZWNJ, ZWJ
-                      0x200E, 0x200F, 0x061C,    # LRM, RLM, ALM (bidi marks)
-                      0x0640,                    # tatweel — a joiner, not a letter
-                      0x0670,                    # Arabic superscript alef
+                      0x200E, 0x200F,            # LRM, RLM (bidi marks)
                       0x093C, 0x09BC, 0x0A3C,    # nukta: Devanagari, Bengali,
                       0x0ABC, 0x0B3C, 0x0CBC)]   #   Gurmukhi, Gujarati, Odia,
                                                  #   Kannada
-    + [chr(c) for c in range(0x064B, 0x0653)])   # Arabic vowel points
+)

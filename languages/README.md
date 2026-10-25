@@ -26,11 +26,11 @@ file.
 
 **`BIND_BACK`** — words that complete the word before them, so a cue may never
 *open* with one and one may never stand alone in a cue. Auxiliaries and copulas
-(`ಇದೆ`, `है`, `ছিল`, `ہے`), and the postpositions and case markers the
+(`ಇದೆ`, `है`, `ছিল`), and the postpositions and case markers the
 Indo-Aryan languages write as separate tokens (`का`, `में`, `નો`, `ਦਾ`).
 
 **`BIND_FWD`** — words that open the clause that follows, so a cue should not
-*end* on one. Conjunctions and subordinators (`ಮತ್ತು`, `और`, `কিন্তু`, `اور`).
+*end* on one. Conjunctions and subordinators (`ಮತ್ತು`, `और`, `কিন্তু`).
 
 **`VERB_END`** — finite verb *endings*, matched as suffixes. Only the four
 verb-final Dravidian languages define this. They suffix the whole finite ending

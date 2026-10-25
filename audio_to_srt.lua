@@ -1140,7 +1140,7 @@ local mp = project:GetMediaPool()
 -- ── Which script a cue is written in ────────────────────────────────────
 -- Every Indic block this tool targets is three UTF-8 bytes starting E0, and the
 -- SECOND byte alone identifies the block: U+0900-0D7F maps onto E0 A4 .. E0 B5
--- in pairs, one pair per script. Perso-Arabic (Urdu) is two bytes, D8-DB.
+-- in pairs, one pair per script.
 --
 -- This replaces a Devanagari-only test. Every non-Devanagari cue used to fall
 -- through to the single default font, so a Tamil or Telugu subtitle was set in
@@ -1182,8 +1182,6 @@ local function script_of(s)
             if b2 == 0xA3 and b3 >= 0xA0 and b3 <= 0xBF then
                 tag = "deva"            -- Devanagari Extended
             end
-        elseif b1 >= 0xD8 and b1 <= 0xDB and i + 1 <= n then
-            tag, width = "arab", 2
         elseif b1 >= 0xF0 then
             width = 4
         elseif b1 >= 0xE0 then

@@ -1,9 +1,8 @@
 {
-  "version": "1.4.6",
+  "version": "1.4.7",
   "notes": [
-    "New look: Audio & language is a large card at the top of the setup page, and the panels sit in the middle of the window.",
-    "New dropdowns with icons, a gold tick on the current choice, languages in their own script, and language search.",
-    "Review shows cue count, average reading speed and cues needing attention; progress uses a ring and step line; Done shows summary tiles."
+    "With punctuation on, captions use each language's own marks: । ends sentences in Bengali, Assamese, Hindi, Nepali, Sanskrit, Punjabi and Odia, and quotes are curly “ ” in every language.",
+    "Urdu is no longer offered as a caption language."
   ],
   "mandatory": false,
   "min_version": ""

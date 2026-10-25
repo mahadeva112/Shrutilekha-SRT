@@ -249,9 +249,8 @@ def get_resolve():
 # ── Which script a cue is written in ────────────────────────────────────────
 # Ported from SCRIPT_BY_B2 in audio_to_srt.lua, which ran the same test against
 # raw UTF-8 lead bytes. Every Indic block this tool targets is one contiguous
-# range; Perso-Arabic (Urdu) is U+0600-06FF.
+# range.
 SCRIPT_RANGES = (
-    (0x0600, 0x06FF, "arab"),
     (0x0900, 0x097F, "deva"),
     (0x0980, 0x09FF, "beng"),      # Bengali and Assamese share the block
     (0x0A00, 0x0A7F, "guru"),
