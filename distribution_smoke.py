@@ -31,7 +31,7 @@ def run(output):
         import transcribe
         from elevenlabs.client import ElevenLabs
         assert callable(ElevenLabs(api_key="distribution-test-key").user.get)
-        assert len(transcribe.languages.LANGUAGES) == 14
+        assert len(transcribe.languages.LANGUAGES) == 13
         assert (resources() / "data" / "translit_beng.json.gz").is_file()
         root = tk.Tk()
         import dpi
