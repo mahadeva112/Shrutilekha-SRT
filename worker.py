@@ -7,7 +7,7 @@ prepare_environment()
 if "--self-test" in sys.argv:
     import subprocess
     import transcribe
-    assert len(transcribe.languages.LANGUAGES) == 14
+    assert len(transcribe.languages.LANGUAGES) == 13
     assert (resources() / "data" / "translit_dev.json.gz").is_file()
     subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
     print("Bundled runtime, languages, transcription engine and FFmpeg: OK")

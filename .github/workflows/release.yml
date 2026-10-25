@@ -48,7 +48,10 @@ jobs:
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
           $report = Join-Path $env:RUNNER_TEMP 'srutilekha-smoke.json'
           $process = Start-Process -FilePath 'dist/Srutilekha/Srutilekha.exe' -ArgumentList @('--self-test', $report) -Wait -PassThru -WindowStyle Hidden
-          if ($process.ExitCode -ne 0 -or !(Test-Path $report)) { throw 'Packaged runtime smoke test failed' }
+          if ($process.ExitCode -ne 0 -or !(Test-Path $report)) {
+            if (Test-Path $report) { Get-Content $report }
+            throw 'Packaged runtime smoke test failed'
+          }
           Get-Content $report
       - uses: actions/upload-artifact@v4
         with:
