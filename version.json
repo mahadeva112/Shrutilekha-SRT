@@ -1,7 +1,7 @@
 {
   "version": "1.4.7",
   "notes": [
-    "With punctuation on, captions use each language's own marks: । ends sentences in Bengali, Assamese, Hindi, Nepali, Sanskrit, Punjabi and Odia, and quotes are curly “ ” in every language.",
+    "With punctuation on, captions use each language's own marks: \u0964 ends sentences in Bengali, Assamese, Hindi, Nepali, Sanskrit, Punjabi and Odia, and quotes are curly \u201c \u201d in every language.",
     "Urdu is no longer offered as a caption language."
   ],
   "mandatory": false,
