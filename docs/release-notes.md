@@ -1,3 +1,11 @@
+v1.4.7: punctuation in the caption's own language; Urdu removed.
+
+- With Punctuation on, a sentence ends with । in Bengali, Assamese, Hindi, Nepali, Sanskrit, Punjabi and Odia instead of a full stop. Marathi, Gujarati, Tamil, Telugu, Kannada and Malayalam keep the full stop they normally use.
+- Straight quotes become curly quotes “ ” and ‘ ’ in every language. Numbers such as 3.5 and 1,000 and the ellipsis ... are left as they are.
+- With Punctuation off, nothing changes.
+- Urdu is removed: it is no longer in the language list, the demo captions or the font list, and its word tables and Perso-Arabic script handling are gone.
+- 83 of 84 tests passed; the one failure is a tray-helper test that already failed before these changes. Not yet run in a live Resolve session.
+
 v1.4.6: new look for every screen.
 
 - Setup page: Audio & language is a large card across the top, with Timing, Script & files and Presets below. The panels sit in the middle of the window instead of leaving an empty strip.

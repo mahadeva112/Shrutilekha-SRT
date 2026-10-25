@@ -37,9 +37,9 @@ splitting, timing, styling and placement all run locally.
   language's script; a transliteration pass catches Latin tokens that slip
   through (`fast food` → `फास्ट-फूड`). Auto-detect is also available.
 - **Linguistic cue splitting.** Boundaries are scored on punctuation (including
-  the danda `।`/`॥` and Urdu `۔`/`؟`), silence width measured relative to the
+  the danda `।`/`॥`), silence width measured relative to the
   speaker's own rate, and the grammar on both sides. No cue opens with a
-  phrase-completing word (है, ছিল, ஆகும், ఉంది, ಇದೆ, ഉണ്ട്, છે, ਹੈ, ଅଛି, ہے, or a
+  phrase-completing word (है, ছিল, ஆகும், ఉంది, ಇದೆ, ഉണ്ട്, છે, ਹੈ, ଅଛି, or a
   standalone postposition). Max characters, lines, duration, word count and
   reading speed (cps) are all enforced.
 - **Dedicated subtitle track.** Cues are imported onto a new subtitle track with
@@ -210,7 +210,6 @@ Coverage:
 | Devanagari (Hindi, Marathi, Nepali, Sanskrit) | Own dictionary and phonetic table |
 | Bengali (Bengali, Assamese) | Own dictionary and phonetic table |
 | Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam | Devanagari's, mapped by codepoint offset with per-script corrections in `languages/scripts.py` |
-| Urdu | Not supported — Perso-Arabic shares no layout with the Indic blocks. Latin tokens are left as-is. |
 
 Per-script corrections cover the cases the offset alone gets wrong: Tamil folds
 the voiced and aspirated series onto the plain stop (`bread` → `ப்ரேட்`);

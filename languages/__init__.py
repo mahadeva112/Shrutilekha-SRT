@@ -24,10 +24,10 @@ reads as a mistake even when the timing is perfect:
   BIND_BACK — completes the word before it, so a cue must never OPEN with one
     and one must never stand alone in a cue. Two families:
       • auxiliaries / copulas: है था होगा (hi), ছিল আছে (bn), இருக்கிறது (ta),
-        ఉంది (te), ಇದೆ (kn), ഉണ്ട് (ml), છે (gu), ਹੈ (pa), ଅଛି (or), ہے (ur)
+        ఉంది (te), ಇದೆ (kn), ഉണ്ട് (ml), છે (gu), ਹੈ (pa), ଅଛି (or)
       • postpositions, case markers and clitic particles, which are written as
         separate words in the Indo-Aryan languages: का की के को में से (hi),
-        এর কে তে থেকে (bn), નો ની ને માં (gu), ਦਾ ਦੀ ਨੂੰ ਵਿੱਚ (pa), کا کی میں (ur)
+        এর কে তে থেকে (bn), નો ની ને માં (gu), ਦਾ ਦੀ ਨੂੰ ਵਿੱਚ (pa)
     The Dravidian languages suffix their case markers onto the noun, so their
     lists are mostly auxiliaries, quotatives (என்று, అని, ಎಂದು, എന്ന്) and
     particles (தான், కూడా, ಮಾತ್ರ).
@@ -35,7 +35,7 @@ reads as a mistake even when the timing is perfect:
   BIND_FWD — opens the clause that follows, so a cue should not END with one:
     और कि क्योंकि लेकिन (hi), এবং কিন্তু যদি (bn), மற்றும் ஆனால் (ta),
     మరియు కానీ (te), ಮತ್ತು ಆದರೆ (kn), എന്നാൽ പക്ഷേ (ml), અને પણ (gu),
-    ਅਤੇ ਪਰ (pa), ଏବଂ କିନ୍ତୁ (or), اور لیکن (ur)
+    ਅਤੇ ਪਰ (pa), ଏବଂ କିନ୍ତୁ (or)
 
 Tables are per language and unioned per script, because the language is not
 always known (auto-detect) and a script pins the candidate languages anyway.
@@ -88,14 +88,14 @@ word endings as clause ends too would double-count.
 """
 
 from . import (assamese, bengali, gujarati, hindi, kannada, malayalam,
-               marathi, nepali, odia, punjabi, sanskrit, tamil, telugu, urdu)
+               marathi, nepali, odia, punjabi, sanskrit, tamil, telugu)
 from . import scripts
 
 # Every supported language. Order is alphabetical by module and carries no
 # meaning: the tables below are dicts and sets, and the per-script unions are
 # order-independent.
 LANGUAGES = (assamese, bengali, gujarati, hindi, kannada, malayalam,
-             marathi, nepali, odia, punjabi, sanskrit, tamil, telugu, urdu)
+             marathi, nepali, odia, punjabi, sanskrit, tamil, telugu)
 
 # ── Assembled tables, in the shape transcribe.py consumes ───────────────────
 # Keyed by the language's 639-3 table key ("hin", "kan", …).

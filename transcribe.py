@@ -138,7 +138,7 @@ def fmt_ts(seconds):
 #     the akshara they sit on and are not counted on their own. Mc marks do take
 #     their own advance width, so a matra-heavy word is very slightly
 #     under-counted; the akshara is still the unit a reader scans.
-#   • format characters (Cf — ZWJ/ZWNJ and the bidi marks Urdu arrives with) are
+#   • format characters (Cf — ZWJ/ZWNJ and the bidi marks) are
 #     invisible and never counted.
 #   • a virama LINKS: in ಇರುತ್ತದೆ the ತ್+ತ is one conjunct glyph, so a consonant
 #     following a virama joins the cluster before it instead of opening a new
@@ -209,10 +209,10 @@ def wrap(text, max_chars, max_lines, lang=None):
     kept: lines as close to equal length as possible, ending at punctuation
     where there is some, and respecting grammatical cohesion —
       • a bind-back word (auxiliary, copula, postposition — "है", "सकता",
-        "ছিল", "ہے", etc.) does not open a line; it stays with the word it
+        "ছিল", etc.) does not open a line; it stays with the word it
         completes;
       • a bind-forward word (conjunction, subordinator — "और", "लेकिन",
-        "কিন্তু", "اور", etc.) does not close a line; it goes down with the
+        "কিন্তু", etc.) does not close a line; it goes down with the
         clause it introduces.
     Fewer lines than asked for are used only when the grammar leaves no good
     cut, or the cue is too short to fill them (see _MIN_LINE_CHARS).
@@ -302,8 +302,7 @@ def wrap(text, max_chars, max_lines, lang=None):
 #
 # IMPORTANT: several codepoints sit inside a script's block but are shared —
 # danda ।(U+0964) / double danda ॥(U+0965) are used by nearly every Indic
-# script, the Vedic tone marks U+0951–U+0952 likewise, and the Arabic block
-# holds the punctuation Urdu shares with Arabic (، ؛ ؟ ۔). None of them may
+# script, and the Vedic tone marks U+0951–U+0952 likewise. None of them may
 # decide a token's script.
 _SCRIPT_RANGES = _scripts.SCRIPT_RANGES
 
@@ -312,7 +311,7 @@ _NEUTRAL_CPS = _scripts.NEUTRAL_CPS
 
 
 def _script_of_cp(cp):
-    """Full script id of a codepoint: 'dev', 'beng', 'taml', 'arab', … or None
+    """Full script id of a codepoint: 'dev', 'beng', 'taml', … or None
     for Latin, digits, punctuation and the pan-Indic marks above."""
     if cp in _NEUTRAL_CPS:
         return None
@@ -330,8 +329,8 @@ def _char_script(cp):
 
 
 def _token_script(token):
-    """Script a token is written in, across every supported Indic script plus
-    Perso-Arabic. Used to pick the grammar table, never to pick a font."""
+    """Script a token is written in, across every supported Indic script.
+    Used to pick the grammar table, never to pick a font."""
     for ch in token:
         s = _script_of_cp(ord(ch))
         if s:
@@ -365,9 +364,7 @@ def _buf_script(buf):
 # Sentence-end punctuation across the supported scripts. A word ending in one
 # of these is a "strong" boundary — never carry past it into the same cue when
 # avoidable. Indic scripts share the danda ।/॥ (Devanagari, Bengali, Gurmukhi,
-# Gujarati, Odia; the southern four normally use the Latin full stop), while
-# Urdu has its own full stop ۔ and question mark ؟ — omitting those made every
-# Urdu cue boundary look unpunctuated to the splitter.
+# Gujarati, Odia; the southern four normally use the Latin full stop).
 _STRONG_END = _scripts.STRONG_END
 _WEAK_END = _scripts.WEAK_END
 _END_TRIM = _scripts.END_TRIM
@@ -378,6 +375,38 @@ _END_TRIM = _scripts.END_TRIM
 # on screen in a mode whose whole point is that they are not there.
 _PUNCT_OFF_RE = re.compile(
     "[" + re.escape("".join(sorted(set(_STRONG_END + _WEAK_END)))) + "]")
+
+
+def _native_punct(token, lang=None, quote_open=False):
+    """Rewrite a token's Latin punctuation into its language's own marks.
+
+    Returns (token, quote_open): a bare " has no side of its own, so whether it
+    opens or closes is carried from word to word. The script comes from the
+    token itself; a pinned ``lang`` decides only for script-neutral tokens and
+    for the Marathi full stop."""
+    key = _FW_LANG_ALIAS.get((lang or "").strip().lower())
+    script = _token_script(token) or _FW_LANG_SCRIPT.get(key)
+    chars = list(token)
+    for i, ch in enumerate(chars):
+        if ch == '"':
+            if i == 0 and len(chars) > 1:
+                chars[i], quote_open = "“", True
+            elif i == len(chars) - 1 and len(chars) > 1:
+                chars[i], quote_open = "”", False
+            else:
+                chars[i] = "”" if quote_open else "“"
+                quote_open = not quote_open
+        elif ch == "'" and (i == 0 or i == len(chars) - 1):
+            chars[i] = "‘" if i == 0 and len(chars) > 1 else "’"
+    token = "".join(chars)
+    stop = _scripts.NATIVE_STOP.get(script)
+    if stop and key not in _scripts.LATIN_STOP_LANGS:
+        # Only a token-final single full stop: an ellipsis stays, and a decimal
+        # or abbreviation dot inside the word is not a sentence end.
+        core = token.rstrip(_END_TRIM)
+        if core.endswith(".") and not core.endswith(".."):
+            token = core[:-1] + stop + token[len(core):]
+    return token, quote_open
 
 
 def _ends_with(token, suffixes):
@@ -416,10 +445,6 @@ def _ends_with(token, suffixes):
 # fixed offset to every codepoint (_fold_from_dev, with the handful of
 # corrections in languages/scripts.py). That is why those seven need no
 # dictionary and no consonant table — they inherit the Devanagari ones.
-#
-# Urdu is the exception and is NOT supported: Perso-Arabic shares no layout with
-# the Indic blocks, so it cannot be reached this way and needs a _TRANSLIT row
-# and a dictionary of its own. Latin words in an Urdu transcript stay Latin.
 
 
 # Rule-based fallback: approximate phonetic mapping, guarantees Devanagari.
@@ -765,9 +790,7 @@ def transliterate(text, script):
 # Language code → script the transcript should be rendered in. Every Indic
 # language the form offers is listed, in both its ISO 639-1 and 639-3 spelling.
 # Absent codes map to None, meaning "leave Latin words alone" — English, where
-# converting would be plainly wrong, and Urdu, whose Perso-Arabic script is not
-# laid out in parallel with the Indic blocks and so cannot be reached from the
-# Devanagari dictionary. Urdu needs tables of its own before it can be listed.
+# converting would be plainly wrong.
 _LANG_SCRIPT = {
     "hi": "dev", "hin": "dev", "mr": "dev", "mar": "dev",
     "ne": "dev", "nep": "dev", "sa": "dev", "san": "dev",
@@ -806,8 +829,7 @@ def _dominant_script(raw_words):
     are left alone.
 
     Auto-detect reaches whatever _TRANSLIT_SCRIPTS covers, so it stays in step
-    with a pinned language rather than being a second, narrower rule. Urdu is
-    still excluded, since it has no tables."""
+    with a pinned language rather than being a second, narrower rule."""
     counts = {}
     for w in raw_words:
         s = _token_script(getattr(w, "text", "") or "")
@@ -835,9 +857,7 @@ _FW_STRIP = _scripts.FW_STRIP
 # variants Scribe produces all reach the same table entry. Built from codepoints
 # because most of them are invisible in an editor:
 #   • zero-width joiners and bidi marks — emitted inconsistently around
-#     Devanagari, Bengali and Urdu words;
-#   • the Arabic vowel points and superscript alef, which Urdu normally omits but
-#     which do appear;
+#     Devanagari and Bengali words;
 #   • the nukta of every Indic script. This one is visible, and it is dropped
 #     because transcripts are inconsistent about it — "पड़ेगा" also arrives as
 #     "पडेगा", "হয়" as "হয". Dropping it on both sides of the comparison (the
@@ -1092,9 +1112,9 @@ def _clitic_chain_start(buf, next_text, lang):
 
     When the word about to be added binds back it belongs with the word before
     it — and that word may bind back in turn, so the chain is walked to the
-    content word heading it: "समझा" of "समझा रहा हूँ", "বলতে" of "বলতে পারি",
-    "بڑھیں" of "بڑھیں گے". If the cue must be closed and the incoming word
-    cannot stay in it, this is the only cut that keeps the phrase whole.
+    content word heading it: "समझा" of "समझा रहा हूँ", "বলতে" of "বলতে পারি".
+    If the cue must be closed and the incoming word cannot stay in it, this is
+    the only cut that keeps the phrase whole.
 
     Returns len(buf) when the incoming word does not bind back (nothing to keep
     together), or 0 when the entire buffer is part of the chain."""
@@ -1169,7 +1189,7 @@ def _reattach_clitics(cues, max_chars, max_lines, max_words=0, max_secs=None,
     """Move a cue's leading phrase-completing word back onto the previous cue.
 
     No cue may OPEN with a word that grammatically finishes the phrase it was cut
-    away from — "है", "ছিল", "ஆகும்", "ہے", "ਹੈ", "છે" and the postpositions /
+    away from — "है", "ছিল", "ஆகும்", "ਹੈ", "છે" and the postpositions /
     case markers alongside them. _best_cut already avoids creating such a
     boundary, but two things can still produce one: a budget so tight that every
     alternative is worse, and the remap path, which builds cues per timeline clip
@@ -1398,9 +1418,9 @@ def build_cues(words, max_chars, max_lines, max_secs, include_punct="1",
          grammar of the words on either side — so the boundary lands where the
          phrase ends, not where the character budget ran out.
       2. Never split a phrase across cues: a cue never opens with a word that
-         completes the phrase before it (है / ছিল / ஆகும் / ہے / ਹੈ, and the
+         completes the phrase before it (है / ছিল / ஆகும் / ਹੈ, and the
          postpositions and case markers written as separate words), and never
-         closes on a word that opens the next clause (और / কিন্তু / ஆனால் / اور)
+         closes on a word that opens the next clause (और / কিন্তু / ஆனால்)
          unless the audio says otherwise.
       3. Do not merge unrelated sentences — once a sentence terminator is
          emitted, close the cue at that point rather than carrying the next
@@ -1411,7 +1431,7 @@ def build_cues(words, max_chars, max_lines, max_secs, include_punct="1",
          boundary, same as a script change.
 
     Rules 1 and 2 work for every supported language: punctuation covers the
-    Indic danda and the Urdu full stop as well as the Latin set, pause widths are
+    Indic danda as well as the Latin set, pause widths are
     measured rather than assumed, and the grammar tables are keyed by the token's
     script so they apply without a language being pinned. Passing ``lang`` (an
     ISO 639-1/639-3 code) narrows the tables to that one language, which matters
@@ -1432,6 +1452,7 @@ def build_cues(words, max_chars, max_lines, max_secs, include_punct="1",
     start = None
     end = None
     cur_spk = None  # diarization speaker of the words currently buffered
+    quote_open = False  # a bare " seen and not yet closed (_native_punct)
     cap = max_chars * max_lines
     pauses = _pause_profile(words)
 
@@ -1476,6 +1497,8 @@ def build_cues(words, max_chars, max_lines, max_secs, include_punct="1",
         wt = raw
         if include_punct == "0":
             wt = _PUNCT_OFF_RE.sub("", wt).strip()
+        else:
+            wt, quote_open = _native_punct(wt, lang, quote_open)
         ws = float(getattr(w, "start", 0) or 0)
         we = float(getattr(w, "end", 0) or 0)
         if not wt:
@@ -2145,7 +2168,7 @@ def build_and_remap_cues(words_by_source, max_chars, max_lines, max_secs, ranges
     # Cues were built one clip at a time, so no clip ever saw its neighbour's
     # last words — the one case _reattach_clitics exists for that build_cues
     # cannot cover. Run it once over the assembled, timeline-ordered list so a
-    # cue at a cut does not open with है / ছিল / ஆகும் / ہے either. Sorting
+    # cue at a cut does not open with है / ছিল / ஆகும் either. Sorting
     # first because the pass only ever looks at the cue immediately before.
     merged = sorted(all_cues, key=lambda c: (c[1], c[2]))
     merged = _reattach_clitics(merged, max_chars, max_lines, max_words,

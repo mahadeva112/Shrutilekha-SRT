@@ -81,7 +81,7 @@ _LANGUAGE_CODES = {
     "Assamese": "asm", "Bengali": "ben", "English": "eng", "Gujarati": "guj",
     "Hindi": "hin", "Kannada": "kan", "Malayalam": "mal", "Marathi": "mar",
     "Nepali": "nep", "Odia": "ori", "Punjabi": "pan", "Tamil": "tam",
-    "Telugu": "tel", "Urdu": "urd",
+    "Telugu": "tel",
 }
 # Alphabetical, built from the map rather than typed out again, so a language
 # added above cannot end up in the list without a code or out of order.
@@ -980,8 +980,6 @@ SUBTITLE_SCRIPTS = (
                          "Nirmala UI")),
     ("mlym", "Malayalam", ("Noto Serif Malayalam", "Noto Sans Malayalam",
                            "Kartika", "Nirmala UI")),
-    ("arab", "Urdu", ("Noto Naskh Arabic", "Urdu Typesetting", "Aldhabi",
-                      "Segoe UI")),
 )
 
 _SCRIPT_FONTS = None
