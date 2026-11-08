@@ -19,7 +19,7 @@ import subprocess
 import threading
 import time
 
-from app_runtime import frozen, install_dir
+from app_runtime import frozen, worker_executable
 
 SETTINGS_KEYS = ("max_chars", "max_lines", "max_secs")
 SETTINGS_DEFAULTS = ("15", "1", "2")
@@ -213,7 +213,7 @@ class RunController:
             startupinfo.wShowWindow = 0
         cmd = [self.paths["python"], self.paths["script"], "--args-file", self.paths["args"]]
         if frozen():
-            cmd = [str(install_dir() / "Srutilekha-worker.exe"), "--args-file", self.paths["args"]]
+            cmd = [str(worker_executable()), "--args-file", self.paths["args"]]
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     stdin=subprocess.DEVNULL, bufsize=1, universal_newlines=True,
