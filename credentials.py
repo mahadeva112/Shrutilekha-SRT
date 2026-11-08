@@ -45,9 +45,16 @@ def _keychain_account():
     return getpass.getuser()
 
 
+def _keychain_service():
+    # SRUTILEKHA_USER_DIR selects a separate profile (tests, packaged self-test).
+    # On Windows that isolates the key file; give it its own Keychain item too.
+    override = os.environ.get("SRUTILEKHA_USER_DIR")
+    return KEYCHAIN_SERVICE + (" [%s]" % override if override else "")
+
+
 def _keychain_get():
     result = _keychain("find-generic-password", "-a", _keychain_account(),
-                       "-s", KEYCHAIN_SERVICE, "-w")
+                       "-s", _keychain_service(), "-w")
     if result.returncode == 44:  # errSecItemNotFound
         return ""
     if result.returncode:
@@ -63,14 +70,14 @@ def _keychain_save(key):
     # `security -i` reads the command from stdin, so the key never appears in argv
     # where other processes could see it.
     command = "add-generic-password -U -a %s -s %s -w %s\n" % (
-        _keychain_quote(_keychain_account()), _keychain_quote(KEYCHAIN_SERVICE), _keychain_quote(key))
+        _keychain_quote(_keychain_account()), _keychain_quote(_keychain_service()), _keychain_quote(key))
     result = _keychain("-i", stdin=command)
     if result.returncode or "error" in (result.stderr or "").lower():
         raise OSError("Keychain write failed: " + (result.stderr.strip() or str(result.returncode)))
 
 
 def _keychain_delete():
-    result = _keychain("delete-generic-password", "-a", _keychain_account(), "-s", KEYCHAIN_SERVICE)
+    result = _keychain("delete-generic-password", "-a", _keychain_account(), "-s", _keychain_service())
     if result.returncode not in (0, 44):
         raise OSError("Keychain delete failed: " + (result.stderr.strip() or str(result.returncode)))
 

@@ -77,6 +77,18 @@ class KeychainTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 credentials.delete_key()
 
+    def test_profile_override_gets_its_own_keychain_item(self):
+        with patch.dict(os.environ, {"SRUTILEKHA_USER_DIR": "/tmp/profile-a"}), \
+             patch("credentials.subprocess.run", return_value=Completed(44)) as run:
+            credentials.get_key()
+        self.assertIn("Srutilekha ElevenLabs API key [/tmp/profile-a]", run.call_args.args[0])
+        env = {k: v for k, v in os.environ.items() if k != "SRUTILEKHA_USER_DIR"}
+        with patch.dict(os.environ, env, clear=True), \
+             patch("credentials.subprocess.run", return_value=Completed(44)) as run:
+            credentials.get_key()
+        self.assertIn("Srutilekha ElevenLabs API key", run.call_args.args[0])
+        self.assertNotIn("Srutilekha ElevenLabs API key [", " ".join(run.call_args.args[0]))
+
     def test_invalid_key_rejected_before_keychain(self):
         with patch("credentials.subprocess.run") as run, self.assertRaises(ValueError):
             credentials.save_key("has space")
