@@ -1,1 +1,3 @@
 scripts/*.sh text eol=lf
+# Shipped in both the Windows and macOS release; keep the bytes identical.
+installer/COPYING.LGPLv2.1 -text
