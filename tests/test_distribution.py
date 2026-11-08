@@ -40,8 +40,9 @@ class DistributionTests(unittest.TestCase):
 
     def info(self, data):
         base = "https://github.com/mahadeva112/Shrutilekha-SRT/releases/download/v9.0.0/"
-        return {"version": "9.0.0", "name": "Srutilekha-Setup-9.0.0.exe",
-                "installer": base + "Srutilekha-Setup-9.0.0.exe",
+        name = updates.installer_name("9.0.0")
+        return {"version": "9.0.0", "name": name,
+                "installer": base + name,
                 "checksums": base + "SHA256SUMS.txt", "size": len(data)}
 
     def test_download_verified_and_personal_data_preserved(self):
@@ -105,6 +106,32 @@ class DistributionTests(unittest.TestCase):
         release["prerelease"] = True
         with patch.object(updates, "_request", return_value=io.BytesIO(json.dumps(release).encode())):
             self.assertIsNone(updates.check())
+
+    def test_installer_name_per_platform(self):
+        with patch.object(updates.sys, "platform", "darwin"):
+            self.assertEqual(updates.installer_name("9.0.0"), "Srutilekha-9.0.0-macOS.dmg")
+        with patch.object(updates.sys, "platform", "win32"):
+            self.assertEqual(updates.installer_name("9.0.0"), "Srutilekha-Setup-9.0.0.exe")
+
+    def test_mac_ignores_release_without_dmg(self):
+        base = "https://github.com/mahadeva112/Shrutilekha-SRT/releases/download/v9.0.0/"
+        release = {"tag_name": "v9.0.0", "assets": [
+            {"name": "Srutilekha-Setup-9.0.0.exe", "browser_download_url": base + "Srutilekha-Setup-9.0.0.exe"},
+            {"name": "SHA256SUMS.txt", "browser_download_url": base + "SHA256SUMS.txt"}]}
+        with patch.object(updates.sys, "platform", "darwin"), \
+             patch.object(updates, "_request", return_value=io.BytesIO(json.dumps(release).encode())):
+            self.assertIsNone(updates.check())
+
+    def test_mac_install_opens_disk_image(self):
+        with patch.object(updates.sys, "platform", "darwin"):
+            data = b"dmg bytes"
+            info = self.info(data)
+            checksum = (hashlib.sha256(data).hexdigest() + "  " + info["name"]).encode()
+            with patch.object(updates, "_request", side_effect=[io.BytesIO(checksum), io.BytesIO(data)]), \
+                 patch.object(updates.subprocess, "Popen") as launch:
+                target = updates.install(info)
+        self.assertTrue(target.endswith("Srutilekha-9.0.0-macOS.dmg"))
+        self.assertEqual(launch.call_args.args[0], ["/usr/bin/open", target])
 
 
 if __name__ == "__main__":

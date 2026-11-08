@@ -1,6 +1,9 @@
-# macOS support — phase 1 (from source)
+# macOS support
 
-There is no Mac installer yet. Phase 1 makes the Python code run on macOS; a `.app`/`.dmg` build comes in a later phase.
+- **Phase 1:** the Python code runs on macOS from source.
+- **Phase 2:** CI builds an unsigned `Srutilekha-<version>-macOS.dmg` for Apple Silicon, and the release includes it.
+
+What end users read is in [macos-install.txt](macos-install.txt), shipped inside the `.dmg` as "Read me first.txt".
 
 ## What changed for macOS
 
@@ -22,13 +25,22 @@ python3 -m pip install -r requirements-build.txt
 python3 app.py --home
 ```
 
+## Packaged app (phase 2)
+
+- `scripts/build_ffmpeg_macos.sh` builds the same LGPL FFmpeg 7.1.1 for the host architecture.
+- `Srutilekha.spec` builds `dist/Srutilekha.app`. It holds the GUI and `Srutilekha-worker` in `Contents/MacOS`, and FFmpeg in `Contents/Frameworks/bin`.
+- `scripts/build_release.py` on macOS wraps the app in a `.dmg` together with an Applications link and the read-me.
+- There is no installer, so `mac_integration.py` runs every time the packaged app or helper starts. It writes the Lua bridge to Resolve's Scripts folder, but only once Resolve has created its settings folder. It also enables start-at-login, unless the user turned that off before.
+- The updater looks for `Srutilekha-<version>-macOS.dmg` and opens it. A release without a `.dmg` is not offered as an update on a Mac.
+- CI: `.github/workflows/build-macos.yml` runs on pull requests. It runs the tests, builds the app, runs the packaged `--self-test` and checks the `.dmg`. `release.yml` calls it on tags, then merges the Windows and macOS assets into one draft release with a single `SHA256SUMS.txt`.
+
+## Limits
+
+- Apple Silicon only. Intel Macs need a separate or universal2 build.
+- Unsigned: users click "Open Anyway" in System Settings > Privacy & Security on first launch.
+- The Mac app supports only Resolve 21.1+ (the Lua bridge). The legacy launcher for 21.0 and earlier still works from source.
+
 ## Not verified yet
 
-- Unit tests run on a GitHub `macos-latest` runner (`.github/workflows/tests.yml`). Nobody has run this with DaVinci Resolve on a Mac yet.
-- The menu bar icon (pystray), the Lua bridge with Resolve 21.1+ and the Keychain prompts all need a test on a real Mac.
-
-## Later phases
-
-- PyInstaller `.app` bundle, a macOS FFmpeg build and an unsigned `.dmg` from CI.
-- An installer step that copies the Resolve script into the Scripts folder above.
-- The updater downloading the `.dmg` instead of `Setup.exe`.
+- CI checks only the build and the packaged self-test. Nobody has run the app with DaVinci Resolve on a Mac yet.
+- The menu bar icon, the Lua bridge with Resolve 21.1+, the Keychain prompts and the Gatekeeper first launch all need a test on a real Mac.

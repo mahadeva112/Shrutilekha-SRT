@@ -74,13 +74,17 @@ def mailbox_lock(path, timeout=0):
             _unlock(handle)
 
 
-def write_launcher(target, directory=None):
+def launcher_text(directory=None):
     from app_runtime import resources
     directory = Path(directory) if directory else user_dir() / 'resolve-bridge'
     directory = directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
     source = (resources() / 'resolve_bridge.lua').read_text(encoding='utf-8')
-    Path(target).write_text(source.replace('"__SRUTILEKHA_MAILBOX__"', lua_value(str(directory))), encoding='utf-8')
+    return source.replace('"__SRUTILEKHA_MAILBOX__"', lua_value(str(directory)))
+
+
+def write_launcher(target, directory=None):
+    Path(target).write_text(launcher_text(directory), encoding='utf-8')
 
 
 def lua_value(value):

@@ -17,6 +17,9 @@ def main():
         sys.stderr = open(os.devnull, "w", encoding="utf-8")
     if "--resolve" in sys.argv:
         sys.argv.remove("--resolve")
+    if not any(flag in sys.argv for flag in ("--self-test", "--tray-self-test", "--dialog")):
+        from mac_integration import ensure
+        ensure()
     if "--tray-self-test" in sys.argv:
         from tray_helper import self_test
         self_test(sys.argv[sys.argv.index("--tray-self-test") + 1])
