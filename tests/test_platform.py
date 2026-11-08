@@ -95,5 +95,51 @@ class KeychainTests(unittest.TestCase):
         run.assert_not_called()
 
 
+
+class MacIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        import mac_integration, tray_helper
+        self.mod = mac_integration
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+        base = Path(self.temp.name)
+        self.support = base / "Resolve"
+        self.scripts = self.support / "Fusion" / "Scripts" / "Utility"
+        patches = [patch.object(mac_integration, "IS_MAC", True), patch.object(mac_integration, "frozen", return_value=True),
+                   patch.object(mac_integration, "resolve_support_dir", return_value=self.support),
+                   patch.object(mac_integration, "resolve_scripts_dir", return_value=self.scripts),
+                   patch.object(mac_integration, "user_dir", return_value=base),
+                   patch("resolve_bridge.user_dir", return_value=base),
+                   patch.object(tray_helper, "user_dir", return_value=base),
+                   patch.object(tray_helper, "IS_MAC", True), patch.object(tray_helper, "IS_WINDOWS", False),
+                   patch.object(tray_helper, "launch_agent_path", return_value=base / "agent.plist")]
+        for p in patches:
+            p.start(); self.addCleanup(p.stop)
+
+    def test_skips_bridge_until_resolve_has_run(self):
+        self.mod.ensure()
+        self.assertFalse(self.scripts.exists())
+        self.assertTrue((Path(self.temp.name) / "agent.plist").exists())
+
+    def test_installs_bridge_and_repairs_it(self):
+        self.support.mkdir()
+        self.mod.ensure()
+        script = self.scripts / "Srutilekha.lua"
+        text = script.read_text(encoding="utf-8")
+        self.assertNotIn("__SRUTILEKHA_MAILBOX__", text)
+        script.write_text("stale", encoding="utf-8")
+        self.mod.ensure()
+        self.assertEqual(script.read_text(encoding="utf-8"), text)
+
+    def test_respects_disabled_startup(self):
+        (Path(self.temp.name) / "tray-startup-disabled.flag").write_text("disabled")
+        self.mod.ensure()
+        self.assertFalse((Path(self.temp.name) / "agent.plist").exists())
+
+    def test_does_nothing_on_source_or_windows(self):
+        with patch.object(self.mod, "frozen", return_value=False):
+            self.mod.ensure()
+        self.assertFalse((Path(self.temp.name) / "agent.plist").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

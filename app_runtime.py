@@ -25,6 +25,11 @@ def app_executable():
     return install_dir() / ("Srutilekha.exe" if IS_WINDOWS else "Srutilekha")
 
 
+def worker_executable():
+    """The frozen transcription worker next to the GUI binary."""
+    return install_dir() / ("Srutilekha-worker.exe" if IS_WINDOWS else "Srutilekha-worker")
+
+
 def _user_base():
     if IS_WINDOWS:
         return Path(os.environ.get("LOCALAPPDATA", Path.home()))
