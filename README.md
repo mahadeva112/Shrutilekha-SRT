@@ -63,7 +63,7 @@ splitting, timing, styling and placement all run locally.
 
 | | |
 | --- | --- |
-| OS | Windows (the Resolve-side script is cross-platform; setup and UI are Windows-first) |
+| OS | Windows (the Resolve-side script is cross-platform; setup and UI are Windows-first). macOS: phase 1, from source only. See [docs/macos.md](docs/macos.md) |
 | DaVinci Resolve | 21.x recommended; 21.0 and earlier supported via the Lua script |
 | Python | 3.10+ with `tkinter` |
 | API key | [ElevenLabs](https://elevenlabs.io) |
