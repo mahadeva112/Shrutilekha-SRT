@@ -13,6 +13,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,4 +22,6 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements-build.txt
       - name: Tests
-        run: python -m unittest discover -s tests -v
+        # A hung GUI test dumps every thread's stack after 5 minutes instead of
+        # silently using up the job's time.
+        run: python -X faulthandler -c "import faulthandler, unittest; faulthandler.dump_traceback_later(300, exit=True); unittest.main(module=None, argv=['unittest', 'discover', '-s', 'tests', '-v'])"
