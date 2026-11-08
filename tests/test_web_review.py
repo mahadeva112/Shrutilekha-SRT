@@ -56,6 +56,10 @@ class ReviewParityTest(unittest.TestCase):
                                   "u", "u", str(p / "result"), str(p / "ack"))
         self.header, self.segs = self.app._parse_cap(str(self.cap))
         self.app._build_review(str(p / "out.srt"), str(self.cap), self.header, self.segs)
+        # Lay out a mapped window, as the app and test_studio_form do: on macOS
+        # (Aqua Tk) update() on the still-withdrawn root never returns.
+        self.root.attributes("-topmost", False)
+        self.root.deiconify()
         self.root.update()
         self.values = {k: v for k, v in dict(
             max_chars=self.app.settings_vars[0].get(), max_lines=self.app.settings_vars[1].get(),

@@ -1,7 +1,8 @@
-"""Resident Windows tray helper. Idle monitoring never calls Resolve APIs."""
+"""Resident tray (Windows) / menu bar (macOS) helper. Idle monitoring never calls Resolve APIs."""
 import json
 import os
 from pathlib import Path
+import plistlib
 import re
 import subprocess
 import sys
@@ -9,16 +10,19 @@ import threading
 import time
 import uuid
 
-from app_runtime import install_dir, resources, user_dir
+from app_runtime import IS_MAC, IS_WINDOWS, app_executable, fusion_prefs, resources, user_dir
 from resolve_bridge import BridgeError, mailbox_lock, probe_connection
 
 RUN_KEY = r'Software\Microsoft\Windows\CurrentVersion\Run'
 RUN_NAME = 'Srutilekha'
+LAUNCH_AGENT_LABEL = 'org.srutilekha.tray'
+RESOLVE_PROCESS_NAMES = ('resolve.exe', 'resolve')
+STARTUP_LABEL = 'Start with Windows' if IS_WINDOWS else 'Start at login'
 
 
 def app_command(*args):
     if getattr(sys, 'frozen', False):
-        return [str(install_dir() / 'Srutilekha.exe'), *args]
+        return [str(app_executable()), *args]
     return [sys.executable, str(resources() / 'app.py'), *args]
 
 
@@ -26,7 +30,38 @@ def launch(*args):
     return subprocess.Popen(app_command(*args), creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
 
 
+def launch_agent_path():
+    return Path.home() / 'Library' / 'LaunchAgents' / (LAUNCH_AGENT_LABEL + '.plist')
+
+
+def _mac_startup_enabled():
+    try:
+        with launch_agent_path().open('rb') as handle:
+            return plistlib.load(handle).get('ProgramArguments') == app_command('--tray')
+    except (OSError, plistlib.InvalidFileException):
+        return False
+
+
+def _mac_set_startup(enabled):
+    # Takes effect at the next login; no launchctl call, so toggling never
+    # starts or kills a second helper in the current session.
+    path = launch_agent_path()
+    if enabled:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        scratch = path.with_suffix('.tmp')
+        with scratch.open('wb') as handle:
+            plistlib.dump({'Label': LAUNCH_AGENT_LABEL, 'ProgramArguments': app_command('--tray'),
+                           'RunAtLoad': True, 'ProcessType': 'Interactive'}, handle)
+        os.replace(scratch, path)
+    else:
+        path.unlink(missing_ok=True)
+
+
 def startup_enabled():
+    if IS_MAC:
+        return _mac_startup_enabled()
+    if not IS_WINDOWS:
+        return False
     import winreg
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
@@ -37,8 +72,16 @@ def startup_enabled():
 
 
 def set_startup(enabled):
-    import winreg
     marker = user_dir() / 'tray-startup-disabled.flag'
+    if not IS_WINDOWS:
+        if IS_MAC:
+            _mac_set_startup(enabled)
+        if enabled:
+            marker.unlink(missing_ok=True)
+        else:
+            marker.write_text('disabled', encoding='utf-8')
+        return
+    import winreg
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
         if enabled:
             winreg.SetValueEx(key, RUN_NAME, 0, winreg.REG_SZ, subprocess.list2cmdline(app_command('--tray')))
@@ -72,14 +115,14 @@ def request_raise():
 def resolve_identity():
     import psutil
     for process in psutil.process_iter(['name', 'pid', 'create_time']):
-        if (process.info['name'] or '').lower() == 'resolve.exe':
+        if (process.info['name'] or '').lower() in RESOLVE_PROCESS_NAMES:
             return process.info['pid'], process.info['create_time']
     return None
 
 
 def launch_signal():
     # Constructing a client is unnecessary during idle monitoring.
-    prefs = Path(os.environ['APPDATA']) / 'Blackmagic Design/DaVinci Resolve/Support/Fusion/Profiles/Default/Fusion.prefs'
+    prefs = fusion_prefs()
     try:
         content = prefs.read_text(encoding='utf-8', errors='replace')
     except OSError:
@@ -151,7 +194,7 @@ def make_icon(controller, stop):
         pystray.MenuItem('API settings', lambda icon,item: launch('--home', '--api-settings')),
         pystray.MenuItem('Updates', lambda icon,item: launch('--home')),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem('Start with Windows', toggle_startup, checked=lambda item: startup_enabled()),
+        pystray.MenuItem(STARTUP_LABEL, toggle_startup, checked=lambda item: startup_enabled()),
         pystray.MenuItem('Quit helper', quit_helper),
     ))
 
@@ -201,6 +244,6 @@ def self_test(output):
     icon = make_icon(TrayController(), stop)
     def ready(icon):
         icon.visible = True
-        Path(output).write_text(json.dumps({'tray':'native Windows icon', 'menu_items':len(list(icon.menu)), 'visible':icon.visible}), encoding='utf-8')
+        Path(output).write_text(json.dumps({'tray':'native Windows icon' if IS_WINDOWS else 'native %s icon' % sys.platform, 'menu_items':len(list(icon.menu)), 'visible':icon.visible}), encoding='utf-8')
         icon.stop()
     icon.run(setup=ready)

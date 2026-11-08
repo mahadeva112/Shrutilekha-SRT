@@ -9,7 +9,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
-from app_runtime import user_dir
+from app_runtime import fusion_prefs, user_dir
 
 
 class BridgeError(RuntimeError):
@@ -32,10 +32,29 @@ def normalize_list_result(value):
     raise BridgeError('Resolve returned an unexpected clip collection; reconnect the app.')
 
 
+if os.name == 'nt':
+    import msvcrt
+
+    def _try_lock(handle):
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+
+    def _unlock(handle):
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    def _try_lock(handle):
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def _unlock(handle):
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 @contextmanager
 def mailbox_lock(path, timeout=0):
-    """Windows process lock; automatically released if the app exits."""
-    import msvcrt
+    """Cross-process lock; the OS releases it automatically if the app exits."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('a+b') as handle:
         if not path.stat().st_size:
@@ -43,8 +62,7 @@ def mailbox_lock(path, timeout=0):
         deadline = time.monotonic() + timeout
         while True:
             try:
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                _try_lock(handle)
                 break
             except OSError:
                 if time.monotonic() >= deadline:
@@ -53,8 +71,7 @@ def mailbox_lock(path, timeout=0):
         try:
             yield
         finally:
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            _unlock(handle)
 
 
 def write_launcher(target, directory=None):
@@ -101,8 +118,7 @@ class BridgeClient:
     def __init__(self, directory=None, prefs=None, timeout=20):
         self.directory = Path(directory) if directory else user_dir() / 'resolve-bridge'
         self.directory.mkdir(parents=True, exist_ok=True)
-        self.prefs = Path(prefs) if prefs else Path(os.environ['APPDATA']) / (
-            'Blackmagic Design/DaVinci Resolve/Support/Fusion/Profiles/Default/Fusion.prefs')
+        self.prefs = Path(prefs) if prefs else fusion_prefs()
         self.timeout = timeout
         self.lock = threading.Lock()
         self.session = None

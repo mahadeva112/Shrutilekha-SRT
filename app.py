@@ -2,7 +2,7 @@
 import os
 import runpy
 import sys
-from app_runtime import resources, install_dir, prepare_environment
+from app_runtime import IS_WINDOWS, resources, install_dir, prepare_environment, app_executable
 
 
 def main():
@@ -101,14 +101,14 @@ def main():
     ttk.Label(body, text="Resolve 21.1+: captions open automatically when connected.\nStart Workspace → Scripts → Srutilekha once per Resolve session.\nResolve 21.0 or earlier: launch from the Scripts menu.", wraplength=560).pack(anchor="w", pady=16)
     def connect_resolve():
         import subprocess
-        command = [str(install_dir() / "Srutilekha.exe"), "--bridge-run"] if getattr(sys, "frozen", False) else [sys.executable, str(resources() / "app.py"), "--bridge-run"]
+        command = [str(app_executable()), "--bridge-run"] if getattr(sys, "frozen", False) else [sys.executable, str(resources() / "app.py"), "--bridge-run"]
         subprocess.Popen(command, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         root.destroy()
     ttk.Button(body, text="Connect to Resolve", command=connect_resolve).pack(anchor="w", pady=(0, 10))
     ttk.Button(body, text="API settings", command=lambda: show_settings(root)).pack(anchor="w")
     from tray_helper import startup_enabled, set_startup
     startup = tk.BooleanVar(value=startup_enabled())
-    ttk.Checkbutton(body, text="Start quietly with Windows", variable=startup,
+    ttk.Checkbutton(body, text="Start quietly with Windows" if IS_WINDOWS else "Start quietly at login", variable=startup,
                     command=lambda: set_startup(startup.get())).pack(anchor="w", pady=(10, 0))
     connection_status = tk.StringVar(value="Connecting to Resolve…")
     ttk.Label(body, textvariable=connection_status, wraplength=550).pack(anchor="w", pady=(10, 0))
