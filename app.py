@@ -181,6 +181,9 @@ def main():
                     return
                 if "Another Srutilekha operation" in str(result):
                     connection_status.set("Your caption window is already open. Close it to reconnect here.")
+                elif str(result).startswith("Resolve bridge is not responding:"):
+                    # A specific missing step (settings, script or bridge), not just "still waiting".
+                    connection_status.set(str(result).split(": ", 1)[1])
                 else:
                     connection_status.set("Waiting for Resolve. Start Workspace → Scripts → Srutilekha; this app will connect automatically.")
                 root.after(2000, probe)
