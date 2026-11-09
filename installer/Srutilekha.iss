@@ -88,6 +88,8 @@ begin
       Text := UTF8Decode(BridgeText);
       StringChangeEx(Mailbox, '\', '\\', True);
       StringChangeEx(Text, '__SRUTILEKHA_MAILBOX__', Mailbox, True);
+      { Version stamp: a running bridge from an older install is replaced, not reused. }
+      StringChangeEx(Text, '__SRUTILEKHA_BRIDGE_VERSION__', Copy(GetSHA1OfString(UTF8Encode(Text)), 1, 12), True);
       ScriptPath := ExpandConstant('{userappdata}\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Utility\Srutilekha.lua');
       ForceDirectories(ExtractFileDir(ScriptPath));
       if not SaveStringToFile(ScriptPath, UTF8Encode(Text), False) then

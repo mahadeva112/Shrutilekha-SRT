@@ -1,5 +1,6 @@
 """Local request mailbox for Resolve's restricted Lua host; no Python API import."""
 import base64
+import hashlib
 import json
 import math
 import os
@@ -80,7 +81,14 @@ def launcher_text(directory=None):
     directory = directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
     source = (resources() / 'resolve_bridge.lua').read_text(encoding='utf-8')
-    return source.replace('"__SRUTILEKHA_MAILBOX__"', lua_value(str(directory)))
+    text = source.replace('"__SRUTILEKHA_MAILBOX__"', lua_value(str(directory)))
+    return text.replace('__SRUTILEKHA_BRIDGE_VERSION__', bridge_version(text))
+
+
+def bridge_version(text):
+    """Stamp of a generated script (code + mailbox), so a running Resolve bridge
+    from an older install is replaced instead of reused. The installer matches it."""
+    return hashlib.sha1(text.encode('utf-8')).hexdigest()[:12]
 
 
 def write_launcher(target, directory=None):
@@ -163,7 +171,7 @@ class BridgeClient:
                             raise BridgeError(response.get('error','Resolve bridge request failed'))
                         return self._decode(response.get('value'))
                     time.sleep(.04)
-                raise BridgeError('Resolve bridge is not responding. In Resolve, open Workspace > Scripts > Srutilekha, then try Connect again.')
+                raise BridgeError(not_responding_message(self.prefs))
             finally:
                 # Do not leave a timed-out mutation to run after the user retries.
                 try:
@@ -214,6 +222,28 @@ class BridgeClient:
         finally:
             self.pending = None
             self.cache.clear()
+
+
+def not_responding_message(prefs):
+    """Say which step is missing, from files only (no Resolve API calls)."""
+    from app_runtime import resolve_scripts_dir
+    script = resolve_scripts_dir() / 'Srutilekha.lua'
+    if not Path(prefs).is_file():
+        return ('Resolve bridge is not responding: Resolve settings were not found at %s. '
+                'Start DaVinci Resolve once, then reopen Srutilekha.' % prefs)
+    if not script.is_file():
+        return ('Resolve bridge is not responding: the Srutilekha script is missing from %s. '
+                'Reopen Srutilekha to reinstall it, restart Resolve, then open Workspace > Scripts > Srutilekha.'
+                % script.parent)
+    try:
+        content = Path(prefs).read_text(encoding='utf-8', errors='replace')
+    except OSError:
+        content = ''
+    if not re.search(r'SrutilekhaBridgeOwner\s*=\s*"[A-Za-z0-9]+"', content):
+        return ('Resolve bridge is not responding: the bridge is not running in Resolve. '
+                'In Resolve, open Workspace > Scripts > Srutilekha, then try Connect again.')
+    return ('Resolve bridge is not responding. Restart Resolve, then open Workspace > Scripts > Srutilekha '
+            'and try Connect again.')
 
 
 def probe_connection():
