@@ -1,3 +1,4 @@
+import hidden_windows  # noqa: F401  (keeps test windows off screen)
 import os
 import tempfile
 import tkinter as tk
