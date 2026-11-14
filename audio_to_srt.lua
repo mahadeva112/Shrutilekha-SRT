@@ -832,12 +832,43 @@ local function import_srt_to_new_track(mp, srt_file)
     end
     timeline:SetCurrentTimecode(tc)   -- anchor so SRT times align with timeline start
 
+    -- Resolve does not reliably use the empty track. With an earlier run's
+    -- cues on track 1 it appended the new ones to track 1, AFTER the old ones:
+    -- on 2026-11-14 a 356-cue run landed 10205 frames (~7 min) late, past the
+    -- end of the audio, and the stretch where they belonged showed old cues or
+    -- none. While the clip is appended, every other subtitle track is locked,
+    -- leaving the fresh one as the only place it can go; each lock is put back
+    -- straight after. Only tracks this run locked are unlocked, and every call
+    -- is guarded: a Resolve without these methods imports as it did before.
+    local relock = {}
+    if addedTrack then
+        for i = 1, beforeTracks do
+            local okGet, locked = pcall(function() return timeline:GetIsTrackLocked("subtitle", i) end)
+            if okGet and not locked
+                    and pcall(function() return timeline:SetTrackLock("subtitle", i, true) end) then
+                relock[#relock + 1] = i
+            end
+        end
+        if #relock > 0 then
+            log(string.format("Locked %d other subtitle track(s) for the import.", #relock))
+        end
+    end
+    local function unlock_others()
+        for _, i in ipairs(relock) do
+            pcall(function() return timeline:SetTrackLock("subtitle", i, false) end)
+        end
+        relock = {}
+    end
+
     local imported = mp:ImportMedia({srt_file})
     if not imported or #imported == 0 then
+        unlock_others()
         if addedTrack then pcall(function() timeline:DeleteTrack("subtitle", addedTrack) end) end
         return false, nil, nil, false, "Resolve could not import the SRT file."
     end
-    if not mp:AppendToTimeline({imported[1]}) then
+    local appended = mp:AppendToTimeline({imported[1]})
+    unlock_others()
+    if not appended then
         if addedTrack then pcall(function() timeline:DeleteTrack("subtitle", addedTrack) end) end
         return false, nil, nil, false, "Resolve could not append the SRT to the timeline."
     end
@@ -872,6 +903,10 @@ local function import_srt_to_new_track(mp, srt_file)
     log(string.format("SRT cues landed on subtitle track %d: %d new, "
         .. "%d cue(s) already there (left untouched).",
         landed, #newItems, priorCount))
+    if priorCount > 0 then
+        log("WARNING: the new cues share a track with earlier ones; Resolve may "
+            .. "have placed them after those cues rather than at their own times.")
+    end
 
     -- If the cues went somewhere other than the track we made, drop ours again
     -- rather than leaving an empty track behind -- and do NOT claim it for Undo,
