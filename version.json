@@ -1,8 +1,10 @@
 {
-  "version": "1.4.7",
+  "version": "2.0.0",
   "notes": [
-    "With punctuation on, captions use each language's own marks: \u0964 ends sentences in Bengali, Assamese, Hindi, Nepali, Sanskrit, Punjabi and Odia, and quotes are curly \u201c \u201d in every language.",
-    "Urdu is no longer offered as a caption language."
+    "New speech-bubble logo, and a more finished look for every screen.",
+    "The review screen has a Back button: change the timing or settings without transcribing again.",
+    "The reference script can be pasted as text instead of choosing a file.",
+    "New captions no longer land on subtitle tracks that already hold cues, and a refused import no longer leaves the app waiting."
   ],
   "mandatory": false,
   "min_version": ""
