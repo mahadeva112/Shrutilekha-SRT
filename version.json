@@ -1,8 +1,8 @@
 {
-  "version": "2.0.1",
+  "version": "2.0.2",
   "notes": [
-    "Works with DaVinci Resolve 21.2: Workspace > Scripts > Srutilekha opens captions again.",
-    "New captions go on their own new subtitle track at the timeline start, not after an earlier run's cues.",
+    "Much faster with the Resolve bridge: no long wait after transcription reaches 100%.",
+    "On Resolve 21.2 new captions are moved onto their own new subtitle track, at the right time.",
     "Resolve 21.2 does not let scripts style subtitle cues; set the look under Inspector > Track > Track Style."
   ],
   "mandatory": false,

@@ -60,6 +60,10 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(lua_value([None,True,2]),'{nil,true,2}')
 
     def test_protocol_roundtrip_errors_and_timeout_cleanup(self):
+        # Tk variables left by earlier UI tests must not be collected on the
+        # responder thread: Tk then blocks that thread for about a second
+        # ("main thread is not in main loop") and the 0.5 s timeout expires.
+        import gc; gc.collect()
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp); prefs=folder/'Fusion.prefs'
             client=BridgeClient(folder,prefs,.5)
@@ -166,5 +170,69 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(len(tracks[1]),1)                      # the old cue stays alone
         self.assertEqual(locks,{1:False})                       # and its track is unlocked again
         self.assertTrue(any('locked' in str(c) for c in log.call_args_list))
+
+    def test_cues_appended_after_old_ones_are_moved_to_the_new_track(self):
+        """Resolve 21.2 on 2026-11-14: trackIndex ignored, the SRT appended to
+        track 1 after the 45 cues already there, 1431 frames late."""
+        class Cue:
+            def __init__(self,start,text='cue'):self.start,self.text=start,text
+            def GetStart(self):return self.start
+            def GetName(self):return self.text
+        tracks={1:[Cue(86406),Cue(87802)]}
+        def append(infos):
+            end=tracks[1][-1].GetStart()+30
+            tracks[1].extend([Cue(end),Cue(end+40)]);return [object()]
+        def move(items,position,linked):
+            shift=position['startFrame']-min(i.start for i in items)
+            for track in tracks.values():
+                track[:]=[i for i in track if i not in items]
+            for i in items:i.start+=shift
+            tracks[position['trackIndex']].extend(items);return True
+        timeline=SimpleNamespace(GetTrackCount=lambda kind:len(tracks),GetItemListInTrack=lambda kind,i:list(tracks[i]),
+                                 AddTrack=lambda kind:tracks.__setitem__(len(tracks)+1,[]) or True,
+                                 DeleteTrack=lambda kind,i:tracks.pop(i),SetCurrentTimecode=lambda tc:True,
+                                 GetIsTrackLocked=lambda kind,i:False,SetTrackLock=lambda kind,i,v:True,MoveItems=move)
+        pool=SimpleNamespace(ImportMedia=lambda paths:[object()],AppendToTimeline=append)
+        with patch.object(workflow,'log'):
+            ok,index,items,created,error=workflow.import_srt_to_new_track(
+                timeline,pool,'demo.srt','01:00:00:00',86400,86406)
+        self.assertTrue(ok);self.assertEqual((index,created),(2,True))
+        self.assertEqual([i.GetStart() for i in items],[86406,86446])
+        self.assertEqual([i.GetStart() for i in tracks[1]],[86406,87802])   # the user's cues, untouched
+
+    def test_first_cue_time_skips_the_blank_anchor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'a.srt'
+            path.write_text('1\n00:00:00,000 --> 00:00:00,040\n \n\n2\n00:00:01,250 --> 00:00:02,000\nনমস্কার\n',encoding='utf-8')
+            self.assertEqual(workflow.srt_first_cue_seconds(str(path)),1.25)
+            self.assertEqual(workflow.first_cue_frame(str(path),24,86400),86430)
+
+    def test_bridge_prefetches_item_info_and_forgets_it_after_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            client=BridgeClient(tmp,Path(tmp)/'prefs')
+            sent=[]
+            def request(payload):
+                sent.append(payload.get('op') if payload.get('op')!='call' else payload['method'])
+                if payload.get('op')=='caption_info':return [{'name':'a','start':10,'end':20},{'name':'b','start':30,'end':40}]
+                if payload.get('method')=='GetItemListInTrack':return [{'__ref':5},{'__ref':6}]
+                return True
+            with patch.object(client,'request',side_effect=lambda p:client._decode(request(p))):
+                items=client.call(1,'GetItemListInTrack',['subtitle',1])
+                self.assertEqual([i.GetStart() for i in items]+[items[1].GetEnd()],[10,30,40])
+                self.assertEqual(sent,['GetItemListInTrack','caption_info'])   # one round trip for all
+                client.call(1,'MoveItems',[items,{'trackIndex':2}])
+                items[0].GetStart()
+                self.assertEqual(sent[-1],'GetStart')                        # cache dropped after a change
+
+    def test_refused_style_batch_stops_further_writes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            client=BridgeClient(tmp,Path(tmp)/'prefs')
+            client.pending=[]
+            with patch.object(client,'request',return_value=[False]*100) as request:
+                for n in range(300):
+                    client.call(1,'SetProperty',['fontFace','x'])
+                client.flush()
+            self.assertEqual(request.call_count,1)            # 2 of 3 batches never sent
+            self.assertEqual(client.rejected_style_properties,300)
 
 if __name__=='__main__': unittest.main()

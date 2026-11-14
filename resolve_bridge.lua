@@ -88,7 +88,7 @@ GetCurrentProject GetMediaPool GetCurrentTimeline GetName GetSetting GetStartFra
 GetTrackCount GetTrackName GetItemListInTrack GetMediaPoolItem GetClipProperty
 GetLeftOffset GetStart GetEnd GetPlayBackSpeed GetUniqueId GetTrackEnable SetTrackEnable
 GetTrackLock SetTrackLock GetIsTrackLocked GetIsTrackEnabled GetCurrentTimecode SetCurrentTimecode AddTrack DeleteTrack
-ImportMedia AppendToTimeline DeleteClips SetProperty GetProperty SetName SaveProject
+ImportMedia AppendToTimeline DeleteClips MoveItems GetPosition SetProperty GetProperty SetName SaveProject
 SetProperties GetProperties GetSpeed
 GetRootFolder GetCurrentFolder SetCurrentFolder GetClipList GetSubFolderList
 GetTimelineCount GetTimelineByIndex SetCurrentTimeline GetProjectListInCurrentFolder
@@ -158,7 +158,12 @@ local function dispatch(req)
         local out={}
         for _,id in ipairs(req.refs or {}) do
             local item=refs[id]; if not item then error('Stale caption object') end
-            out[#out+1]={name=item:GetName(),start=item:GetStart()}
+            local info={}
+            for key,name in pairs({name='GetName',start='GetStart',['end']='GetEnd'}) do
+                local ok,value=pcall(function() return item[name](item) end)
+                if ok and value~=nil then info[key]=value end
+            end
+            out[#out+1]=info
         end
         return out
     end
@@ -204,6 +209,10 @@ announce(session)
 print('Srutilekha bridge ready. The tray helper will open captions automatically.')
 local last_id=nil
 local last_probe=nil
+-- Poll every 5 ms while the app is working and every 100 ms when idle: an
+-- import makes hundreds of calls, and a fixed 100 ms wait made each one cost
+-- that much (27 s after transcription on 2026-11-14).
+local last_activity=0
 while prefs:GetPrefs(owner_key)==session do
     local probe=prefs:GetPrefs('Global.SrutilekhaBridgeProbe')
     if probe and probe~=last_probe then
@@ -220,10 +229,14 @@ while prefs:GetPrefs(owner_key)==session do
             local packed_ok,body=pcall(json,response)
             if not packed_ok then body=json({ok=false,error='Cannot encode Resolve result: '..tostring(body)}) end
             local encoded=base64(body)
-            write_file('response-'..req.id..'.txt', encoded)
-            prefs:SetPrefs('Global.SrutilekhaBridgeResponse',req.id..':'..encoded)
-            save_prefs()
+            -- Prefs only as a fallback: on 21.2 every reply copied there grew
+            -- Fusion.prefs by hundreds of KB and cost time on each call.
+            if not write_file('response-'..req.id..'.txt', encoded) then
+                prefs:SetPrefs('Global.SrutilekhaBridgeResponse',req.id..':'..encoded)
+                save_prefs()
+            end
+            last_activity=os.time()
         end
     end
-    bmd.wait(.1)
+    bmd.wait(os.time()-last_activity<=5 and .005 or .1)
 end

@@ -145,6 +145,7 @@ class BridgeClient:
         self.pending = None
         self.cache = {}
         self.rejected_style_properties = 0
+        self.styles_refused = False
 
     def _decode(self, value):
         if isinstance(value, dict):
@@ -177,9 +178,13 @@ class BridgeClient:
                         raise BridgeError('Resolve is holding the bridge request file. Try Connect again.')
                     time.sleep(.02)
             try:
+                prefs_checked = 0.0
                 while time.monotonic() < deadline:
                     body = read_response_file(response_path)
-                    if body is None:
+                    # The prefs file is only a fallback and can be hundreds of
+                    # KB; read it a few times a second, not on every poll.
+                    if body is None and time.monotonic() - prefs_checked >= .1:
+                        prefs_checked = time.monotonic()
                         try:
                             content = self.prefs.read_text(encoding='utf-8', errors='replace')
                         except OSError:
@@ -191,7 +196,7 @@ class BridgeClient:
                         if not response.get('ok'):
                             raise BridgeError(response.get('error','Resolve bridge request failed'))
                         return self._decode(response.get('value'))
-                    time.sleep(.04)
+                    time.sleep(.004)
                 raise BridgeError('Resolve bridge is not responding. In Resolve, open Workspace > Scripts > Srutilekha, then try Connect again.')
             finally:
                 remove_quietly(response_path)
@@ -213,6 +218,9 @@ class BridgeClient:
 
     def call(self, ref, method, args):
         if self.pending is not None and method == 'SetProperty':
+            if self.styles_refused:
+                self.rejected_style_properties += 1
+                return False
             self.pending.append({'ref':ref,'method':method,'args':args,'argc':len(args)})
             if len(self.pending) >= 100:
                 self.flush()
@@ -221,14 +229,45 @@ class BridgeClient:
             self.flush()
         if not args and (ref, method) in self.cache:
             return self.cache[ref, method]
+        if not method.startswith('Get'):
+            # Anything that is not a getter may change the timeline.
+            self.cache.clear()
         result = self.request({'op':'call','ref':ref,'method':method,'args':args,'argc':len(args)})
-        return normalize_list_result(result) if method in LIST_RESULTS else result
+        if method in LIST_RESULTS:
+            result = normalize_list_result(result)
+        if method == 'GetItemListInTrack' and result:
+            self.prefetch(result)
+        return result
+
+    def prefetch(self, items):
+        """Name, start and end of every item in one round trip instead of one
+        call each: an import reads them for every cue, several times over."""
+        refs = [item.ref for item in items if isinstance(item, RemoteObject)]
+        if not refs:
+            return
+        try:
+            values = self.request({'op':'caption_info','refs':refs})
+        except BridgeError:
+            return
+        for ref, value in zip(refs, values if isinstance(values, list) else []):
+            if isinstance(value, dict):
+                for key, method in (('name','GetName'), ('start','GetStart'), ('end','GetEnd')):
+                    if key in value:
+                        self.cache[ref, method] = value[key]
 
     def flush(self):
         if self.pending:
             calls, self.pending = self.pending, []
+            if self.styles_refused:
+                self.rejected_style_properties += len(calls)
+                return
             results = self.request({'op':'batch','calls':calls})
-            self.rejected_style_properties += sum(value is False for value in results)
+            rejected = sum(value is False for value in results)
+            self.rejected_style_properties += rejected
+            # Resolve 21.2 refuses every subtitle style key. Once a whole batch
+            # comes back refused, stop sending the rest of them.
+            if len(results) >= 10 and rejected == len(results):
+                self.styles_refused = True
 
     def style_items(self, function, items, *args, **kwargs):
         values = self.request({'op':'caption_info','refs':[item.ref for item in items]})

@@ -1,3 +1,10 @@
+v2.0.2: faster bridge, captions on their own track in Resolve 21.2.
+
+- The wait after transcription reached 100% is gone. Every Resolve call through the bridge waited up to 100 ms in Resolve and 40 ms in the app; a 44-cue run made hundreds of them and sat at 100% for 27 seconds (8 more before transcription, reading 13 clips). The bridge now checks every 5 ms while the app is working (back to 100 ms when idle), names, start and end frames of a whole track come back in one call, and once Resolve refuses a full batch of style writes the rest are not sent. Measured per call: 109 ms before, 16 ms now.
+- Bridge replies are no longer copied into Resolve's preferences, which had grown Fusion.prefs by hundreds of KB.
+- Resolve 21.2 ignores the track number for an SRT and appends it to track 1 after the cues already there (44 cues landed 1431 frames late). The new cues are now moved with `Timeline.MoveItems` onto the new subtitle track, with the first caption at its own time. Your earlier cues are never moved.
+- 102 tests pass. Speed was measured with the bridge in Resolve's own Lua; the move onto the new track is covered by tests but not yet seen in a live Resolve run.
+
 v2.0.1: works with DaVinci Resolve 21.2.
 
 - Resolve 21.2 removed `loadfile`, `dofile` and `SavePrefs` from script Lua and writes settings to disk only about every 30 seconds, so the bridge stopped at its first line and nothing opened. The bridge now reads requests and writes replies through Resolve's own file access (`OpenFile`), and clicks reach the tray helper at once. Resolve 21.1 keeps working the old way.

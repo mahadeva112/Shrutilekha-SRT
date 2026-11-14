@@ -627,7 +627,31 @@ def field(sel, key, default=""):
 # diffing the subtitle tracks. Nothing is deleted, and the answer is observed
 # rather than assumed.
 
-def import_srt_to_new_track(timeline, mp, srt_file, timecode, record_frame=None):
+def srt_first_cue_seconds(path):
+    """Start time of the first SRT cue that has text, in seconds, or None. The
+    blank anchor cue at 0 is skipped: Resolve drops it on import."""
+    body = read_text(path) or ""
+    for block in re.split(r"\r?\n\s*\r?\n", body):
+        lines = block.strip().splitlines()
+        for k, line in enumerate(lines):
+            m = re.match(r"\s*(\d+):(\d+):(\d+)[,.](\d+)\s*-->", line)
+            if m:
+                if any(text.strip() for text in lines[k + 1:]):
+                    h, mi, s, ms = (int(g) for g in m.groups())
+                    return h * 3600 + mi * 60 + s + ms / 1000.0
+                break
+    return None
+
+
+def first_cue_frame(srt_path, fps, tl_start):
+    """Timeline frame the first captioned cue belongs at (as the log's
+    'expected' frame is computed), or None when the SRT has no text cue."""
+    seconds = srt_first_cue_seconds(srt_path)
+    return None if seconds is None else tl_start + int(seconds * fps)
+
+
+def import_srt_to_new_track(timeline, mp, srt_file, timecode, record_frame=None,
+                            first_frame=None):
     """Returns (ok, track_index, items, created_track, error).
 
     `items` is only the cues THIS import added, which is not the same as the
@@ -743,7 +767,7 @@ def import_srt_to_new_track(timeline, mp, srt_file, timecode, record_frame=None)
         info = {"mediaPoolItem": clip, "trackIndex": added_track}
         if record_frame is not None:
             info["recordFrame"] = record_frame
-        placed = attempt("on the new track at the timeline start",
+        placed = attempt("asking for the new track at the timeline start",
                          lambda: mp.AppendToTimeline([info]))
         if not placed:
             relock = []
@@ -799,6 +823,40 @@ def import_srt_to_new_track(timeline, mp, srt_file, timecode, record_frame=None)
 
     log("SRT cues landed on subtitle track %d: %d new, %d cue(s) already "
         "there (left untouched)." % (landed, len(new_items), prior_count))
+
+    # Resolve 21.2 ignores trackIndex for an SRT and appends it after the cues
+    # already on track 1 (45 cues landed 1431 frames late on 2026-11-14). Move
+    # exactly this run's cues onto the new track at the frame their first
+    # caption belongs at; MoveItems keeps their spacing.
+    if added_track and first_frame is not None and new_items:
+        starts = [item_start(item) for item in new_items]
+        ref = 0
+        for k, item in enumerate(new_items):
+            try:
+                if (item.GetName() or "").strip():
+                    ref = k          # skip a surviving blank anchor cue
+                    break
+            except Exception:
+                pass
+        if None not in starts:
+            shift = first_frame - starts[ref]
+            if landed != added_track or abs(shift) > 2:
+                target = min(starts) + shift
+                moved, why = False, ""
+                try:
+                    moved = timeline.MoveItems(
+                        new_items, {"trackIndex": added_track, "startFrame": target}, False)
+                except Exception as exc:
+                    why = " (%s)" % exc
+                on_new = track_items(added_track) if moved else []
+                if moved and len(on_new) >= len(new_items):
+                    log("Moved the %d new cue(s) from subtitle track %d to track %d, "
+                        "first caption at frame %d (was %d)."
+                        % (len(new_items), landed, added_track, first_frame, starts[ref]))
+                    landed, new_items, prior_count = added_track, on_new, 0
+                else:
+                    log("Could not move the new cues onto track %d%s."
+                        % (added_track, why))
     if prior_count:
         log("WARNING: the new cues share a track with earlier ones; Resolve may "
             "have placed them after those cues rather than at their own times.")
@@ -1289,7 +1347,8 @@ def main():
             return
 
         ok, strack, items, created, ierr = import_srt_to_new_track(
-            timeline, mp, srt_out, tc, tl_start)
+            timeline, mp, srt_out, tc, tl_start,
+            first_cue_frame(srt_out, fps, tl_start))
         rm(srt_out)
         if not ok:
             alert_error("Srutilekha", ierr or "Could not import the synced SRT.")
@@ -1398,7 +1457,8 @@ def main():
     caption = parse_caption(cap_path, fps)
 
     ok, strack, items, created, ierr = import_srt_to_new_track(
-        timeline, mp, srt_path, tc, tl_start)
+        timeline, mp, srt_path, tc, tl_start,
+        first_cue_frame(srt_path, fps, tl_start))
     rm(srt_path)
     rm(cap_path)
     if not ok:
