@@ -28,6 +28,7 @@ HARNESS = r"""
 local logs = {}
 function log(s) logs[#logs + 1] = s end
 tc = "01:00:00:00"
+tlStart = 0
 local CUES = {100, 200, 300}          -- the SRT's cue start frames
 
 local function make_timeline(tracks, opts)
@@ -50,21 +51,37 @@ local function make_timeline(tracks, opts)
     return tl
 end
 
+-- opts.clipinfo: honours {mediaPoolItem, trackIndex, recordFrame}; otherwise a
+-- clipInfo append places nothing. opts.refuse_locked: a plain append places
+-- nothing while any subtitle track is locked (Resolve on 2026-11-14).
+-- opts.fail: nothing is ever placed. Plain appends go to the first unlocked
+-- track, after the cues already on it. Every call returns nil, so only the
+-- timeline itself tells whether an append worked.
 local function make_pool(tl, opts)
     opts = opts or {}
     local mp = {}
     function mp:ImportMedia(files) return {{}} end
     function mp:AppendToTimeline(clips)
-        if opts.fail_append then return false end
+        if opts.fail then return nil end
+        local info = clips[1]
+        if info.mediaPoolItem then
+            if not opts.clipinfo then return nil end
+            local t = tl.tracks[info.trackIndex]
+            for _, f in ipairs(CUES) do t.items[#t.items + 1] = f + info.recordFrame end
+            return nil
+        end
+        for _, t in ipairs(tl.tracks) do
+            if t.locked and opts.refuse_locked then return nil end
+        end
         for _, t in ipairs(tl.tracks) do
             if not t.locked then
                 local after = 0
                 for _, f in ipairs(t.items) do after = math.max(after, f + 50) end
                 for _, f in ipairs(CUES) do t.items[#t.items + 1] = f + after end
-                return true
+                return nil
             end
         end
-        return false
+        return nil
     end
     return mp
 end
@@ -81,24 +98,21 @@ local function report(name, tl, ok, landed, items, created, err)
     print(string.format("RESULT %s ok=%s landed=%s created=%s starts=%s locks=%s tracks=%d err=%s",
         name, tostring(ok), tostring(landed), tostring(created), starts(items),
         table.concat(locks), #tl.tracks, (tostring(err):gsub("%s", "_"))))
+    print("LOGS " .. name .. " " .. table.concat(logs, " | "))
+    logs = {}
 end
 
--- An earlier run's cues on track 1: the new ones must still go to a fresh track, on time.
-timeline = make_timeline({{items = {5000, 9000}, locked = false}})
-report("occupied", timeline, import_srt_to_new_track(make_pool(timeline), "x.srt"))
+local function run(name, tracks, topts, popts)
+    timeline = make_timeline(tracks, topts)
+    report(name, timeline, import_srt_to_new_track(make_pool(timeline, popts), "x.srt"))
+end
 
--- A track the user locked stays locked; an unlocked one is unlocked again.
-timeline = make_timeline({{items = {5000}, locked = true}, {items = {7000}, locked = false}})
-report("userlock", timeline, import_srt_to_new_track(make_pool(timeline), "x.srt"))
-
--- A Resolve without the lock methods still imports (as before the fix).
-timeline = make_timeline({{items = {5000}, locked = false}}, {no_locks = true})
-report("nolocks", timeline, import_srt_to_new_track(make_pool(timeline), "x.srt"))
-
--- A failed append puts the locks back and removes the empty track.
-timeline = make_timeline({{items = {5000}, locked = false}})
-report("failed", timeline, import_srt_to_new_track(make_pool(timeline, {fail_append = true}), "x.srt"))
-print("LOGS " .. table.concat(logs, " | "))
+run("clipinfo", {{items = {5000, 9000}, locked = false}}, {}, {clipinfo = true})
+run("locks", {{items = {5000, 9000}, locked = false}}, {}, {})
+run("refused", {{items = {5000, 9000}, locked = false}}, {}, {refuse_locked = true})
+run("userlock", {{items = {5000}, locked = true}, {items = {7000}, locked = false}}, {}, {})
+run("nolocks", {{items = {5000}, locked = false}}, {no_locks = true}, {})
+run("failed", {{items = {5000}, locked = false}}, {}, {fail = true})
 """
 
 
@@ -112,21 +126,39 @@ class LuaImportTest(unittest.TestCase):
             out = subprocess.run([FUSCRIPT, "-l", "lua", str(script)], capture_output=True,
                                  text=True, encoding="utf-8", errors="replace", timeout=60)
         cls.output = out.stdout + out.stderr
-        cls.results = {}
+        cls.results, cls.logs = {}, {}
         for line in cls.output.splitlines():
             if line.startswith("RESULT "):
                 name, *pairs = line.split()[1:]
                 cls.results[name] = dict(p.split("=", 1) for p in pairs)
+            elif line.startswith("LOGS "):
+                name, _, text = line[5:].partition(" ")
+                cls.logs[name] = text
 
     def result(self, name):
         self.assertIn(name, self.results, self.output)
         return self.results[name]
 
-    def test_cues_go_to_a_fresh_track_at_their_own_times(self):
-        r = self.result("occupied")
+    def test_clipinfo_places_cues_on_the_new_track_at_their_own_times(self):
+        r = self.result("clipinfo")
         self.assertEqual((r["ok"], r["landed"], r["created"]), ("true", "2", "true"))
-        self.assertEqual(r["starts"], "100,200,300")       # not after the old cues
+        self.assertEqual(r["starts"], "100,200,300")       # once, and not after the old cues
+        self.assertEqual(r["locks"], "--")
+        self.assertNotIn("locked", self.logs["clipinfo"])  # no later attempt ran
+
+    def test_locking_steers_a_plain_append_to_the_new_track(self):
+        r = self.result("locks")
+        self.assertEqual((r["landed"], r["created"], r["starts"]), ("2", "true", "100,200,300"))
         self.assertEqual(r["locks"], "--")                 # track 1 unlocked again
+
+    def test_a_refused_locked_append_falls_back_instead_of_stopping(self):
+        # What happened on 2026-11-14: the run must still import, as before.
+        r = self.result("refused")
+        self.assertEqual((r["ok"], r["landed"]), ("true", "1"))
+        self.assertEqual(r["locks"], "-")
+        self.assertIn("Resolve placed nothing with 1 other subtitle track(s) locked", self.logs["refused"])
+        self.assertIn("Placed the captions with a plain append", self.logs["refused"])
+        self.assertIn("WARNING: the new cues share a track", self.logs["refused"])
 
     def test_only_tracks_this_run_locked_are_unlocked(self):
         r = self.result("userlock")
@@ -135,11 +167,22 @@ class LuaImportTest(unittest.TestCase):
 
     def test_resolve_without_lock_methods_still_imports(self):
         r = self.result("nolocks")
-        self.assertEqual(r["ok"], "true")
-        self.assertEqual(r["landed"], "1")                 # the old behaviour, but no error
-        self.assertIn("WARNING: the new cues share a track", self.output)
+        self.assertEqual((r["ok"], r["landed"]), ("true", "1"))
 
-    def test_failed_append_restores_locks_and_drops_the_empty_track(self):
+    def test_whole_script_and_packaged_script_compile(self):
+        from scripts.package_lua import package
+        with tempfile.TemporaryDirectory() as tmp:
+            packaged = Path(tmp) / "Srutilekha.lua"
+            package(ROOT / "audio_to_srt.lua", packaged)
+            check = Path(tmp) / "compile.lua"
+            check.write_text("".join(
+                'local f, e = loadfile(%r) print(f and "COMPILED" or ("BROKEN " .. tostring(e)))\n'
+                % str(p).replace("\\", "/") for p in (ROOT / "audio_to_srt.lua", packaged)), encoding="utf-8")
+            out = subprocess.run([FUSCRIPT, "-l", "lua", str(check)], capture_output=True,
+                                 text=True, encoding="utf-8", errors="replace", timeout=60)
+        self.assertEqual((out.stdout + out.stderr).count("COMPILED"), 2, out.stdout + out.stderr)
+
+    def test_nothing_placed_reports_failure_and_drops_the_empty_track(self):
         r = self.result("failed")
         self.assertEqual(r["ok"], "false")
         self.assertEqual((r["locks"], r["tracks"]), ("-", "1"))

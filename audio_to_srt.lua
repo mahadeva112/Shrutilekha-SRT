@@ -306,6 +306,18 @@ local function wait_for_ack(timeout_s)
     end
 end
 
+-- Once the worker has finished, the app shows "Importing subtitles…" and waits
+-- for the result file, so a failure from then on must be reported there. An
+-- alert box instead left the app waiting ten minutes with the message hidden
+-- behind Resolve (2026-11-14). The "ERROR\n" prefix makes it a failed result.
+local function fail_after_done(msg)
+    log("Import failed: " .. (tostring(msg):gsub("\n", " | ")))
+    local rw = io.open(resultPath, "w")
+    if rw then rw:write("ERROR\n" .. msg); rw:close() end
+    wait_for_ack()
+    cleanup_run()
+end
+
 -- Minimal JSON escape for our case (track names, default settings).
 local function json_escape(s)
     return (tostring(s)
@@ -836,39 +848,69 @@ local function import_srt_to_new_track(mp, srt_file)
     -- cues on track 1 it appended the new ones to track 1, AFTER the old ones:
     -- on 2026-11-14 a 356-cue run landed 10205 frames (~7 min) late, past the
     -- end of the audio, and the stretch where they belonged showed old cues or
-    -- none. While the clip is appended, every other subtitle track is locked,
-    -- leaving the fresh one as the only place it can go; each lock is put back
-    -- straight after. Only tracks this run locked are unlocked, and every call
-    -- is guarded: a Resolve without these methods imports as it did before.
-    local relock = {}
-    if addedTrack then
-        for i = 1, beforeTracks do
-            local okGet, locked = pcall(function() return timeline:GetIsTrackLocked("subtitle", i) end)
-            if okGet and not locked
-                    and pcall(function() return timeline:SetTrackLock("subtitle", i, true) end) then
-                relock[#relock + 1] = i
-            end
+    -- none. So the clip is placed in up to three ways, each tried only when
+    -- Resolve placed nothing with the one before; the last is the old way:
+    --   1. AppendToTimeline with a clipInfo naming the new track and the
+    --      timeline start (Resolve's documented trackIndex/recordFrame keys);
+    --   2. a plain append with every other subtitle track locked, leaving the
+    --      new one as the only target (each lock this run set is undone);
+    --   3. a plain append.
+    -- A refused attempt must never end the run: on 2026-11-14 Resolve refused
+    -- the append with track 1 locked, and the app sat on "Importing subtitles…".
+    -- Success is judged by cues appearing on the timeline, not by the return
+    -- value, so no attempt can run after one that worked and duplicate them.
+    local function cue_total()
+        local n = 0
+        for i = 1, timeline:GetTrackCount("subtitle") do
+            n = n + #(timeline:GetItemListInTrack("subtitle", i) or {})
         end
-        if #relock > 0 then
-            log(string.format("Locked %d other subtitle track(s) for the import.", #relock))
-        end
+        return n
     end
-    local function unlock_others()
-        for _, i in ipairs(relock) do
-            pcall(function() return timeline:SetTrackLock("subtitle", i, false) end)
+    local function try(how, append)
+        local was = cue_total()
+        local ok, err = pcall(append)
+        if cue_total() > was then
+            log("Placed the captions " .. how .. ".")
+            return true
         end
-        relock = {}
+        log("Resolve placed nothing " .. how .. (ok and "" or (" (" .. tostring(err) .. ")")) .. ".")
+        return false
     end
 
     local imported = mp:ImportMedia({srt_file})
     if not imported or #imported == 0 then
-        unlock_others()
         if addedTrack then pcall(function() timeline:DeleteTrack("subtitle", addedTrack) end) end
         return false, nil, nil, false, "Resolve could not import the SRT file."
     end
-    local appended = mp:AppendToTimeline({imported[1]})
-    unlock_others()
-    if not appended then
+    local clip = imported[1]
+    local placed = false
+    if addedTrack then
+        placed = try("on the new track at the timeline start", function()
+            return mp:AppendToTimeline({{mediaPoolItem = clip, trackIndex = addedTrack,
+                                         recordFrame = tlStart}})
+        end)
+        if not placed then
+            local relock = {}
+            for i = 1, beforeTracks do
+                local okGet, locked = pcall(function() return timeline:GetIsTrackLocked("subtitle", i) end)
+                if okGet and not locked
+                        and pcall(function() return timeline:SetTrackLock("subtitle", i, true) end) then
+                    relock[#relock + 1] = i
+                end
+            end
+            if #relock > 0 then
+                placed = try(string.format("with %d other subtitle track(s) locked", #relock),
+                             function() return mp:AppendToTimeline({clip}) end)
+                for _, i in ipairs(relock) do
+                    pcall(function() return timeline:SetTrackLock("subtitle", i, false) end)
+                end
+            end
+        end
+    end
+    if not placed then
+        placed = try("with a plain append", function() return mp:AppendToTimeline({clip}) end)
+    end
+    if not placed then
         if addedTrack then pcall(function() timeline:DeleteTrack("subtitle", addedTrack) end) end
         return false, nil, nil, false, "Resolve could not append the SRT to the timeline."
     end
@@ -1008,7 +1050,7 @@ if action == "sync" then
 
     local check = io.open(srtOutPath)
     if not check then
-        alert_error("Srutilekha", "Sync produced no output. Check:\n" .. LOG_FILE .. ".transcribe")
+        fail_after_done("Sync produced no output. Check:\n" .. LOG_FILE .. ".transcribe")
         return
     end
     check:close()
@@ -1018,8 +1060,7 @@ if action == "sync" then
         import_srt_to_new_track(mp, srtOutPath)
     os.remove(srtOutPath)
     if not ok then
-        alert_error("Srutilekha", ierr or "Could not import the synced SRT.")
-        cleanup_run()
+        fail_after_done(ierr or "Could not import the synced SRT.")
         return
     end
     record_undo("subtitle", strack, created)
@@ -1138,9 +1179,8 @@ end
 
 local check = io.open(srtPath)
 if not check then
-    alert_error("Srutilekha", "Transcription produced no output.\n\nExpected: "
+    fail_after_done("Transcription produced no output.\n\nExpected: "
         .. srtPath .. "\nCheck:\n" .. LOG_FILE .. ".transcribe")
-    cleanup_run()
     return
 end
 check:close()
@@ -1392,8 +1432,7 @@ local scriptCounts, fontUsed = {}, {}
 local ok, strack, items, created, ierr = import_srt_to_new_track(mp, srtPath)
 os.remove(srtPath); os.remove(capPath)
 if not ok then
-    alert_error("Srutilekha", ierr or "Could not import the SRT file.")
-    cleanup_run()
+    fail_after_done(ierr or "Could not import the SRT file.")
     return
 end
 local subtitleTrack = strack
