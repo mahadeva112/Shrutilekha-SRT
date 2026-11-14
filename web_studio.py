@@ -243,6 +243,17 @@ class StudioApi(web_ui.BaseApi):
         job = getattr(self, "_job", None)
         return job.apply_review(segs) if job else {"ok": False, "message": "Nothing to apply."}
 
+    def regenerate(self, values):
+        """Back from review, then Regenerate: transcribe again, same track."""
+        job = getattr(self, "_job", None)
+        if job is None:
+            return {"ok": False, "message": "Nothing to regenerate."}
+        if self._ctx.get("frozen") and not self._has_key():
+            return {"ok": False, "needKey": True, "message": "Add your ElevenLabs API key to continue."}
+        import web_run
+        sel = web_run.build_selection("generate", values, self._prompt, self._ctx, timeline_res)
+        return job.regenerate(sel)
+
     def run_state(self):
         job = getattr(self, "_job", None)
         return job.snapshot() if job else None

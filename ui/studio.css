@@ -285,3 +285,5 @@ kbd { font: 600 10.5px "Segoe UI", sans-serif; padding: 2px 6px; margin: 0 3px 0
   .actionbar { padding: 9px 22px; } .go { height: 40px; }
 }
 @media (max-height: 740px) { .heading p { display: none; } }
+/* Back from review: the track, task and review switch belong to this run. */
+body.from-review [data-lock] { opacity: .42; filter: saturate(.4); }

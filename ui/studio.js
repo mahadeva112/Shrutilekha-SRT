@@ -85,7 +85,40 @@ function render() {
   });
   renderComfort();
   renderSummary();
+  renderBack();
   Dropdown.syncAll();
+}
+
+/* ── back from review ────────────────────────────────────── */
+/* Back from the review keeps the transcript. Timing values re-cut it locally
+   on Continue; the settings the worker itself reads need a fresh transcription
+   (Regenerate). Resolve read the track once, so the track, the task and the
+   review switch stay as they were for this run. */
+const TRANSCRIBE_KEYS = ["lang", "punct", "diarize", "ref_script"];
+const SPLIT_KEYS = ["max_chars", "max_lines", "max_secs", "cps", "min_secs", "words_per"];
+const pick = (keys) => Object.fromEntries(keys.map((k) => [k, String(V[k] ?? "").trim()]));
+const Back = {
+  active: false, ran: {}, split: {},
+  changed() { return TRANSCRIBE_KEYS.some((k) => String(V[k] ?? "").trim() !== this.ran[k]); },
+};
+
+function renderBack() {
+  document.body.classList.toggle("from-review", Back.active);
+  document.querySelectorAll("[data-lock]").forEach((el) => el.inert = Back.active);
+  $("undoBtn").hidden = Back.active;
+  $("altBtn").hidden = !Back.active;
+  $("pageTitle").textContent = Back.active ? "Settings" : "Caption studio";
+  if (!Back.active) return;
+  const changed = Back.changed();
+  $("pageLead").textContent = changed
+    ? "Language, punctuation, speakers or script changed. Regenerate to transcribe again."
+    : "Your transcript is kept. Change the timing and continue, or regenerate it. The track stays the same for this run.";
+  $("goText").textContent = changed ? "Regenerate captions" : "Continue to review";
+  $("altBtn").innerHTML = changed ? UI.icon("undo") + "Keep transcript" : UI.icon("refresh") + "Regenerate";
+  $("altBtn").title = changed
+    ? "Undo the language, punctuation, speaker and script changes and go back to the same transcript"
+    : "Transcribe the audio again with these settings (a new API call)";
+  $("summary").textContent = changed ? "Regenerating uses your API credits again" : "Timing changes re-cut the same transcript · no API call";
 }
 
 function renderComfort() {
@@ -278,25 +311,38 @@ function wirePresets() {
 }
 
 /* ── submit ──────────────────────────────────────────────── */
+const actionButtons = () => [$("goBtn"), $("undoBtn"), $("cancelBtn"), $("altBtn")];
+function releaseActions() {
+  actionButtons().forEach((b) => b.disabled = false);
+  $("goBtn").classList.remove("working");
+}
+
 async function submit(action) {
-  const buttons = [$("goBtn"), $("undoBtn"), $("cancelBtn")];
-  buttons.forEach((b) => b.disabled = true);
+  if (action === "continue") { Review.resume(); return; }
+  actionButtons().forEach((b) => b.disabled = true);
   const go = action !== "undo";
   if (go) { $("goBtn").classList.add("working"); $("goText").textContent = "Starting…"; }
-  const r = await api.submit(action, { ...V });
-  if (r.ok && r.running) { Run.enter(); return; }
+  const r = action === "regenerate" ? await api.regenerate({ ...V }) : await api.submit(action, { ...V });
+  if (r.ok && (r.running || action === "regenerate")) { Back.active = false; renderBack(); Run.enter(); return; }
   if (r.ok) return;                                   // window is closing
-  buttons.forEach((b) => b.disabled = false);
-  $("goBtn").classList.remove("working");
+  releaseActions();
   render();
   if (r.needKey) { pending = action; UI.openModal("keyModal"); }
   UI.toast(r.message, r.needKey ? "" : "err");
 }
-const primaryAction = () => (V.task === "Sync Existing" ? "sync" : "generate");
+function primaryAction() {
+  if (Back.active) return Back.changed() ? "regenerate" : "continue";
+  return V.task === "Sync Existing" ? "sync" : "generate";
+}
 
 function wireActions() {
   $("goBtn").onclick = () => submit(primaryAction());
   $("undoBtn").onclick = () => submit("undo");
+  $("altBtn").onclick = () => {
+    if (!Back.changed()) { submit("regenerate"); return; }
+    Object.assign(V, Back.ran);                       // Keep transcript: drop those changes
+    submit("continue");
+  };
   $("cancelBtn").onclick = () => api.cancel();
   $("close").onclick = () => (Run.phase === "done" ? api.close_done() : api.cancel());
   $("runCancel").onclick = () => { $("runCancel").disabled = true; api.cancel(); };
@@ -305,7 +351,7 @@ function wireActions() {
   document.addEventListener("keydown", (e) => {
     if (UI.modalOpen() || e.defaultPrevented) return;
     if (Run.phase === "done") { if (e.key === "Enter" || e.key === "Escape") api.close_done(); return; }
-    if (Run.phase) return;                            // no shortcuts while a job runs
+    if (Run.phase && !Back.active) return;            // no shortcuts while a job runs
     const tag = document.activeElement?.tagName;
     if (e.key === "Escape") api.cancel();
     else if (e.key === "Enter" && tag !== "SELECT" && tag !== "BUTTON" && tag !== "TEXTAREA") submit(primaryAction());
@@ -326,6 +372,7 @@ const Run = {
 
   enter() {
     this.phase = "progress";
+    this.shown = this.target = 0;                     // a Regenerate starts the ring again
     $("formView").hidden = true;
     $("runView").hidden = false;
     $("runView").classList.add("entering");

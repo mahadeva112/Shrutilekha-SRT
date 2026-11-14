@@ -76,6 +76,33 @@ def build_selection(action, values, prompt, ctx, timeline_res):
     return sel
 
 
+# Lines of the generate args file audio_to_srt.lua writes, and the selection
+# key each one comes from. transcribe.py reads them in this order.
+ARG_LINES = (("max_chars", 2), ("max_lines", 3), ("max_secs", 4), ("punct", 6),
+             ("lang_code", 7), ("diarize", 8), ("cps", 9), ("min_secs", 10),
+             ("words_per", 11), ("ref_script", 12))
+
+
+def write_args(path, sel):
+    """Put a new selection's worker settings into an existing args file.
+
+    Audio path, SRT path and clip ranges (lines 0, 1, 5) are Resolve's and are
+    kept. Written atomically, like the selection file."""
+    with open(path, encoding="utf-8") as f:
+        lines = [ln.rstrip("\r\n") for ln in f]
+    if not lines or lines[0] == "SYNC" or len(lines) < 2:
+        raise OSError("not a generate args file")
+    lines += [""] * (13 - len(lines))
+    chars, nlines, secs = (sel["settings"].split(",") + ["", "", ""])[:3]
+    values = dict(sel, max_chars=chars, max_lines=nlines, max_secs=secs)
+    for key, i in ARG_LINES:
+        lines[i] = _s(values.get(key))
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, path)
+
+
 class RunController:
     def __init__(self, paths, on_close):
         # paths: selection, args, done, log, result, ack, python, script
@@ -193,6 +220,38 @@ class RunController:
                   msg="Placing captions on the timeline…")
         threading.Thread(target=self._finish, args=(0,), daemon=True).start()
         return {"ok": True}
+
+    def regenerate(self, sel):
+        """Transcribe again from the review step with new settings.
+
+        Resolve read the selection once and is now only waiting for `done`, so
+        nothing on its side has to change: the worker is re-run here with the
+        args file rewritten. Only settings the worker reads can change this way
+        (language, punctuation, speakers, reference script, split values); the
+        track and its clip ranges stay as Resolve wrote them.
+        """
+        if self.review is None or self.state.get("phase") != "review":
+            return {"ok": False, "message": "Nothing to regenerate."}
+        try:
+            write_args(self.paths["args"], sel)
+        except OSError as exc:
+            return {"ok": False, "message": "Cannot update the worker settings: %s" % exc}
+        self.review = None
+        self.started = time.time()
+        self._set(phase="progress", pct=0, msg="Preparing…", title="Transcribing audio",
+                  stages=[list(s) for s in GEN_STAGES], detail="")
+        threading.Thread(target=self._rerun, daemon=True).start()
+        return {"ok": True}
+
+    def _rerun(self):
+        code = self._run_worker()
+        if self.cancelled or code is None:
+            return
+        self.exit_code = code
+        if code == 0 and self._review_available():
+            self._begin_review()
+            return
+        self._finish(code)
 
     def _run_worker(self):
         try:

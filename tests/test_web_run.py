@@ -119,6 +119,45 @@ class RunControllerTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "done"))
         self.assertEqual(Path(self.paths["done"]).read_text(), "0")
 
+    REGEN_SEL = {"settings": "20,2,3.5", "punct": 1, "lang_code": "bn", "diarize": 1, "cps": "18",
+                 "min_secs": "0.6", "words_per": "4", "ref_script": "C:/script ’s.docx"}
+
+    def test_write_args_keeps_resolves_lines_and_replaces_the_settings(self):
+        args = Path(self.paths["args"])
+        args.write_text("C:/a.wav\nC:/o.srt\n15\n1\n2\nC:/r.txt\n0\nauto\n0\n25\n0.4\n0\n\n", encoding="utf-8")
+        web_run.write_args(str(args), self.REGEN_SEL)
+        self.assertEqual(args.read_text(encoding="utf-8").split("\n"),
+                         ["C:/a.wav", "C:/o.srt", "20", "2", "3.5", "C:/r.txt", "1", "bn", "1", "18",
+                          "0.6", "4", "C:/script ’s.docx", ""])
+        args.write_text("SYNC\nC:/a.wav\n", encoding="utf-8")
+        with self.assertRaises(OSError):
+            web_run.write_args(str(args), self.REGEN_SEL)
+
+    def test_regenerate_from_review_transcribes_again_while_resolve_waits(self):
+        # The fake worker puts the language it was given into the transcript.
+        self.worker("import sys\nlines = open(sys.argv[2], encoding='utf-8').read().split('\\n')\n"
+                    "lang = lines[7] if len(lines) > 7 and lines[7] else 'first'\n"
+                    "open(lines[1] + '.cap', 'w', encoding='utf-8').write("
+                    "'SPK 1 #ffffff A\\nSEG 0.000 1.000 1\\nWRD 0.000 1.000 %s\\n' % lang)\n"
+                    "open(lines[1], 'w', encoding='utf-8').write('1\\n')\n"
+                    "print('PROGRESS|100|done', flush=True)\n")
+        self.resolve(srt=self.dir / "out.srt")
+        job = self.job()
+        job.start({"action": "generate"}, review_wanted=True)
+        self.assertFalse(job.regenerate(self.REGEN_SEL)["ok"])          # not reviewing yet
+        self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "review"))
+        self.assertEqual([s["text"] for s in job.review["segs"]], ["first"])
+        self.assertTrue(job.regenerate(self.REGEN_SEL)["ok"])
+        self.assertEqual(job.snapshot()["phase"], "progress")
+        self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "review"))
+        self.assertEqual([s["text"] for s in job.review["segs"]], ["bn"])
+        self.assertEqual(Path(self.paths["args"]).read_text(encoding="utf-8").split("\n")[:3],
+                         ["ARGS", str(self.dir / "out.srt"), "20"])
+        self.assertFalse(os.path.exists(self.paths["done"]))           # Resolve still waits
+        self.assertTrue(job.apply_review(job.review["segs"])["ok"])
+        self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "done"))
+        self.assertEqual(Path(self.paths["done"]).read_text(), "0")
+
     def test_cancel_stops_the_worker(self):
         self.worker("import time\nprint('PROGRESS|40|uploading', flush=True)\ntime.sleep(60)\n")
         self.resolve(result=None)
