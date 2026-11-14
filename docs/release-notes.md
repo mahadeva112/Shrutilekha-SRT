@@ -1,3 +1,11 @@
+v2.0.3: captions open sooner after a script click.
+
+- The tray helper looked for a click once a second, and scanned every running process (about 0.2 s) each time. It now reads the bridge's small launch marker every 0.1 s and scans processes only when a click is new. The large Fusion.prefs, which only an older bridge uses, is read every 2 seconds.
+- A script click no longer makes the tray check the bridge before starting the caption workflow, which connects to it anyway.
+- The caption window no longer loads the update checker's network code (urllib and the Windows certificate store) at startup; it loads on the first update check. The API key connection check sets up the Windows certificate store itself.
+- Live in Resolve 21.2.0.6 with v2.0.2: 100% to Done took 1 s (27 s in v2.0.1), and 50 cues were moved to their own new track with the first caption on its frame.
+- 104 tests pass.
+
 v2.0.2: faster bridge, captions on their own track in Resolve 21.2.
 
 - The wait after transcription reached 100% is gone. Every Resolve call through the bridge waited up to 100 ms in Resolve and 40 ms in the app; a 44-cue run made hundreds of them and sat at 100% for 27 seconds (8 more before transcription, reading 13 clips). The bridge now checks every 5 ms while the app is working (back to 100 ms when idle), names, start and end frames of a whole track come back in one call, and once Resolve refuses a full batch of style writes the rest are not sent. Measured per call: 109 ms before, 16 ms now.

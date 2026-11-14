@@ -371,6 +371,8 @@ class ApiSettingsPanel(tk.Frame):
         events = self._events
         def work():
             try:
+                from app_runtime import ensure_trust
+                ensure_trust()
                 from elevenlabs.client import ElevenLabs
                 ElevenLabs(api_key=key, timeout=15).user.get()
                 result = "Connection successful. Transcription uses your account credits."

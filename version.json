@@ -1,9 +1,9 @@
 {
-  "version": "2.0.2",
+  "version": "2.0.3",
   "notes": [
+    "Captions open sooner after Workspace > Scripts > Srutilekha: the tray helper notices the click within 0.1 s.",
     "Much faster with the Resolve bridge: no long wait after transcription reaches 100%.",
-    "On Resolve 21.2 new captions are moved onto their own new subtitle track, at the right time.",
-    "Resolve 21.2 does not let scripts style subtitle cues; set the look under Inspector > Track > Track Style."
+    "On Resolve 21.2 new captions are moved onto their own new subtitle track, at the right time."
   ],
   "mandatory": false,
   "min_version": ""

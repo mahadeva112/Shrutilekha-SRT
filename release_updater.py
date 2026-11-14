@@ -7,13 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
-from app_runtime import resources, user_dir
-try:
-    import truststore
-    truststore.inject_into_ssl()
-except ImportError:
-    pass
+from app_runtime import ensure_trust, resources, user_dir
 
 OWNER = "mahadeva112"
 REPO = "Shrutilekha-SRT"
@@ -32,6 +26,11 @@ def version(value):
 
 
 def _request(url, timeout=15):
+    # urllib.request and the Windows certificate store are loaded on the first
+    # request, not at import: the caption window imports this module and opened
+    # ~0.15 s later for it.
+    from urllib.request import Request, urlopen
+    ensure_trust()
     return urlopen(Request(url, headers={"User-Agent": "Srutilekha/" + VERSION,
                                         "Accept": "application/vnd.github+json"}), timeout=timeout)
 

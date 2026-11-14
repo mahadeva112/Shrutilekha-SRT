@@ -89,3 +89,31 @@ class TrayTests(unittest.TestCase):
         icon.stop.assert_called_once()
         controller.child.terminate.assert_not_called()
         controller.child.kill.assert_not_called()
+
+    def test_fast_ticks_scan_processes_only_for_a_new_click(self):
+        controller = tray.TrayController()
+        with patch.object(controller, 'active_caption', return_value=False), \
+             patch('tray_helper.launch_signal', return_value=('click-a', 101)) as signal, \
+             patch('tray_helper.resolve_identity', return_value=(1, 100)) as identity, \
+             patch('tray_helper.probe_connection') as probe, patch('tray_helper.launch') as launch:
+            launch.return_value.poll.return_value = None
+            for _ in range(20):
+                controller.tick()
+            self.assertEqual(identity.call_count, 1)        # one ~0.2 s scan, not one per tick
+            launch.assert_called_once_with('--bridge-run')
+            probe.assert_not_called()                       # the click proved the bridge is up
+            signal.return_value = ('stale', 50)
+            for _ in range(20):
+                controller.tick()
+            self.assertEqual(identity.call_count, 2)        # a stale marker is checked once
+            self.assertEqual(launch.call_count, 1)
+
+    def test_launch_marker_is_read_without_prefs_between_slow_ticks(self):
+        folder = Path(self.temp.name) / 'resolve-bridge'
+        folder.mkdir()
+        (folder / 'launch.txt').write_text('abc123 1794651447\nEND\n', encoding='ascii')
+        self.assertEqual(tray.launch_signal(False), ('abc123', 1794651447))
+        (folder / 'launch.txt').unlink()
+        with patch('tray_helper.Path') as path:
+            self.assertIsNone(tray.launch_signal(False))
+            path.assert_not_called()                        # Fusion.prefs untouched

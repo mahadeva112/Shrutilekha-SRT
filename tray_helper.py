@@ -77,7 +77,7 @@ def resolve_identity():
     return None
 
 
-def launch_signal():
+def launch_signal(prefs_fallback=True):
     # Constructing a client is unnecessary during idle monitoring.
     # Resolve 21.2 flushes prefs to disk only every ~30 s, so the bridge also
     # writes launch.txt through Fusion FileIO; prefer it when present.
@@ -86,6 +86,8 @@ def launch_signal():
     match = re.fullmatch(r'([A-Za-z0-9]+) (\d+)', body or '')
     if match:
         return match.group(1), int(match.group(2))
+    if not prefs_fallback:
+        return None
     prefs = Path(os.environ['APPDATA']) / 'Blackmagic Design/DaVinci Resolve/Support/Fusion/Profiles/Default/Fusion.prefs'
     try:
         content = prefs.read_text(encoding='utf-8', errors='replace')
@@ -99,6 +101,8 @@ def launch_signal():
 class TrayController:
     def __init__(self):
         self.seen = None
+        self.ignored = None
+        self.failed, self.failed_at = None, 0.0
         self.resolve = None
         self.child = None
         self.home = None
@@ -118,6 +122,11 @@ class TrayController:
                 return True
             if self.child and self.child.poll() is None:
                 return True
+            if automatic:
+                # A script click just announced a live bridge; --bridge-run
+                # connects itself, so a separate probe only added a round trip.
+                self.child = launch('--bridge-run')
+                return True
             try:
                 info = probe_connection()
             except (BridgeError, OSError):
@@ -129,19 +138,24 @@ class TrayController:
             self.child = launch('--bridge-run')
             return True
 
-    def tick(self):
-        identity = resolve_identity()
-        if identity != self.resolve:
-            self.resolve, self.seen = identity, None
-        if not identity:
+    def tick(self, prefs_fallback=True):
+        """Runs every 0.1 s, so the cheap launch marker is read first and the
+        ~0.2 s process scan only happens when a click is new."""
+        packet = launch_signal(prefs_fallback)
+        if not packet or packet[0] in (self.seen, self.ignored):
             return
-        packet = launch_signal()
-        if not packet or packet[1] < identity[1] - 2:
-            return  # Ignore persisted markers from an earlier Resolve process.
-        signal = packet[0]
-        if signal != self.seen:
-            if self.open(automatic=True):
-                self.seen = signal
+        if packet[0] == self.failed and time.monotonic() - self.failed_at < 2:
+            return
+        identity = resolve_identity()
+        if not identity or packet[1] < identity[1] - 2:
+            # Resolve is closed, or the marker is from an earlier Resolve
+            # process; a later click writes a new marker.
+            self.ignored = packet[0]
+            return
+        if self.open(automatic=True):
+            self.seen = packet[0]
+        else:
+            self.failed, self.failed_at = packet[0], time.monotonic()
 
 
 def make_icon(controller, stop):
@@ -172,7 +186,9 @@ def run():
             def monitor():
                 folder = user_dir() / 'tray-commands'
                 folder.mkdir(exist_ok=True)
+                ticks = 0
                 while not stop.is_set():
+                    ticks += 1
                     for path in folder.glob('*.json'):
                         try:
                             command = json.loads(path.read_text(encoding='utf-8'))
@@ -186,11 +202,13 @@ def run():
                         except (OSError, ValueError, KeyError):
                             pass
                     try:
-                        controller.tick()
+                        # launch.txt every 0.1 s; the large Fusion.prefs that an
+                        # older bridge writes to only every 2 s.
+                        controller.tick(prefs_fallback=ticks % 20 == 0)
                     except Exception:
                         # A closing Resolve or transient prefs write is retried later.
                         pass
-                    stop.wait(1)
+                    stop.wait(.1)
             def ready(icon):
                 icon.visible = True
                 threading.Thread(target=monitor, daemon=True).start()

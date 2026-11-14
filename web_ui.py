@@ -54,6 +54,8 @@ class BaseApi:
         if not key:
             return {"ok": False, "message": "Paste your API key first."}
         try:
+            from app_runtime import ensure_trust
+            ensure_trust()
             from elevenlabs.client import ElevenLabs
             ElevenLabs(api_key=key, timeout=15).user.get()
             return {"ok": True, "message": "Connection successful. Transcription uses your account credits."}
