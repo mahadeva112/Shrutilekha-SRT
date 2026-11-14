@@ -1,3 +1,19 @@
+v2.0.1–v2.0.3 (2026-11-14), live on Resolve 21.2.0.6 Free (upgraded from
+21.0.4.5). Diagnostic scripts run from the Workspace menu showed that 21.2 Lua
+has no `io`, `loadfile`, `dofile` or `SavePrefs`, flushes `SetPrefs` to disk
+about 30 s later, and still allows `fusion:OpenFile` with `ReadLine` and
+`WriteLine`. With the rebuilt bridge, the user's click connected in 0.18 s and
+read the project, timeline, tracks and clips. Paid transcriptions through the
+bridge imported 45, 44 and 50 cues. 21.2 ignored `trackIndex` and appended to
+track 1 after the existing cues; from v2.0.2 the cues are moved to the new
+track with `MoveItems` (delta 0, verified twice). Every subtitle style write
+was refused through `SetProperties` and `SetProperty`. Timings: 100% to Done
+27 s in v2.0.1 and 1 s in v2.0.2; click to caption window launched 2–3 s in
+v2.0.1 and under 1 s in v2.0.3. Misplaced test cues on one project were
+removed with the user's approval. 104 tests pass; installers built locally
+pass `--self-test`. Not covered: Resolve 21.1 with the new bridge, and a clean
+physical PC.
+
 v1.3.9 preview: all 52 automated regression tests passed. Includes all prior
 Studio, Resolve bridge, tray and caption review/split/Apply changes plus the
 redesigned API connection page. API layout checks cover 620 × 550,

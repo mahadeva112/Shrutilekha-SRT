@@ -1,9 +1,9 @@
 # Srutilekha
 
-Windows standalone installer: [download Srutilekha-Setup-2.0.0.exe](https://github.com/mahadeva112/Shrutilekha-SRT/releases/download/v2.0.0/Srutilekha-Setup-2.0.0.exe) ([v2.0.0 release notes](https://github.com/mahadeva112/Shrutilekha-SRT/releases/tag/v2.0.0), [latest release](https://github.com/mahadeva112/Shrutilekha-SRT/releases/latest)), or see [build, API settings and release instructions](docs/windows-release.md).
+Windows standalone installer: [download Srutilekha-Setup-2.0.3.exe](https://github.com/mahadeva112/Shrutilekha-SRT/releases/download/v2.0.3/Srutilekha-Setup-2.0.3.exe) ([v2.0.3 release notes](https://github.com/mahadeva112/Shrutilekha-SRT/releases/tag/v2.0.3), [latest release](https://github.com/mahadeva112/Shrutilekha-SRT/releases/latest)), or see [build, API settings and release instructions](docs/windows-release.md).
 The installer bundles Python, adds the Resolve launcher and stores each user's own API key encrypted.
 Resolve 21.0 and earlier use the legacy Lua launcher. Resolve 21.1 and 21.2, Free or Studio, require the installer's [Lua bridge and tray helper](docs/resolve-bridge.md). The helper starts with Windows; clicking Workspace > Scripts > Srutilekha opens captions. Python menu scripting on 21.1+ requires Studio.
-Lua launching and SRT import were verified in Resolve 21.0.4.5. See [validation scope](docs/validation.md) for remaining checks. Public stable releases appear through the app's update checker. Use Check for updates, then Install update.
+Lua launching and SRT import were verified in Resolve 21.0.4.5. The Lua bridge, transcription and caption import onto a new subtitle track were verified in Resolve 21.2.0.6 Free. See [validation scope](docs/validation.md) for remaining checks. Public stable releases appear through the app's update checker. Use Check for updates, then Install update.
 
 Transcribe a DaVinci Resolve timeline and import the result back as a styled
 SRT subtitle track. Built for Indic-language footage: the output is pinned to a
@@ -86,7 +86,7 @@ falls back to exporting the Windows certificate store to a PEM for pip.
 Launch from Resolve: **Workspace → Scripts → Srutilekha**.
 
 > **Note**
-> Resolve 21.1 Free needs the EXE installer and [Lua bridge](docs/resolve-bridge.md).
+> Resolve 21.1 and 21.2 Free need the EXE installer and [Lua bridge](docs/resolve-bridge.md).
 > The legacy `setup.bat` installs Python scripting, which requires Studio on 21.1+.
 > The legacy Lua launcher remains available for Resolve 21.0 and earlier.
 
@@ -249,7 +249,7 @@ third-party package — just a data file loaded lazily on the first Latin word.
   Scripts folder (`Srutilekha.py`), not the repository file. Re-run `setup.bat`
   after editing that file. All other Python files are read live.
 - **A run fails silently inside Resolve.** Check `logs/audio_to_srt.log` first.
-- **The menu entry is missing on Resolve 21.1 Free.** Run the installer and choose
+- **The menu entry is missing on Resolve 21.1 or 21.2 Free.** Run the installer and choose
   the Free/Studio Lua bridge option and restart Resolve when your work is saved.
   With the tray helper running, click the script to open captions.
 
