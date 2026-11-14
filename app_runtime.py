@@ -31,3 +31,20 @@ def prepare_environment():
     binary_dir = resources() / "bin"
     if binary_dir.is_dir():
         os.environ["PATH"] = str(binary_dir) + os.pathsep + os.environ.get("PATH", "")
+
+
+_trust_ready = False
+
+
+def ensure_trust():
+    """Use the Windows certificate store for HTTPS (networks that inspect
+    HTTPS re-sign it). Done before the first request rather than at import,
+    so windows that never go online do not pay for it."""
+    global _trust_ready
+    if not _trust_ready:
+        try:
+            import truststore
+            truststore.inject_into_ssl()
+        except ImportError:
+            pass
+        _trust_ready = True

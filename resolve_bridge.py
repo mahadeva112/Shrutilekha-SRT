@@ -16,6 +16,36 @@ class BridgeError(RuntimeError):
     pass
 
 
+STRING_PIECE = 200
+
+
+def request_source(payload):
+    """Lua source for a request, one table element per line."""
+    return 'return ' + lua_value(payload).replace(',', ',\n') + '\n'
+
+
+def read_response_file(path):
+    """Base64 body written by the bridge with FileIO, or None until it ends with END."""
+    try:
+        lines = path.read_text(encoding='ascii', errors='replace').splitlines()
+    except OSError:
+        return None
+    lines = [line.strip() for line in lines if line.strip()]
+    if not lines or lines[-1] != 'END':
+        return None
+    return ''.join(lines[:-1])
+
+
+def remove_quietly(path, attempts=5):
+    for _ in range(attempts):
+        try:
+            path.unlink(missing_ok=True)
+            return True
+        except OSError:
+            time.sleep(.02)  # Resolve may still be closing the file.
+    return False
+
+
 LIST_RESULTS = frozenset({'GetItemListInTrack', 'GetClipList', 'GetSubFolderList',
                           'ImportMedia', 'AppendToTimeline', 'GetProjectListInCurrentFolder'})
 
@@ -79,7 +109,13 @@ def lua_value(value):
             raise ValueError('Non-finite bridge number')
         return repr(value)
     if isinstance(value, str):
-        return '"' + ''.join('\\%03d' % b for b in value.encode('utf-8')) + '"'
+        # Byte escapes never contain ',' or a newline, so a long string is split
+        # into concatenated pieces; this keeps every request line short for
+        # Resolve 21.2's FileIO ReadLine.
+        data = value.encode('utf-8')
+        pieces = ['"' + ''.join('\\%03d' % b for b in data[i:i+STRING_PIECE]) + '"'
+                  for i in range(0, len(data), STRING_PIECE)] or ['""']
+        return '..\n'.join(pieces)
     if isinstance(value, (list, tuple)):
         return '{' + ','.join(lua_value(v) for v in value) + '}'
     if isinstance(value, dict):
@@ -109,6 +145,7 @@ class BridgeClient:
         self.pending = None
         self.cache = {}
         self.rejected_style_properties = 0
+        self.styles_refused = False
 
     def _decode(self, value):
         if isinstance(value, dict):
@@ -126,41 +163,64 @@ class BridgeClient:
             if self.session:
                 payload['session'] = self.session
             request_path = self.directory / 'request.lua'
+            response_path = self.directory / ('response-'+request_id+'.txt')
             scratch = self.directory / ('request-'+request_id+'.tmp')
-            scratch.write_text('return '+lua_value(payload)+'\n', encoding='utf-8')
-            os.replace(scratch, request_path)
+            scratch.write_text(request_source(payload), encoding='utf-8')
             deadline = time.monotonic()+self.timeout
+            while True:
+                try:
+                    os.replace(scratch, request_path)
+                    break
+                except PermissionError:
+                    # Resolve 21.2 reads the request with FileIO and may hold it open briefly.
+                    if time.monotonic() >= deadline:
+                        scratch.unlink(missing_ok=True)
+                        raise BridgeError('Resolve is holding the bridge request file. Try Connect again.')
+                    time.sleep(.02)
             try:
+                prefs_checked = 0.0
                 while time.monotonic() < deadline:
-                    try:
-                        content = self.prefs.read_text(encoding='utf-8', errors='replace')
-                    except OSError:
-                        content = ''
-                    match = re.search(r'SrutilekhaBridgeResponse\s*=\s*"'+request_id+r':([A-Za-z0-9+/=]+)"',content)
-                    if match:
-                        response = json.loads(base64.b64decode(match.group(1), validate=True))
+                    body = read_response_file(response_path)
+                    # The prefs file is only a fallback and can be hundreds of
+                    # KB; read it a few times a second, not on every poll.
+                    if body is None and time.monotonic() - prefs_checked >= .1:
+                        prefs_checked = time.monotonic()
+                        try:
+                            content = self.prefs.read_text(encoding='utf-8', errors='replace')
+                        except OSError:
+                            content = ''
+                        match = re.search(r'SrutilekhaBridgeResponse\s*=\s*"'+request_id+r':([A-Za-z0-9+/=]+)"',content)
+                        body = match.group(1) if match else None
+                    if body is not None:
+                        response = json.loads(base64.b64decode(body, validate=True))
                         if not response.get('ok'):
                             raise BridgeError(response.get('error','Resolve bridge request failed'))
                         return self._decode(response.get('value'))
-                    time.sleep(.04)
+                    time.sleep(.004)
                 raise BridgeError('Resolve bridge is not responding. In Resolve, open Workspace > Scripts > Srutilekha, then try Connect again.')
             finally:
+                remove_quietly(response_path)
                 # Do not leave a timed-out mutation to run after the user retries.
                 try:
                     content = request_path.read_text(encoding='utf-8')
                     if request_id in content or lua_value(request_id) in content:
-                        request_path.unlink(missing_ok=True)
+                        remove_quietly(request_path)
                 except OSError:
                     pass
 
     def connect(self):
         self.session = None
+        for stale in self.directory.glob('response-*.txt'):
+            remove_quietly(stale, attempts=1)
         info = self.request({'op':'hello'})
         self.session = info['session']
         return info, RemoteObject(self, info['resolve'])
 
     def call(self, ref, method, args):
         if self.pending is not None and method == 'SetProperty':
+            if self.styles_refused:
+                self.rejected_style_properties += 1
+                return False
             self.pending.append({'ref':ref,'method':method,'args':args,'argc':len(args)})
             if len(self.pending) >= 100:
                 self.flush()
@@ -169,14 +229,45 @@ class BridgeClient:
             self.flush()
         if not args and (ref, method) in self.cache:
             return self.cache[ref, method]
+        if not method.startswith('Get'):
+            # Anything that is not a getter may change the timeline.
+            self.cache.clear()
         result = self.request({'op':'call','ref':ref,'method':method,'args':args,'argc':len(args)})
-        return normalize_list_result(result) if method in LIST_RESULTS else result
+        if method in LIST_RESULTS:
+            result = normalize_list_result(result)
+        if method == 'GetItemListInTrack' and result:
+            self.prefetch(result)
+        return result
+
+    def prefetch(self, items):
+        """Name, start and end of every item in one round trip instead of one
+        call each: an import reads them for every cue, several times over."""
+        refs = [item.ref for item in items if isinstance(item, RemoteObject)]
+        if not refs:
+            return
+        try:
+            values = self.request({'op':'caption_info','refs':refs})
+        except BridgeError:
+            return
+        for ref, value in zip(refs, values if isinstance(values, list) else []):
+            if isinstance(value, dict):
+                for key, method in (('name','GetName'), ('start','GetStart'), ('end','GetEnd')):
+                    if key in value:
+                        self.cache[ref, method] = value[key]
 
     def flush(self):
         if self.pending:
             calls, self.pending = self.pending, []
+            if self.styles_refused:
+                self.rejected_style_properties += len(calls)
+                return
             results = self.request({'op':'batch','calls':calls})
-            self.rejected_style_properties += sum(value is False for value in results)
+            rejected = sum(value is False for value in results)
+            self.rejected_style_properties += rejected
+            # Resolve 21.2 refuses every subtitle style key. Once a whole batch
+            # comes back refused, stop sending the rest of them.
+            if len(results) >= 10 and rejected == len(results):
+                self.styles_refused = True
 
     def style_items(self, function, items, *args, **kwargs):
         values = self.request({'op':'caption_info','refs':[item.ref for item in items]})

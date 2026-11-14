@@ -13,7 +13,15 @@ Right-click the tray icon for Open captions, API settings, Updates, Start with W
 
 Do not switch projects during a caption operation. The bridge stays available until Resolve closes; subsequent script clicks reuse a responsive bridge. Concurrent desktop workflows are blocked. Caption operations time out without automatic retries; inspect Resolve before repeating an import after a timeout. The helper only sends a read-only connection probe when a fresh script launch marker appears; it makes no idle Resolve API calls.
 
-The bridge uses a per-user request file and Resolve-managed Fusion preferences for responses. Connecting requires no Python installation, external scripting server or paid API call. Existing encrypted API keys and presets retain their original storage.
+The bridge uses a per-user request file and per-request response files in `%LOCALAPPDATA%\Srutilekha\resolve-bridge`; on 21.1 it also writes responses to Resolve-managed Fusion preferences.
+
+## Resolve 21.2
+
+Resolve 21.2 (checked on 21.2.0.6 Free) tightened script Lua: `io`, `loadfile`, `dofile` and `fusion:SavePrefs` are gone, and `SetPrefs` values reach `Fusion.prefs` on disk only about 30 seconds later. The bridge therefore reads `request.lua` with `fusion:OpenFile(path, 1)` and `ReadLine`, compiles it with `loadstring` without access to any globals, and writes each reply to `response-<id>.txt` with `WriteLine` and a closing `END` line. A click also writes `launch.txt`, which the tray helper reads instead of waiting for the prefs file.
+
+The bridge checks for requests every 5 ms while the app is working and every 100 ms after five idle seconds. `GetItemListInTrack` results are followed by one `caption_info` call that returns every item's name, start and end; the app caches those until its next call that is not a getter.
+
+21.2 renamed the track getters to `GetIsTrackLocked` and `GetIsTrackEnabled` (`SetTrackLock` is unchanged). It also ignores `trackIndex` when appending an SRT, so the app moves the new cues onto its new track with `Timeline.MoveItems`. Subtitle cues return an empty `GetProperties()` and refuse every style key through both `SetProperties` and `SetProperty`, so caption font, size, outline and position must be set in Resolve under Inspector > Track > Track Style. Connecting requires no Python installation, external scripting server or paid API call. Existing encrypted API keys and presets retain their original storage.
 
 Resolve 21.1 uses SetProperties/GetProperties and GetSpeed; the bridge adapts the old calls. Rejected caption styling properties are reported. Review caption styling in Resolve after import.
 
