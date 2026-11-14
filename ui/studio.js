@@ -34,7 +34,7 @@ function moveThumb(seg) {
   const thumb = seg.querySelector(".seg-thumb");
   if (!active || !thumb) return;
   thumb.style.width = active.offsetWidth + "px";
-  thumb.style.transform = `translateX(${active.offsetLeft - 4}px)`;
+  thumb.style.transform = `translateX(${active.offsetLeft - thumb.offsetLeft}px)`;
 }
 
 /* ── value plumbing ──────────────────────────────────────── */
@@ -57,8 +57,13 @@ function bindControls() {
     const path = await api.pick_file(b.dataset.browse);
     if (path) set(b.dataset.browse === "script" ? "ref_script" : "sync_srt", path);
   });
+  document.querySelectorAll("#scriptSeg button").forEach((b) => b.onclick = () => {
+    set("script_mode", b.dataset.mode);
+    if (b.dataset.mode === "paste") $("refText").focus();
+  });
+  $("pasteClear").onclick = () => { set("ref_text", ""); $("refText").value = ""; $("refText").focus(); };
 
-  window.addEventListener("resize", () => document.querySelectorAll(".segments").forEach(moveThumb));
+  window.addEventListener("resize", () => document.querySelectorAll(".segments, .mini-seg").forEach(moveThumb));
 }
 
 /* ── render ──────────────────────────────────────────────── */
@@ -71,8 +76,9 @@ function render() {
   });
   const sync = V.task === "Sync Existing";
   document.querySelectorAll("#taskSeg button").forEach((b) => b.classList.toggle("active", b.dataset.task === V.task));
-  document.querySelectorAll(".segments").forEach(moveThumb);
+  document.querySelectorAll(".segments, .mini-seg").forEach(moveThumb);
   $("syncField").querySelectorAll("input, button").forEach((el) => el.disabled = !sync);
+  renderScript();
   $("goText").textContent = sync ? "Sync timing" : "Generate captions";
   $("pageLead").textContent = sync ? "Keep your words. Rebuild the timing from the audio." : "Your audio. Clear, readable captions.";
 
@@ -93,13 +99,37 @@ function render() {
    on Continue; the settings the worker itself reads need a fresh transcription
    (Regenerate). Resolve read the track once, so the track, the task and the
    review switch stay as they were for this run. */
-const TRANSCRIBE_KEYS = ["lang", "punct", "diarize", "ref_script"];
+const TRANSCRIBE_KEYS = ["lang", "punct", "diarize", "ref_script", "ref_text", "script_mode"];
 const SPLIT_KEYS = ["max_chars", "max_lines", "max_secs", "cps", "min_secs", "words_per"];
 const pick = (keys) => Object.fromEntries(keys.map((k) => [k, String(V[k] ?? "").trim()]));
+// The script the worker would use: the file in Browse mode, the text in Paste
+// mode. Switching modes alone, with the other side empty, changes nothing.
+const scriptOf = (v) => {
+  const paste = v.script_mode === "paste";
+  const s = String((paste ? v.ref_text : v.ref_script) ?? "").trim();
+  return s ? (paste ? "paste:" : "file:") + s : "";
+};
 const Back = {
   active: false, ran: {}, split: {},
-  changed() { return TRANSCRIBE_KEYS.some((k) => String(V[k] ?? "").trim() !== this.ran[k]); },
+  changed() {
+    return ["lang", "punct", "diarize"].some((k) => String(V[k] ?? "").trim() !== this.ran[k])
+      || scriptOf(V) !== scriptOf(this.ran);
+  },
 };
+
+function renderScript() {
+  const paste = V.script_mode === "paste";
+  document.querySelectorAll("#scriptSeg button").forEach((b) => b.classList.toggle("active", b.dataset.mode === (paste ? "paste" : "file")));
+  moveThumb($("scriptSeg"));
+  $("scriptFile").hidden = paste;
+  $("scriptPaste").hidden = !paste;
+  $("scriptNote").hidden = paste;
+  $("scriptField").classList.toggle("pasting", paste);
+  const text = String(V.ref_text || "").trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  $("pasteCount").textContent = words ? words.toLocaleString() + (words === 1 ? " word" : " words") : "Empty";
+  $("pasteClear").disabled = !text;
+}
 
 function renderBack() {
   document.body.classList.toggle("from-review", Back.active);
@@ -168,6 +198,7 @@ function renderSummary() {
     const srt = String(V.sync_srt || "").trim();
     bits.push(srt ? `Re-time ${base(srt)} against ${V.chosen}` : `Choose the SRT to re-time against ${V.chosen}`);
   } else bits.push(`${V.chosen} · ${V.lang} → a subtitle track`);
+  if (scriptOf(V)) bits.push(V.script_mode === "paste" ? "pasted script" : "script " + base(String(V.ref_script).trim()));
   bits.push(Number(V.review) ? "review first" : "applied straight away");
   $("summary").textContent = bits.join("  ·  ");
 }

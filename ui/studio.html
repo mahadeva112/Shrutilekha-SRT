@@ -40,10 +40,10 @@
         <label class="fld" data-lock><span>Audio track</span><select data-key="chosen" id="trackSel"></select></label>
         <label class="fld" title="Auto-detect follows the audio; a fixed language pins the transcript to its script"><span>Language</span><select data-key="lang" id="langSel"></select></label>
       </div>
-      <div class="row-toggle" title="Adds commas and full stops to the transcript"><span>Punctuation</span><input type="checkbox" class="switch" data-key="punct"></div>
-      <div class="row-toggle" title="Colours each voice differently"><span>Separate speakers</span><input type="checkbox" class="switch" data-key="diarize"></div>
+      <div class="row-toggle" title="Adds commas and full stops to the transcript"><span>Punctuation<small>Commas and full stops in the transcript</small></span><input type="checkbox" class="switch" data-key="punct"></div>
+      <div class="row-toggle" title="Colours each voice differently"><span>Separate speakers<small>Each voice gets its own colour</small></span><input type="checkbox" class="switch" data-key="diarize"></div>
       <hr>
-      <div class="row-toggle" data-lock title="Stop to read and edit the cues, and re-split them without transcribing again"><span>Review captions first</span><input type="checkbox" class="switch" data-key="review"></div>
+      <div class="row-toggle" data-lock title="Stop to read and edit the cues, and re-split them without transcribing again"><span>Review captions first<small>Read, edit and re-cut before import</small></span><input type="checkbox" class="switch" data-key="review"></div>
     </section>
 
     <section class="panel">
@@ -57,14 +57,26 @@
 
     <section class="panel">
       <div class="panel-head"><span class="sec-icon" data-icon="file"></span><h3>Script &amp; files</h3></div>
-      <label class="fld" title="Use a .docx, .txt or .srt script to match spellings and punctuation.">
-        <span>Reference script · optional</span>
-        <div class="path"><input data-key="ref_script" placeholder="Choose a file or paste its path…" spellcheck="false"><button class="btn sm" data-browse="script">Browse</button></div>
-      </label>
+      <div class="fld script-fld" id="scriptField">
+        <div class="fld-head">
+          <span>Reference script · optional</span>
+          <div class="mini-seg" role="tablist" id="scriptSeg" title="Use a script file, or paste the script text">
+            <button type="button" data-mode="file">Browse file</button>
+            <button type="button" data-mode="paste">Paste text</button>
+            <i class="seg-thumb"></i>
+          </div>
+        </div>
+        <div class="path" id="scriptFile" title="Use a .docx, .txt or .srt script to match spellings and punctuation."><input data-key="ref_script" placeholder="Choose a file or paste its path…" spellcheck="false"><button class="btn sm" data-browse="script">Browse</button></div>
+        <div class="paste-box" id="scriptPaste" hidden>
+          <textarea data-key="ref_text" id="refText" placeholder="Paste or type the script here. Names, spellings and punctuation in it are matched to the captions." spellcheck="false"></textarea>
+          <div class="paste-foot"><span id="pasteCount">Empty</span><button type="button" class="btn ghost sm" id="pasteClear">Clear</button></div>
+        </div>
+      </div>
       <label class="fld" id="syncField" title="The file whose text is right but whose timing is wrong. Its words are kept; only the timings are rebuilt.">
         <span>Existing SRT · Sync mode</span>
         <div class="path"><input data-key="sync_srt" placeholder="Choose a file or paste its path…" spellcheck="false"><button class="btn sm" data-browse="srt">Browse</button></div>
       </label>
+      <p class="panel-note" id="scriptNote"><span data-icon="sparkle"></span>A script keeps names, spellings and punctuation exact. Accepts .docx, .txt or .srt.</p>
     </section>
 
   </div>
