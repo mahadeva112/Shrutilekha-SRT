@@ -6,7 +6,7 @@ import runpy
 import subprocess
 import tempfile
 import tkinter as tk
-from app_runtime import app_executable, resources, prepare_environment, worker_executable
+from app_runtime import resources, install_dir, prepare_environment
 
 
 def run(output):
@@ -20,7 +20,7 @@ def run(output):
         assert callable(audio_to_srt.import_srt_to_new_track)
         assert (resources() / 'resolve_bridge.lua').is_file()
         tray_report = Path(scratch) / 'tray-test.json'
-        subprocess.run([str(app_executable()), '--tray-self-test', str(tray_report)],
+        subprocess.run([str(install_dir() / 'Srutilekha.exe'), '--tray-self-test', str(tray_report)],
                        check=True, timeout=20, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         assert json.loads(tray_report.read_text())['visible']
         import credentials
@@ -89,7 +89,7 @@ def run(output):
         assert Path(srt).stat().st_size
         assert not ui_errors,ui_errors
         root.destroy()
-        worker = subprocess.run([str(worker_executable()), "--self-test"],
+        worker = subprocess.run([str(install_dir() / "Srutilekha-worker.exe"), "--self-test"],
                                 capture_output=True, text=True, encoding="utf-8", timeout=30,
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         if worker.returncode:

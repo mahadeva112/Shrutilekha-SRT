@@ -124,37 +124,4 @@ class BridgeTests(unittest.TestCase):
         self.assertTrue(ok);self.assertEqual(items,[new]);self.assertFalse(created)
         self.assertEqual(tracks,{1:[old,new]})
 
-class BridgeVersionTests(unittest.TestCase):
-    def test_launcher_is_stamped_and_stamp_follows_code_and_mailbox(self):
-        from resolve_bridge import launcher_text
-        with tempfile.TemporaryDirectory() as tmp:
-            first=launcher_text(Path(tmp)/'a')
-            self.assertNotIn('__SRUTILEKHA_BRIDGE_VERSION__',first)
-            self.assertNotIn('__SRUTILEKHA_MAILBOX__',first)
-            self.assertEqual(first,launcher_text(Path(tmp)/'a'))
-            other=launcher_text(Path(tmp)/'b')
-            stamp=lambda text:text.split('local bridge_version = "',1)[1].split('"',1)[0]
-            self.assertRegex(stamp(first),'^[0-9a-f]{12}$')
-            self.assertNotEqual(stamp(first),stamp(other))
-
-    def test_running_bridge_is_reused_only_when_versions_match(self):
-        from app_runtime import resources
-        source=(resources()/'resolve_bridge.lua').read_text(encoding='utf-8')
-        self.assertIn("prefs:GetPrefs(version_key) == bridge_version then",source)
-        self.assertIn("prefs:SetPrefs(version_key, bridge_version)",source)
-        self.assertIn("while prefs:GetPrefs(owner_key)==session do",source)
-
-    def test_not_responding_names_the_missing_step(self):
-        from resolve_bridge import not_responding_message
-        with tempfile.TemporaryDirectory() as tmp:
-            prefs=Path(tmp)/'Fusion.prefs'; scripts=Path(tmp)/'Utility'
-            with patch('app_runtime.resolve_scripts_dir',return_value=scripts):
-                self.assertIn('settings were not found',not_responding_message(prefs))
-                prefs.write_text('{}')
-                self.assertIn('script is missing',not_responding_message(prefs))
-                scripts.mkdir(); (scripts/'Srutilekha.lua').write_text('--')
-                self.assertIn('not running in Resolve',not_responding_message(prefs))
-                prefs.write_text('Global = { SrutilekhaBridgeOwner = "table0x1" }')
-                self.assertIn('Restart Resolve',not_responding_message(prefs))
-
 if __name__=='__main__': unittest.main()

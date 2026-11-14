@@ -1,8 +1,6 @@
 -- Srutilekha local Lua bridge. Generated launcher supplies the mailbox path.
 -- No io, ffi, package, require, os.execute or external Python scripting.
 local mailbox = "__SRUTILEKHA_MAILBOX__"
--- Stamp of this generated script. A newer install replaces a running older bridge.
-local bridge_version = "__SRUTILEKHA_BRIDGE_VERSION__"
 local prefs = fusion or fu
 local rv = resolve or (prefs and prefs:GetResolve())
 if not prefs or not rv or not loadfile or not bmd or not bmd.wait then
@@ -11,16 +9,13 @@ if not prefs or not rv or not loadfile or not bmd or not bmd.wait then
 end
 local session = tostring({}):gsub("[^%w]", "") .. tostring(os.time())
 local owner_key = "Global.SrutilekhaBridgeOwner"
-local version_key = "Global.SrutilekhaBridgeVersion"
 local function announce(token)
     prefs:SetPrefs('Global.SrutilekhaBridgeLaunch', token)
     prefs:SetPrefs('Global.SrutilekhaBridgeLaunchTime', os.time())
     prefs:SavePrefs()
 end
 local existing = prefs:GetPrefs(owner_key)
--- Reuse a running bridge only when it is this same script. An older bridge left
--- running from before an update is replaced: taking ownership makes its loop exit.
-if existing and existing ~= '' and prefs:GetPrefs(version_key) == bridge_version then
+if existing and existing ~= '' then
     prefs:SetPrefs('Global.SrutilekhaBridgeProbe', session)
     for i=1,10 do
         bmd.wait(.1)
@@ -32,7 +27,6 @@ if existing and existing ~= '' and prefs:GetPrefs(version_key) == bridge_version
     end
 end
 prefs:SetPrefs(owner_key, session)
-prefs:SetPrefs(version_key, bridge_version)
 local refs, ids, next_ref = {}, {}, 0
 local function register(value)
     if ids[value] then return ids[value] end
@@ -108,7 +102,7 @@ end
 local function dispatch(req)
     if req.protocol~=1 then error('Bridge protocol mismatch; update Srutilekha') end
     if req.op=='hello' then
-        return {session=session,resolve=resolve_ref,version=rv:GetVersionString(),product=rv:GetProductName(),bridge=bridge_version}
+        return {session=session,resolve=resolve_ref,version=rv:GetVersionString(),product=rv:GetProductName()}
     end
     if req.session~=session then error('Resolve bridge restarted; reconnect the app') end
     if req.op=='stop' then prefs:SetPrefs(owner_key, ''); return true end

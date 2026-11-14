@@ -25,13 +25,6 @@ class UpdateError(Exception):
     pass
 
 
-def installer_name(release_version):
-    """The release asset this platform installs from."""
-    if sys.platform == "darwin":
-        return "Srutilekha-%s-macOS.dmg" % release_version
-    return "Srutilekha-Setup-%s.exe" % release_version
-
-
 def version(value):
     if not re.fullmatch(r"v?\d+\.\d+\.\d+", value):
         raise UpdateError("Invalid release version.")
@@ -63,10 +56,8 @@ def check():
     remote = version(tag)
     if release.get("draft") or release.get("prerelease") or remote <= version(VERSION):
         return None
-    name = installer_name(tag.lstrip("v"))
+    name = "Srutilekha-Setup-%s.exe" % tag.lstrip("v")
     assets = {a["name"]: a for a in release.get("assets", [])}
-    if sys.platform == "darwin" and name not in assets:
-        return None  # A Windows-only release is not an update for the Mac app.
     if name not in assets or "SHA256SUMS.txt" not in assets:
         raise UpdateError("Release installer or checksum is missing.")
     return {"version": tag.lstrip("v"), "notes": (release.get("body") or "").splitlines(),
@@ -79,7 +70,7 @@ def check():
 def download(info, report=lambda message: None):
     tag = "v" + info["version"]
     version(tag)
-    name = installer_name(info["version"])
+    name = "Srutilekha-Setup-%s.exe" % info["version"]
     if info["name"] != name:
         raise UpdateError("Unexpected installer name.")
     for key, filename in (("installer", name), ("checksums", "SHA256SUMS.txt")):
@@ -127,10 +118,6 @@ def download(info, report=lambda message: None):
 
 def install(info, report=lambda message: None):
     target = download(info, report)
-    if sys.platform == "darwin":
-        report("Opening the disk image. Quit Srutilekha, then drag the new app onto Applications.")
-        subprocess.Popen(["/usr/bin/open", str(target)], close_fds=True)
-        return str(target)
     report("Opening Setup. Close Srutilekha to finish the update.")
     subprocess.Popen([str(target), "/CURRENTUSER", "/SP-"], close_fds=True)
     return str(target)
