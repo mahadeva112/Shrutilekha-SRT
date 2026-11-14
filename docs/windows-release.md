@@ -40,7 +40,9 @@ be disabled in the tray/home settings. Legacy Lua launching and SRT timeline imp
 verified in Resolve 21.0.4.5; see [validation details](validation.md). The Python
 launcher requires a working Python scripting host in Resolve. The bundled app
 runtime does not configure Resolve's Python host. Resolve 21.1.1 Free connection
-was verified; real caption import/styling awaits validation. See [bridge usage](resolve-bridge.md).
+was verified. On Resolve 21.2.0.6 Free the bridge connection, transcription and
+caption import onto a new subtitle track were verified; 21.2 refuses subtitle
+styling from scripts. See [bridge usage](resolve-bridge.md).
 
 API keys are encrypted by Windows DPAPI for the current Windows user and
 stored under `%LOCALAPPDATA%/Srutilekha`. Keys never enter the installer,
