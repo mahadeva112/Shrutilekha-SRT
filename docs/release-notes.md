@@ -1,11 +1,3 @@
-v1.5.0: first macOS build.
-
-- New `Srutilekha-1.5.0-macOS.dmg` for Apple Silicon Macs on macOS 12 or newer. Drag the app to Applications. It is not signed by Apple, so on first launch open System Settings > Privacy & Security and click "Open Anyway". The steps are in "Read me first.txt" inside the .dmg.
-- On a Mac the first launch adds Workspace > Scripts > Srutilekha to DaVinci Resolve 21.1 or newer, starts the menu bar helper at login and keeps the ElevenLabs API key in the login Keychain. Resolve 21.0 and earlier and Intel Macs are not supported by the Mac app.
-- The Mac app uses the classic Tkinter screens; the new web screens stay Windows-only for now.
-- Windows: the app works as before. The release build now also produces the Mac .dmg, and SHA256SUMS.txt lists both.
-- The tests pass on Windows and macOS in CI, and CI builds the .dmg and runs the packaged self-test. Not yet run with DaVinci Resolve on a real Mac.
-
 v1.4.7: punctuation in the caption's own language; Urdu removed.
 
 - With Punctuation on, a sentence ends with । in Bengali, Assamese, Hindi, Nepali, Sanskrit, Punjabi and Odia instead of a full stop. Marathi, Gujarati, Tamil, Telugu, Kannada and Malayalam keep the full stop they normally use.

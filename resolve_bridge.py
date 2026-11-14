@@ -1,6 +1,5 @@
 """Local request mailbox for Resolve's restricted Lua host; no Python API import."""
 import base64
-import hashlib
 import json
 import math
 import os
@@ -10,7 +9,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
-from app_runtime import fusion_prefs, user_dir
+from app_runtime import user_dir
 
 
 class BridgeError(RuntimeError):
@@ -33,29 +32,10 @@ def normalize_list_result(value):
     raise BridgeError('Resolve returned an unexpected clip collection; reconnect the app.')
 
 
-if os.name == 'nt':
-    import msvcrt
-
-    def _try_lock(handle):
-        handle.seek(0)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-
-    def _unlock(handle):
-        handle.seek(0)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-else:
-    import fcntl
-
-    def _try_lock(handle):
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-    def _unlock(handle):
-        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
-
 @contextmanager
 def mailbox_lock(path, timeout=0):
-    """Cross-process lock; the OS releases it automatically if the app exits."""
+    """Windows process lock; automatically released if the app exits."""
+    import msvcrt
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('a+b') as handle:
         if not path.stat().st_size:
@@ -63,7 +43,8 @@ def mailbox_lock(path, timeout=0):
         deadline = time.monotonic() + timeout
         while True:
             try:
-                _try_lock(handle)
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
                 break
             except OSError:
                 if time.monotonic() >= deadline:
@@ -72,27 +53,17 @@ def mailbox_lock(path, timeout=0):
         try:
             yield
         finally:
-            _unlock(handle)
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
 
-def launcher_text(directory=None):
+def write_launcher(target, directory=None):
     from app_runtime import resources
     directory = Path(directory) if directory else user_dir() / 'resolve-bridge'
     directory = directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
     source = (resources() / 'resolve_bridge.lua').read_text(encoding='utf-8')
-    text = source.replace('"__SRUTILEKHA_MAILBOX__"', lua_value(str(directory)))
-    return text.replace('__SRUTILEKHA_BRIDGE_VERSION__', bridge_version(text))
-
-
-def bridge_version(text):
-    """Stamp of a generated script (code + mailbox), so a running Resolve bridge
-    from an older install is replaced instead of reused. The installer matches it."""
-    return hashlib.sha1(text.encode('utf-8')).hexdigest()[:12]
-
-
-def write_launcher(target, directory=None):
-    Path(target).write_text(launcher_text(directory), encoding='utf-8')
+    Path(target).write_text(source.replace('"__SRUTILEKHA_MAILBOX__"', lua_value(str(directory))), encoding='utf-8')
 
 
 def lua_value(value):
@@ -130,7 +101,8 @@ class BridgeClient:
     def __init__(self, directory=None, prefs=None, timeout=20):
         self.directory = Path(directory) if directory else user_dir() / 'resolve-bridge'
         self.directory.mkdir(parents=True, exist_ok=True)
-        self.prefs = Path(prefs) if prefs else fusion_prefs()
+        self.prefs = Path(prefs) if prefs else Path(os.environ['APPDATA']) / (
+            'Blackmagic Design/DaVinci Resolve/Support/Fusion/Profiles/Default/Fusion.prefs')
         self.timeout = timeout
         self.lock = threading.Lock()
         self.session = None
@@ -171,7 +143,7 @@ class BridgeClient:
                             raise BridgeError(response.get('error','Resolve bridge request failed'))
                         return self._decode(response.get('value'))
                     time.sleep(.04)
-                raise BridgeError(not_responding_message(self.prefs))
+                raise BridgeError('Resolve bridge is not responding. In Resolve, open Workspace > Scripts > Srutilekha, then try Connect again.')
             finally:
                 # Do not leave a timed-out mutation to run after the user retries.
                 try:
@@ -222,28 +194,6 @@ class BridgeClient:
         finally:
             self.pending = None
             self.cache.clear()
-
-
-def not_responding_message(prefs):
-    """Say which step is missing, from files only (no Resolve API calls)."""
-    from app_runtime import resolve_scripts_dir
-    script = resolve_scripts_dir() / 'Srutilekha.lua'
-    if not Path(prefs).is_file():
-        return ('Resolve bridge is not responding: Resolve settings were not found at %s. '
-                'Start DaVinci Resolve once, then reopen Srutilekha.' % prefs)
-    if not script.is_file():
-        return ('Resolve bridge is not responding: the Srutilekha script is missing from %s. '
-                'Reopen Srutilekha to reinstall it, restart Resolve, then open Workspace > Scripts > Srutilekha.'
-                % script.parent)
-    try:
-        content = Path(prefs).read_text(encoding='utf-8', errors='replace')
-    except OSError:
-        content = ''
-    if not re.search(r'SrutilekhaBridgeOwner\s*=\s*"[A-Za-z0-9]+"', content):
-        return ('Resolve bridge is not responding: the bridge is not running in Resolve. '
-                'In Resolve, open Workspace > Scripts > Srutilekha, then try Connect again.')
-    return ('Resolve bridge is not responding. Restart Resolve, then open Workspace > Scripts > Srutilekha '
-            'and try Connect again.')
 
 
 def probe_connection():

@@ -1,5 +1,4 @@
 import os
-import sys
 import tempfile
 import tkinter as tk
 import unittest
@@ -19,7 +18,6 @@ class SettingsTests(unittest.TestCase):
         self.root.bind('<Escape>', lambda e: None)
         self.bindings={k:self.root.bind(k) for k in ('<Return>','<Escape>')}
     def tearDown(self):
-        credentials.delete_key()  # macOS: the profile's Keychain item outlives the folder.
         self.root.destroy()
         self.env.stop()
         self.scratch.cleanup()
@@ -72,10 +70,7 @@ class SettingsTests(unittest.TestCase):
 
     def test_connection_layout_fits_compact_and_studio_windows_at_native_scales(self):
         context = attach(self.root, factor=1, watch=False)
-        # macOS never applies a Windows-style DPI scale (Tk handles Retina
-        # itself and dpi.monitor reports 96), so 2x only occurs on Windows.
-        scales = (.8, 1, 1.25, 1.5, 2) if sys.platform == 'win32' else (.8, 1, 1.25, 1.5)
-        for scale in scales:
+        for scale in (.8, 1, 1.25, 1.5, 2):
             context.rescale(scale, (0, 0, 3840, 2160))
             for width, height in ((620, 500), (620, 550), (1040, 720), (1180, 820)):
                 with self.subTest(scale=scale, size=(width, height)):

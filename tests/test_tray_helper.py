@@ -1,4 +1,3 @@
-import sys
 import tempfile
 from pathlib import Path
 import unittest
@@ -55,7 +54,6 @@ class TrayTests(unittest.TestCase):
             self.assertTrue(controller.open(automatic=True))
             self.assertEqual(launch.call_args.args,('--bridge-run',))
 
-    @unittest.skipUnless(sys.platform == 'win32', 'Windows registry')
     def test_commands_are_atomic_and_startup_toggle_preserves_other_values(self):
         tray.queue_command('open')
         folder=Path(self.temp.name)/'tray-commands'
@@ -91,34 +89,3 @@ class TrayTests(unittest.TestCase):
         icon.stop.assert_called_once()
         controller.child.terminate.assert_not_called()
         controller.child.kill.assert_not_called()
-
-
-class MacStartupTests(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        for target, value in (('tray_helper.user_dir', Path(self.temp.name)),
-                              ('tray_helper.launch_agent_path', Path(self.temp.name) / 'LaunchAgents' / 'org.srutilekha.tray.plist')):
-            p = patch(target, return_value=value); p.start(); self.addCleanup(p.stop)
-        for name, value in (('IS_MAC', True), ('IS_WINDOWS', False)):
-            p = patch.object(tray, name, value); p.start(); self.addCleanup(p.stop)
-
-    def test_launch_agent_written_and_removed(self):
-        import plistlib
-        self.assertFalse(tray.startup_enabled())
-        tray.set_startup(True)
-        agent = tray.launch_agent_path()
-        data = plistlib.loads(agent.read_bytes())
-        self.assertEqual(data['Label'], 'org.srutilekha.tray')
-        self.assertEqual(data['ProgramArguments'], tray.app_command('--tray'))
-        self.assertTrue(data['RunAtLoad'])
-        self.assertTrue(tray.startup_enabled())
-        tray.set_startup(False)
-        self.assertFalse(agent.exists())
-        self.assertFalse(tray.startup_enabled())
-        self.assertTrue((Path(self.temp.name) / 'tray-startup-disabled.flag').exists())
-
-    def test_mac_resolve_process_is_recognised(self):
-        process = Mock(info={'name': 'Resolve', 'pid': 7, 'create_time': 12.0})
-        with patch('psutil.process_iter', return_value=[process]):
-            self.assertEqual(tray.resolve_identity(), (7, 12.0))
