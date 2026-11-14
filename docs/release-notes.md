@@ -1,3 +1,10 @@
+v2.0.1: works with DaVinci Resolve 21.2.
+
+- Resolve 21.2 removed `loadfile`, `dofile` and `SavePrefs` from script Lua and writes settings to disk only about every 30 seconds, so the bridge stopped at its first line and nothing opened. The bridge now reads requests and writes replies through Resolve's own file access (`OpenFile`), and clicks reach the tray helper at once. Resolve 21.1 keeps working the old way.
+- Captions made through the bridge go on a new subtitle track at the timeline start. Before, Resolve could append them to an earlier run's track after its cues: on 21.2 a 45-cue run landed 1429 frames late. The same three placement attempts as the Lua launcher are used, with 21.2's renamed `GetIsTrackLocked`.
+- Resolve 21.2 refuses every subtitle style write from scripts (font, size, outline, position), through both `SetProperties` and `SetProperty`. Text and timing are imported; set the look under Inspector > Track > Track Style.
+- Checked live on Resolve 21.2.0.6 Free: connection, timeline reading, transcription and import through the bridge. The new track placement is covered by tests but not yet seen in a live run. 98 tests pass, including the bridge run in Resolve's own Lua with 21.2's restrictions.
+
 v2.0.0: new logo, Back from review, pasted scripts, safer imports, new look.
 
 - New logo: a speech bubble with two subtitle lines on the gold tile, the same in the app header, the classic window and the installer icon.

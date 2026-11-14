@@ -79,6 +79,13 @@ def resolve_identity():
 
 def launch_signal():
     # Constructing a client is unnecessary during idle monitoring.
+    # Resolve 21.2 flushes prefs to disk only every ~30 s, so the bridge also
+    # writes launch.txt through Fusion FileIO; prefer it when present.
+    from resolve_bridge import read_response_file
+    body = read_response_file(user_dir() / 'resolve-bridge' / 'launch.txt')
+    match = re.fullmatch(r'([A-Za-z0-9]+) (\d+)', body or '')
+    if match:
+        return match.group(1), int(match.group(2))
     prefs = Path(os.environ['APPDATA']) / 'Blackmagic Design/DaVinci Resolve/Support/Fusion/Profiles/Default/Fusion.prefs'
     try:
         content = prefs.read_text(encoding='utf-8', errors='replace')

@@ -124,4 +124,47 @@ class BridgeTests(unittest.TestCase):
         self.assertTrue(ok);self.assertEqual(items,[new]);self.assertFalse(created)
         self.assertEqual(tracks,{1:[old,new]})
 
+    def _resolve_212_timeline(self, honour_track_index, honour_locks):
+        """Appends the way Resolve 21.2 did on 2026-11-14: a plain append goes to
+        the first unlocked subtitle track, after the cues already on it."""
+        old=SimpleNamespace(GetStart=lambda:100)
+        tracks={1:[old]};locks={}
+        def add(kind):tracks[len(tracks)+1]=[];return True
+        def append(infos):
+            info=infos[0];start=info.get('recordFrame',0) if honour_track_index else None
+            if 'trackIndex' in info and not honour_track_index:
+                return False                                    # refused, nothing placed
+            if honour_track_index and 'trackIndex' in info:
+                target=info['trackIndex']
+            else:
+                free=[i for i in sorted(tracks) if not (honour_locks and locks.get(i))]
+                if not free:return False
+                target=free[0]
+            begin=start if start is not None else (tracks[target][-1].GetStart()+50 if tracks[target] else 0)
+            tracks[target].append(SimpleNamespace(GetStart=lambda b=begin:b,GetName=lambda:'cue'))
+            return [object()]
+        timeline=SimpleNamespace(GetTrackCount=lambda kind:len(tracks),GetItemListInTrack=lambda kind,i:list(tracks[i]),
+                                 AddTrack=add,DeleteTrack=lambda kind,i:tracks.pop(i),SetCurrentTimecode=lambda tc:True,
+                                 GetIsTrackLocked=lambda kind,i:locks.get(i,False),
+                                 SetTrackLock=lambda kind,i,v:locks.__setitem__(i,v) or True)
+        pool=SimpleNamespace(ImportMedia=lambda paths:[object()],AppendToTimeline=append)
+        return timeline,pool,tracks,locks
+
+    def test_import_names_the_new_track_and_timeline_start(self):
+        timeline,pool,tracks,locks=self._resolve_212_timeline(True,True)
+        with patch.object(workflow,'log'):
+            ok,index,items,created,error=workflow.import_srt_to_new_track(timeline,pool,'demo.srt','01:00:00:00',86400)
+        self.assertTrue(ok);self.assertEqual((index,created),(2,True))
+        self.assertEqual([i.GetStart() for i in items],[86400])
+        self.assertEqual(len(tracks[1]),1)
+
+    def test_import_locks_old_tracks_when_resolve_refuses_track_index(self):
+        timeline,pool,tracks,locks=self._resolve_212_timeline(False,True)
+        with patch.object(workflow,'log') as log:
+            ok,index,items,created,error=workflow.import_srt_to_new_track(timeline,pool,'demo.srt','01:00:00:00',86400)
+        self.assertTrue(ok);self.assertEqual((index,created),(2,True))
+        self.assertEqual(len(tracks[1]),1)                      # the old cue stays alone
+        self.assertEqual(locks,{1:False})                       # and its track is unlocked again
+        self.assertTrue(any('locked' in str(c) for c in log.call_args_list))
+
 if __name__=='__main__': unittest.main()

@@ -16,6 +16,36 @@ class BridgeError(RuntimeError):
     pass
 
 
+STRING_PIECE = 200
+
+
+def request_source(payload):
+    """Lua source for a request, one table element per line."""
+    return 'return ' + lua_value(payload).replace(',', ',\n') + '\n'
+
+
+def read_response_file(path):
+    """Base64 body written by the bridge with FileIO, or None until it ends with END."""
+    try:
+        lines = path.read_text(encoding='ascii', errors='replace').splitlines()
+    except OSError:
+        return None
+    lines = [line.strip() for line in lines if line.strip()]
+    if not lines or lines[-1] != 'END':
+        return None
+    return ''.join(lines[:-1])
+
+
+def remove_quietly(path, attempts=5):
+    for _ in range(attempts):
+        try:
+            path.unlink(missing_ok=True)
+            return True
+        except OSError:
+            time.sleep(.02)  # Resolve may still be closing the file.
+    return False
+
+
 LIST_RESULTS = frozenset({'GetItemListInTrack', 'GetClipList', 'GetSubFolderList',
                           'ImportMedia', 'AppendToTimeline', 'GetProjectListInCurrentFolder'})
 
@@ -79,7 +109,13 @@ def lua_value(value):
             raise ValueError('Non-finite bridge number')
         return repr(value)
     if isinstance(value, str):
-        return '"' + ''.join('\\%03d' % b for b in value.encode('utf-8')) + '"'
+        # Byte escapes never contain ',' or a newline, so a long string is split
+        # into concatenated pieces; this keeps every request line short for
+        # Resolve 21.2's FileIO ReadLine.
+        data = value.encode('utf-8')
+        pieces = ['"' + ''.join('\\%03d' % b for b in data[i:i+STRING_PIECE]) + '"'
+                  for i in range(0, len(data), STRING_PIECE)] or ['""']
+        return '..\n'.join(pieces)
     if isinstance(value, (list, tuple)):
         return '{' + ','.join(lua_value(v) for v in value) + '}'
     if isinstance(value, dict):
@@ -126,35 +162,51 @@ class BridgeClient:
             if self.session:
                 payload['session'] = self.session
             request_path = self.directory / 'request.lua'
+            response_path = self.directory / ('response-'+request_id+'.txt')
             scratch = self.directory / ('request-'+request_id+'.tmp')
-            scratch.write_text('return '+lua_value(payload)+'\n', encoding='utf-8')
-            os.replace(scratch, request_path)
+            scratch.write_text(request_source(payload), encoding='utf-8')
             deadline = time.monotonic()+self.timeout
+            while True:
+                try:
+                    os.replace(scratch, request_path)
+                    break
+                except PermissionError:
+                    # Resolve 21.2 reads the request with FileIO and may hold it open briefly.
+                    if time.monotonic() >= deadline:
+                        scratch.unlink(missing_ok=True)
+                        raise BridgeError('Resolve is holding the bridge request file. Try Connect again.')
+                    time.sleep(.02)
             try:
                 while time.monotonic() < deadline:
-                    try:
-                        content = self.prefs.read_text(encoding='utf-8', errors='replace')
-                    except OSError:
-                        content = ''
-                    match = re.search(r'SrutilekhaBridgeResponse\s*=\s*"'+request_id+r':([A-Za-z0-9+/=]+)"',content)
-                    if match:
-                        response = json.loads(base64.b64decode(match.group(1), validate=True))
+                    body = read_response_file(response_path)
+                    if body is None:
+                        try:
+                            content = self.prefs.read_text(encoding='utf-8', errors='replace')
+                        except OSError:
+                            content = ''
+                        match = re.search(r'SrutilekhaBridgeResponse\s*=\s*"'+request_id+r':([A-Za-z0-9+/=]+)"',content)
+                        body = match.group(1) if match else None
+                    if body is not None:
+                        response = json.loads(base64.b64decode(body, validate=True))
                         if not response.get('ok'):
                             raise BridgeError(response.get('error','Resolve bridge request failed'))
                         return self._decode(response.get('value'))
                     time.sleep(.04)
                 raise BridgeError('Resolve bridge is not responding. In Resolve, open Workspace > Scripts > Srutilekha, then try Connect again.')
             finally:
+                remove_quietly(response_path)
                 # Do not leave a timed-out mutation to run after the user retries.
                 try:
                     content = request_path.read_text(encoding='utf-8')
                     if request_id in content or lua_value(request_id) in content:
-                        request_path.unlink(missing_ok=True)
+                        remove_quietly(request_path)
                 except OSError:
                     pass
 
     def connect(self):
         self.session = None
+        for stale in self.directory.glob('response-*.txt'):
+            remove_quietly(stale, attempts=1)
         info = self.request({'op':'hello'})
         self.session = info['session']
         return info, RemoteObject(self, info['resolve'])

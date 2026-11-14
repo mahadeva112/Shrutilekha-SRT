@@ -1,10 +1,9 @@
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "notes": [
-    "New speech-bubble logo, and a more finished look for every screen.",
-    "The review screen has a Back button: change the timing or settings without transcribing again.",
-    "The reference script can be pasted as text instead of choosing a file.",
-    "New captions no longer land on subtitle tracks that already hold cues, and a refused import no longer leaves the app waiting."
+    "Works with DaVinci Resolve 21.2: Workspace > Scripts > Srutilekha opens captions again.",
+    "New captions go on their own new subtitle track at the timeline start, not after an earlier run's cues.",
+    "Resolve 21.2 does not let scripts style subtitle cues; set the look under Inspector > Track > Track Style."
   ],
   "mandatory": false,
   "min_version": ""

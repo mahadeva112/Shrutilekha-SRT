@@ -627,7 +627,7 @@ def field(sel, key, default=""):
 # diffing the subtitle tracks. Nothing is deleted, and the answer is observed
 # rather than assumed.
 
-def import_srt_to_new_track(timeline, mp, srt_file, timecode):
+def import_srt_to_new_track(timeline, mp, srt_file, timecode, record_frame=None):
     """Returns (ok, track_index, items, created_track, error).
 
     `items` is only the cues THIS import added, which is not the same as the
@@ -697,9 +697,79 @@ def import_srt_to_new_track(timeline, mp, srt_file, timecode):
         drop_added()
         return False, None, None, False, \
             "Resolve could not import the SRT file."
-    # Resolve 21.1 documents clip-info dictionaries as the supported append
-    # form; the older bare MediaPoolItem overload is deprecated.
-    if not mp.AppendToTimeline([{"mediaPoolItem": imported[0]}]):
+    clip = imported[0]
+
+    # Resolve does not reliably use the empty track. With an earlier run's cues
+    # on track 1 it appends the new ones to track 1, AFTER the old ones: on
+    # 2026-11-14 a 45-cue run through the Resolve 21.2 bridge landed 1429 frames
+    # late that way. Same three attempts as audio_to_srt.lua, each tried only
+    # when Resolve placed nothing with the one before:
+    #   1. a clipInfo naming the new track and the timeline start;
+    #   2. a plain append with every other subtitle track locked;
+    #   3. a plain append.
+    # Success is judged by cues appearing, not by the return value, so no
+    # attempt runs after one that worked and duplicates them.
+    def cue_total():
+        try:
+            return sum(len(track_items(i))
+                       for i in range(1, timeline.GetTrackCount("subtitle") + 1))
+        except Exception:
+            return 0
+
+    def attempt(how, append):
+        was = cue_total()
+        error = ""
+        try:
+            append()
+        except Exception as exc:
+            error = " (%s)" % exc
+        if cue_total() > was:
+            log("Placed the captions %s." % how)
+            return True
+        log("Resolve placed nothing %s%s." % (how, error))
+        return False
+
+    def is_locked(i):
+        # Resolve 21.2 renamed GetTrackLock to GetIsTrackLocked.
+        for name in ("GetIsTrackLocked", "GetTrackLock"):
+            try:
+                return bool(getattr(timeline, name)("subtitle", i))
+            except Exception:
+                continue
+        return None
+
+    placed = False
+    if added_track:
+        info = {"mediaPoolItem": clip, "trackIndex": added_track}
+        if record_frame is not None:
+            info["recordFrame"] = record_frame
+        placed = attempt("on the new track at the timeline start",
+                         lambda: mp.AppendToTimeline([info]))
+        if not placed:
+            relock = []
+            for i in range(1, before_tracks + 1):
+                if is_locked(i) is False:
+                    try:
+                        if timeline.SetTrackLock("subtitle", i, True):
+                            relock.append(i)
+                    except Exception:
+                        pass
+            if relock:
+                try:
+                    placed = attempt("with %d other subtitle track(s) locked" % len(relock),
+                                     lambda: mp.AppendToTimeline([{"mediaPoolItem": clip}]))
+                finally:
+                    for i in relock:
+                        try:
+                            timeline.SetTrackLock("subtitle", i, False)
+                        except Exception:
+                            pass
+    if not placed:
+        # Resolve 21.1 documents clip-info dictionaries as the supported append
+        # form; the older bare MediaPoolItem overload is deprecated.
+        placed = attempt("with a plain append",
+                         lambda: mp.AppendToTimeline([{"mediaPoolItem": clip}]))
+    if not placed:
         drop_added()
         return False, None, None, False, \
             "Resolve could not append the SRT to the timeline."
@@ -729,6 +799,9 @@ def import_srt_to_new_track(timeline, mp, srt_file, timecode):
 
     log("SRT cues landed on subtitle track %d: %d new, %d cue(s) already "
         "there (left untouched)." % (landed, len(new_items), prior_count))
+    if prior_count:
+        log("WARNING: the new cues share a track with earlier ones; Resolve may "
+            "have placed them after those cues rather than at their own times.")
 
     # If the cues went somewhere other than the track we made, drop ours again
     # rather than leaving an empty track behind -- and do NOT claim it for Undo,
@@ -1216,7 +1289,7 @@ def main():
             return
 
         ok, strack, items, created, ierr = import_srt_to_new_track(
-            timeline, mp, srt_out, tc)
+            timeline, mp, srt_out, tc, tl_start)
         rm(srt_out)
         if not ok:
             alert_error("Srutilekha", ierr or "Could not import the synced SRT.")
@@ -1325,7 +1398,7 @@ def main():
     caption = parse_caption(cap_path, fps)
 
     ok, strack, items, created, ierr = import_srt_to_new_track(
-        timeline, mp, srt_path, tc)
+        timeline, mp, srt_path, tc, tl_start)
     rm(srt_path)
     rm(cap_path)
     if not ok:
