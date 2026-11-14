@@ -26,6 +26,7 @@ PRESET_KEYS = ("min_secs", "cps", "lang", "punct", "diarize", "words_per",
                "review")
 SETTINGS_KEYS = ("max_chars", "max_lines", "max_secs")
 SETTINGS_DEFAULTS = ("15", "1", "2")
+PASTED_SCRIPT = "pasted_script.txt"   # under data_dir()/scripts
 TOGGLES = ("punct", "diarize", "outline", "shadow", "safe_zone", "review")
 
 
@@ -84,6 +85,44 @@ def initial_values(prompt, ctx):
     for key, default in (("punct", 0), ("diarize", 0), ("outline", 1),
                          ("shadow", 1), ("safe_zone", 1), ("review", 1)):
         values[key] = int(d.get(key, default))
+    # A script pasted last time comes back as pasted text, not as a file path.
+    values["script_mode"], values["ref_text"] = "file", ""
+    ref = str(values["ref_script"] or "").strip()
+    pasted = pasted_script_path()
+    if ref and os.path.normcase(os.path.abspath(ref)) == os.path.normcase(pasted):
+        try:
+            with open(pasted, encoding="utf-8-sig") as f:
+                values["ref_text"] = f.read()
+            values["script_mode"], values["ref_script"] = "paste", ""
+        except OSError:
+            values["ref_script"] = ""
+    return values
+
+
+def pasted_script_path():
+    return os.path.abspath(os.path.join(data_dir(), "scripts", PASTED_SCRIPT))
+
+
+def resolve_script(values):
+    """Values with pasted script text swapped for the .txt file holding it.
+
+    The worker only reads a script from a path, so pasted text is written to
+    one file (replaced on every run) and ref_script points at it. In file mode
+    the values are returned unchanged. Raises OSError if the file can't be
+    written."""
+    values = dict(values)
+    if values.get("script_mode") != "paste":
+        return values
+    text = str(values.get("ref_text") or "").strip()
+    values["ref_script"] = ""
+    if text:
+        path = pasted_script_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text + "\n")
+        os.replace(tmp, path)
+        values["ref_script"] = path
     return values
 
 
@@ -186,6 +225,10 @@ class StudioApi(web_ui.BaseApi):
                 return {"ok": False, "message": "Choose an audio track first."}
             if action == "sync" and not str(values.get("sync_srt") or "").strip():
                 return {"ok": False, "message": "Enter the path to the existing SRT to sync."}
+            try:
+                values = resolve_script(values)
+            except OSError as exc:
+                return {"ok": False, "message": "Could not save the pasted script: %s" % exc}
         if not self._ctx.get("paths"):
             # No Resolve job attached: hand the values back to the caller.
             self.result = {"action": action, "values": values}
@@ -242,6 +285,21 @@ class StudioApi(web_ui.BaseApi):
     def review_apply(self, segs):
         job = getattr(self, "_job", None)
         return job.apply_review(segs) if job else {"ok": False, "message": "Nothing to apply."}
+
+    def regenerate(self, values):
+        """Back from review, then Regenerate: transcribe again, same track."""
+        job = getattr(self, "_job", None)
+        if job is None:
+            return {"ok": False, "message": "Nothing to regenerate."}
+        if self._ctx.get("frozen") and not self._has_key():
+            return {"ok": False, "needKey": True, "message": "Add your ElevenLabs API key to continue."}
+        try:
+            values = resolve_script(values)
+        except OSError as exc:
+            return {"ok": False, "message": "Could not save the pasted script: %s" % exc}
+        import web_run
+        sel = web_run.build_selection("generate", values, self._prompt, self._ctx, timeline_res)
+        return job.regenerate(sel)
 
     def run_state(self):
         job = getattr(self, "_job", None)

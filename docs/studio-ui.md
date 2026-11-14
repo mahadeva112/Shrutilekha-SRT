@@ -22,7 +22,7 @@ pixel-identical.
 | Review before import | Audio & language panel |
 | Max characters, lines, min/max duration, CPS, max words | Timing & readability panel |
 | Numeric range feedback and reading comfort | Timing fields and compact comfort strip |
-| Reference script path and Browse | Script & files panel |
+| Reference script: Browse a file or Paste the text | Script & files panel; pasted text is saved to `scripts/pasted_script.txt` in the data folder and passed to the worker as the script path |
 | Existing SRT path and Browse | Always-visible row; enabled in Sync mode |
 | Save/load/remove named presets | Presets panel; existing JSON format retained, caption style fields no longer saved |
 | Cue preview at the timeline's frame | Review editor, after Generate |

@@ -3,7 +3,6 @@
    the values back to Python, which runs the existing selection/handshake path. */
 let api, init;
 const V = {};                       // current form values, same keys as web_studio
-const PLACEHOLDER = "Select a preset", NONE = "(none saved)";
 const NUMBERS = [
   ["max_chars", "Max characters", "chars", 8, 60],
   ["max_lines", "Lines per cue", "lines", 1, 4],
@@ -35,7 +34,7 @@ function moveThumb(seg) {
   const thumb = seg.querySelector(".seg-thumb");
   if (!active || !thumb) return;
   thumb.style.width = active.offsetWidth + "px";
-  thumb.style.transform = `translateX(${active.offsetLeft - 4}px)`;
+  thumb.style.transform = `translateX(${active.offsetLeft - thumb.offsetLeft}px)`;
 }
 
 /* ── value plumbing ──────────────────────────────────────── */
@@ -58,8 +57,13 @@ function bindControls() {
     const path = await api.pick_file(b.dataset.browse);
     if (path) set(b.dataset.browse === "script" ? "ref_script" : "sync_srt", path);
   });
+  document.querySelectorAll("#scriptSeg button").forEach((b) => b.onclick = () => {
+    set("script_mode", b.dataset.mode);
+    if (b.dataset.mode === "paste") $("refText").focus();
+  });
+  $("pasteClear").onclick = () => { set("ref_text", ""); $("refText").value = ""; $("refText").focus(); };
 
-  window.addEventListener("resize", () => document.querySelectorAll(".segments").forEach(moveThumb));
+  window.addEventListener("resize", () => document.querySelectorAll(".segments, .mini-seg").forEach(moveThumb));
 }
 
 /* ── render ──────────────────────────────────────────────── */
@@ -72,8 +76,9 @@ function render() {
   });
   const sync = V.task === "Sync Existing";
   document.querySelectorAll("#taskSeg button").forEach((b) => b.classList.toggle("active", b.dataset.task === V.task));
-  document.querySelectorAll(".segments").forEach(moveThumb);
+  document.querySelectorAll(".segments, .mini-seg").forEach(moveThumb);
   $("syncField").querySelectorAll("input, button").forEach((el) => el.disabled = !sync);
+  renderScript();
   $("goText").textContent = sync ? "Sync timing" : "Generate captions";
   $("pageLead").textContent = sync ? "Keep your words. Rebuild the timing from the audio." : "Your audio. Clear, readable captions.";
 
@@ -85,7 +90,64 @@ function render() {
   });
   renderComfort();
   renderSummary();
+  renderBack();
   Dropdown.syncAll();
+}
+
+/* ── back from review ────────────────────────────────────── */
+/* Back from the review keeps the transcript. Timing values re-cut it locally
+   on Continue; the settings the worker itself reads need a fresh transcription
+   (Regenerate). Resolve read the track once, so the track, the task and the
+   review switch stay as they were for this run. */
+const TRANSCRIBE_KEYS = ["lang", "punct", "diarize", "ref_script", "ref_text", "script_mode"];
+const SPLIT_KEYS = ["max_chars", "max_lines", "max_secs", "cps", "min_secs", "words_per"];
+const pick = (keys) => Object.fromEntries(keys.map((k) => [k, String(V[k] ?? "").trim()]));
+// The script the worker would use: the file in Browse mode, the text in Paste
+// mode. Switching modes alone, with the other side empty, changes nothing.
+const scriptOf = (v) => {
+  const paste = v.script_mode === "paste";
+  const s = String((paste ? v.ref_text : v.ref_script) ?? "").trim();
+  return s ? (paste ? "paste:" : "file:") + s : "";
+};
+const Back = {
+  active: false, ran: {}, split: {},
+  changed() {
+    return ["lang", "punct", "diarize"].some((k) => String(V[k] ?? "").trim() !== this.ran[k])
+      || scriptOf(V) !== scriptOf(this.ran);
+  },
+};
+
+function renderScript() {
+  const paste = V.script_mode === "paste";
+  document.querySelectorAll("#scriptSeg button").forEach((b) => b.classList.toggle("active", b.dataset.mode === (paste ? "paste" : "file")));
+  moveThumb($("scriptSeg"));
+  $("scriptFile").hidden = paste;
+  $("scriptPaste").hidden = !paste;
+  $("scriptNote").hidden = paste;
+  $("scriptField").classList.toggle("pasting", paste);
+  const text = String(V.ref_text || "").trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  $("pasteCount").textContent = words ? words.toLocaleString() + (words === 1 ? " word" : " words") : "Empty";
+  $("pasteClear").disabled = !text;
+}
+
+function renderBack() {
+  document.body.classList.toggle("from-review", Back.active);
+  document.querySelectorAll("[data-lock]").forEach((el) => el.inert = Back.active);
+  $("undoBtn").hidden = Back.active;
+  $("altBtn").hidden = !Back.active;
+  $("pageTitle").textContent = Back.active ? "Settings" : "Caption studio";
+  if (!Back.active) return;
+  const changed = Back.changed();
+  $("pageLead").textContent = changed
+    ? "Language, punctuation, speakers or script changed. Regenerate to transcribe again."
+    : "Your transcript is kept. Change the timing and continue, or regenerate it. The track stays the same for this run.";
+  $("goText").textContent = changed ? "Regenerate captions" : "Continue to review";
+  $("altBtn").innerHTML = changed ? UI.icon("undo") + "Keep transcript" : UI.icon("refresh") + "Regenerate";
+  $("altBtn").title = changed
+    ? "Undo the language, punctuation, speaker and script changes and go back to the same transcript"
+    : "Transcribe the audio again with these settings (a new API call)";
+  $("summary").textContent = changed ? "Regenerating uses your API credits again" : "Timing changes re-cut the same transcript · no API call";
 }
 
 function renderComfort() {
@@ -136,13 +198,14 @@ function renderSummary() {
     const srt = String(V.sync_srt || "").trim();
     bits.push(srt ? `Re-time ${base(srt)} against ${V.chosen}` : `Choose the SRT to re-time against ${V.chosen}`);
   } else bits.push(`${V.chosen} · ${V.lang} → a subtitle track`);
+  if (scriptOf(V)) bits.push(V.script_mode === "paste" ? "pasted script" : "script " + base(String(V.ref_script).trim()));
   bits.push(Number(V.review) ? "review first" : "applied straight away");
   $("summary").textContent = bits.join("  ·  ");
 }
 
 /* ── dropdowns ───────────────────────────────────────────── */
 /* A styled button and list over each native select. The select stays in the
-   page (hidden) and keeps the value, so binding, render and presets are
+   page (hidden) and keeps the value, so binding and render are
    unchanged; the dropdown only mirrors it. */
 const Dropdown = {
   native: { Assamese: "অসমীয়া", Bengali: "বাংলা", Gujarati: "ગુજરાતી", Hindi: "हिन्दी", Kannada: "ಕನ್ನಡ", Malayalam: "മലയാളം",
@@ -150,7 +213,6 @@ const Dropdown = {
   icons: {
     trackSel: '<path d="M3 12h2m3-5v10m4-13v16m4-11v6m4-3h1"/>',
     langSel: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
-    presetSel: '<path d="M7 4h10v17l-5-4-5 4z"/>',
   },
   all: [], close: null,
 
@@ -171,7 +233,7 @@ const Dropdown = {
     dd.append(sel);
     sel.tabIndex = -1;
     dd.insertAdjacentHTML("beforeend",
-      `<button type="button" class="dd-btn"><span class="dd-ico">${svg(this.icons[sel.id] || this.icons.presetSel)}</span><span class="dd-label"></span><span class="dd-chev">${svg('<path d="m6 9 6 6 6-6"/>')}</span></button>` +
+      `<button type="button" class="dd-btn"><span class="dd-ico">${svg(this.icons[sel.id])}</span><span class="dd-label"></span><span class="dd-chev">${svg('<path d="m6 9 6 6 6-6"/>')}</span></button>` +
       `<div class="dd-pop">${lang ? `<label class="dd-search">${svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>')}<input placeholder="Search languages…" spellcheck="false"></label>` : ""}<div class="dd-list" role="listbox"></div></div>`);
     const btn = dd.querySelector(".dd-btn"), list = dd.querySelector(".dd-list"), search = dd.querySelector(".dd-search input");
     const tick = svg('<path d="m5 12 4 4L19 6"/>');
@@ -240,63 +302,39 @@ const Dropdown = {
 };
 document.addEventListener("click", () => Dropdown.close && Dropdown.close());
 
-/* ── presets ─────────────────────────────────────────────── */
-function fillPresets(list, pick) {
-  fillSelect($("presetSel"), [PLACEHOLDER, ...(list.length ? list : [NONE])], pick || PLACEHOLDER);
-  $("presetSel").options[0].disabled = true;
-}
-function wirePresets() {
-  $("presetSel").onchange = async (e) => {
-    const name = e.target.value;
-    if (name === PLACEHOLDER || name === NONE) return;
-    const r = await api.load_preset(name);
-    if (!r.ok) { UI.toast(r.message, "err"); return; }
-    Object.assign(V, r.values);
-    render();
-    UI.toast(`Preset “${name}” applied`);
-  };
-  $("savePreset").onclick = () => UI.busy($("savePreset"), async () => {
-    const typed = $("presetName").value.trim();
-    const picked = $("presetSel").value;
-    const name = typed || (picked !== PLACEHOLDER && picked !== NONE ? picked : "");
-    if (!name) { $("presetName").focus(); UI.toast("Type a name for the preset first."); return; }
-    const r = await api.save_preset(name, V);
-    if (!r.ok) { UI.toast(r.message, "err"); return; }
-    fillPresets(r.presets, name);
-    $("presetName").value = "";
-    UI.toast(`Preset “${name}” saved`);
-  });
-  $("removePreset").onclick = () => UI.busy($("removePreset"), async () => {
-    const name = $("presetSel").value;
-    if (name === PLACEHOLDER || name === NONE) return;
-    const r = await api.remove_preset(name);
-    if (!r.ok) { UI.toast(r.message, "err"); return; }
-    fillPresets(r.presets);
-    UI.toast(`Preset “${name}” removed`);
-  });
-  $("presetName").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.stopPropagation(); $("savePreset").click(); } });
+/* ── submit ──────────────────────────────────────────────── */
+const actionButtons = () => [$("goBtn"), $("undoBtn"), $("cancelBtn"), $("altBtn")];
+function releaseActions() {
+  actionButtons().forEach((b) => b.disabled = false);
+  $("goBtn").classList.remove("working");
 }
 
-/* ── submit ──────────────────────────────────────────────── */
 async function submit(action) {
-  const buttons = [$("goBtn"), $("undoBtn"), $("cancelBtn")];
-  buttons.forEach((b) => b.disabled = true);
+  if (action === "continue") { Review.resume(); return; }
+  actionButtons().forEach((b) => b.disabled = true);
   const go = action !== "undo";
   if (go) { $("goBtn").classList.add("working"); $("goText").textContent = "Starting…"; }
-  const r = await api.submit(action, { ...V });
-  if (r.ok && r.running) { Run.enter(); return; }
+  const r = action === "regenerate" ? await api.regenerate({ ...V }) : await api.submit(action, { ...V });
+  if (r.ok && (r.running || action === "regenerate")) { Back.active = false; renderBack(); Run.enter(); return; }
   if (r.ok) return;                                   // window is closing
-  buttons.forEach((b) => b.disabled = false);
-  $("goBtn").classList.remove("working");
+  releaseActions();
   render();
   if (r.needKey) { pending = action; UI.openModal("keyModal"); }
   UI.toast(r.message, r.needKey ? "" : "err");
 }
-const primaryAction = () => (V.task === "Sync Existing" ? "sync" : "generate");
+function primaryAction() {
+  if (Back.active) return Back.changed() ? "regenerate" : "continue";
+  return V.task === "Sync Existing" ? "sync" : "generate";
+}
 
 function wireActions() {
   $("goBtn").onclick = () => submit(primaryAction());
   $("undoBtn").onclick = () => submit("undo");
+  $("altBtn").onclick = () => {
+    if (!Back.changed()) { submit("regenerate"); return; }
+    Object.assign(V, Back.ran);                       // Keep transcript: drop those changes
+    submit("continue");
+  };
   $("cancelBtn").onclick = () => api.cancel();
   $("close").onclick = () => (Run.phase === "done" ? api.close_done() : api.cancel());
   $("runCancel").onclick = () => { $("runCancel").disabled = true; api.cancel(); };
@@ -305,7 +343,7 @@ function wireActions() {
   document.addEventListener("keydown", (e) => {
     if (UI.modalOpen() || e.defaultPrevented) return;
     if (Run.phase === "done") { if (e.key === "Enter" || e.key === "Escape") api.close_done(); return; }
-    if (Run.phase) return;                            // no shortcuts while a job runs
+    if (Run.phase && !Back.active) return;            // no shortcuts while a job runs
     const tag = document.activeElement?.tagName;
     if (e.key === "Escape") api.cancel();
     else if (e.key === "Enter" && tag !== "SELECT" && tag !== "BUTTON" && tag !== "TEXTAREA") submit(primaryAction());
@@ -326,6 +364,7 @@ const Run = {
 
   enter() {
     this.phase = "progress";
+    this.shown = this.target = 0;                     // a Regenerate starts the ring again
     $("formView").hidden = true;
     $("runView").hidden = false;
     $("runView").classList.add("entering");
@@ -479,11 +518,9 @@ window.addEventListener("pywebviewready", async () => {
   buildNumbers();
   fillSelect($("trackSel"), init.items.length ? init.items : [""], V.chosen);
   fillSelect($("langSel"), init.languages, V.lang);
-  fillPresets(init.presets);
-  ["trackSel", "langSel", "presetSel"].forEach((id) => Dropdown.enhance($(id)));
+  ["trackSel", "langSel"].forEach((id) => Dropdown.enhance($(id)));
   UI.hydrateIcons();
   bindControls();
-  wirePresets();
   wireActions();
   render();
   document.body.classList.add("ready");

@@ -10,13 +10,47 @@ const Review = {
     $("runView").hidden = true;
     $("reviewView").hidden = false;
     $("reviewView").classList.add("entering");
+    Back.ran = pick(TRANSCRIBE_KEYS);                 // what this transcript was made with
     const r = await api.review_init({ ...V });
     if (!r) { UI.toast("The transcript could not be opened for review.", "err"); return; }
     Object.assign(this, { colors: r.colors, fields: r.fields, recipes: r.recipes });
     this.buildControls();
     this.rebuild(r.segs, r.s);
+    if (this.observed) return;                        // entered again after a Regenerate
+    this.observed = true;
     new ResizeObserver(() => { this.rows.forEach((r) => this.fit(r)); this.paintPreview(); }).observe($("cueList"));
     new ResizeObserver(() => this.paintPreview()).observe($("miniViewport"));
+  },
+
+  /* ── back to the settings, and on again ─────────────────── */
+  back() {
+    clearTimeout(this.timer);
+    if (this.timer) this.resplit();                   // a pending re-cut lands before we leave
+    Back.active = true;
+    Back.split = pick(SPLIT_KEYS);
+    $("reviewView").hidden = true;
+    $("formView").hidden = false;
+    $("formView").classList.remove("entering");
+    void $("formView").offsetWidth;
+    $("formView").classList.add("entering");
+    releaseActions();
+    render();
+  },
+
+  resume() {
+    // Continue: the same transcript, with any edits. Timing values changed in
+    // the settings re-cut it, exactly as dragging them here would.
+    const recut = SPLIT_KEYS.some((k) => String(V[k] ?? "").trim() !== Back.split[k]);
+    Back.active = false;
+    render();
+    $("formView").hidden = true;
+    $("reviewView").hidden = false;
+    $("reviewView").classList.remove("entering");
+    void $("reviewView").offsetWidth;
+    $("reviewView").classList.add("entering");
+    this.syncControls();
+    if (recut) this.schedule();
+    requestAnimationFrame(() => { this.rows.forEach((r) => this.fit(r)); this.paintPreview(); });
   },
 
   /* ── split controls ─────────────────────────────────────── */
@@ -58,6 +92,7 @@ const Review = {
     $("cueSearch").oninput = () => this.applyFilter();
     $("applyBtn").onclick = () => this.apply();
     $("reviewCancel").onclick = () => api.cancel();
+    $("reviewBack").onclick = () => this.back();
     this.syncControls();
   },
 

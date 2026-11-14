@@ -80,6 +80,32 @@ class WebStudioTest(unittest.TestCase):
         self.assertEqual(sel["color"], "#ffcc00")
         self.assertEqual(sel["srt_posy"], str(round(0.2 * 1920)))
 
+    def test_pasted_script_is_saved_as_the_reference_file(self):
+        api = web_studio.StudioApi(PROMPT, self.ctx)
+        api._window = mock.Mock()
+        values = web_studio.initial_values(PROMPT, self.ctx)
+        self.assertEqual((values["script_mode"], values["ref_text"]), ("file", ""))
+        values.update(script_mode="paste", ref_text="  আমি আজ তোমাকে\nএকটা গল্প বলব।  ", ref_script="C:/old.docx")
+        self.assertTrue(api.submit("generate", values)["ok"])
+        path = api.result["values"]["ref_script"]
+        self.assertEqual(path, web_studio.pasted_script_path())
+        self.assertTrue(path.startswith(self.scratch.name))
+        self.assertEqual(Path(path).read_text(encoding="utf-8"), "আমি আজ তোমাকে\nএকটা গল্প বলব।\n")
+        # transcribe.py reads it like any browsed .txt script
+        import transcribe
+        self.assertEqual(transcribe.read_reference_script(path), ["আমি", "আজ", "তোমাকে", "একটা", "গল্প", "বলব।"])
+        # next launch reopens it as pasted text
+        again = web_studio.initial_values(dict(PROMPT, defaults=dict(PROMPT["defaults"], ref_script=path)), self.ctx)
+        self.assertEqual((again["script_mode"], again["ref_script"]), ("paste", ""))
+        self.assertEqual(again["ref_text"].strip(), "আমি আজ তোমাকে\nএকটা গল্প বলব।")
+
+    def test_script_mode_decides_which_script_is_used(self):
+        empty = web_studio.resolve_script({"script_mode": "paste", "ref_text": "   ", "ref_script": "C:/a.docx"})
+        self.assertEqual(empty["ref_script"], "")
+        browsed = web_studio.resolve_script({"script_mode": "file", "ref_text": "ignored", "ref_script": "C:/a.docx"})
+        self.assertEqual(browsed["ref_script"], "C:/a.docx")
+        self.assertFalse(Path(web_studio.pasted_script_path()).exists())
+
     def test_presets_are_shared_with_the_tk_form(self):
         api = web_studio.StudioApi(PROMPT, self.ctx)
         values = web_studio.initial_values(PROMPT, self.ctx)

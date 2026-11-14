@@ -1623,25 +1623,9 @@ def _mix(c1, c2, t):
 
 
 class LogoTile(tk.Canvas):
-    """The Srutilekha mark: two caption bars on a rounded gold tile.
-
-    Same geometry as make_icon.py — a long line with a shorter one under it,
-    the way a subtitle sits on a frame. Change one, change the other.
-
-    It used to draw five shapes here (three waveform bars plus two caption
-    lines) with a per-row gradient and a highlight line along the top edge.
-    In a 22px title-bar tile none of that survives: every shape lands on one
-    or two pixels, Tk's canvas does not antialias lines, and the result was a
-    smudge. Two bars snapped to whole pixels on a flat tile stay legible.
-    """
-
-    # Fractions of the tile, mirroring BAR_H / GAP / TOP_W / BOTTOM_W in
-    # make_icon.py. The gap must stay wider than the bars are thick or the
-    # pair reads as one block; the length ratio stays near 2:1.
-    BAR_H = 0.11
-    GAP = 0.15
-    TOP_W = 0.58
-    BOTTOM_W = 0.30
+    """The Srutilekha mark: a speech bubble with two subtitle lines on a
+    rounded gold tile. ui_icons.draw_logo draws it, rasterised with
+    antialiasing, so it matches the web header and icon.ico."""
 
     def __init__(self, parent, size=38, radius=10, bg_parent=BG):
         super().__init__(parent, width=size, height=size,
@@ -1650,16 +1634,6 @@ class LogoTile(tk.Canvas):
         self._radius = radius
         self.bind("<Configure>", self._draw)
         self._draw()
-
-    def _bar(self, cy, width):
-        """A caption bar centred on cy, on integer pixel edges."""
-        s = self._size
-        h = max(2, int(round(s * self.BAR_H)))
-        half_w = int(round(width / 2.0))
-        cx = s // 2
-        y = int(round(cy - h / 2.0))
-        self.create_rectangle(cx - half_w, y, cx + half_w, y + h,
-                              fill=ACCENT_INK, outline="")
 
     def _draw(self, event=None):
         from ui_icons import photo

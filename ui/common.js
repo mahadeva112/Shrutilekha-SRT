@@ -10,6 +10,7 @@ const UI = (() => {
     max: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
     x: '<path d="m6 6 12 12M18 6 6 18"/>',
     arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
+    back: '<path d="M19 12H5m6-6-6 6 6 6"/>',
     refresh: '<path d="M20 11a8 8 0 0 0-14.6-4.5L4 8m0-4v4h4M4 13a8 8 0 0 0 14.6 4.5L20 16m0 4v-4h-4"/>',
     power: '<path d="M12 3v8m5.7-4.7a8 8 0 1 1-11.4 0"/>',
     eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
