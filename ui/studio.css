@@ -15,7 +15,7 @@ h1 { margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -.3px; }
 .workspace::-webkit-scrollbar { width: 6px; }
 .workspace::-webkit-scrollbar-thumb { background: #ffffff1c; border-radius: 9px; }
 /* Audio & language is the hero across the top; the other three sit below it. */
-.settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-content: start; width: 100%; max-width: 1100px; margin: 0 auto; }
+.settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; width: 100%; max-width: 1100px; margin: 0 auto; }
 .panel { border-radius: var(--radius); border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; transition: border-color .25s, box-shadow .25s; }
 .panel:focus-within { border-color: #e9be6855; box-shadow: 0 0 0 1px #e9be6815, 0 0 28px #e9be6810; }
 .panel-head { display: flex; align-items: center; gap: 8px; }
@@ -32,9 +32,6 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
 .panel.hero > .pair .fld > span { font-size: 13px; }
 .panel.hero > .row-toggle { grid-column: 2; }
 .panel.hero > hr { display: none; }
-.panel.presets .path { flex-wrap: wrap; }
-.panel.presets .path input { flex-basis: 100%; }
-.panel.presets .path .btn { flex: 1; }
 
 /* ── fields ────────────────────────────────────────────── */
 .fld { display: flex; flex-direction: column; gap: 5px; min-width: 0; }

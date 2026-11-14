@@ -3,7 +3,6 @@
    the values back to Python, which runs the existing selection/handshake path. */
 let api, init;
 const V = {};                       // current form values, same keys as web_studio
-const PLACEHOLDER = "Select a preset", NONE = "(none saved)";
 const NUMBERS = [
   ["max_chars", "Max characters", "chars", 8, 60],
   ["max_lines", "Lines per cue", "lines", 1, 4],
@@ -175,7 +174,7 @@ function renderSummary() {
 
 /* ── dropdowns ───────────────────────────────────────────── */
 /* A styled button and list over each native select. The select stays in the
-   page (hidden) and keeps the value, so binding, render and presets are
+   page (hidden) and keeps the value, so binding and render are
    unchanged; the dropdown only mirrors it. */
 const Dropdown = {
   native: { Assamese: "অসমীয়া", Bengali: "বাংলা", Gujarati: "ગુજરાતી", Hindi: "हिन्दी", Kannada: "ಕನ್ನಡ", Malayalam: "മലയാളം",
@@ -183,7 +182,6 @@ const Dropdown = {
   icons: {
     trackSel: '<path d="M3 12h2m3-5v10m4-13v16m4-11v6m4-3h1"/>',
     langSel: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
-    presetSel: '<path d="M7 4h10v17l-5-4-5 4z"/>',
   },
   all: [], close: null,
 
@@ -204,7 +202,7 @@ const Dropdown = {
     dd.append(sel);
     sel.tabIndex = -1;
     dd.insertAdjacentHTML("beforeend",
-      `<button type="button" class="dd-btn"><span class="dd-ico">${svg(this.icons[sel.id] || this.icons.presetSel)}</span><span class="dd-label"></span><span class="dd-chev">${svg('<path d="m6 9 6 6 6-6"/>')}</span></button>` +
+      `<button type="button" class="dd-btn"><span class="dd-ico">${svg(this.icons[sel.id])}</span><span class="dd-label"></span><span class="dd-chev">${svg('<path d="m6 9 6 6 6-6"/>')}</span></button>` +
       `<div class="dd-pop">${lang ? `<label class="dd-search">${svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>')}<input placeholder="Search languages…" spellcheck="false"></label>` : ""}<div class="dd-list" role="listbox"></div></div>`);
     const btn = dd.querySelector(".dd-btn"), list = dd.querySelector(".dd-list"), search = dd.querySelector(".dd-search input");
     const tick = svg('<path d="m5 12 4 4L19 6"/>');
@@ -272,43 +270,6 @@ const Dropdown = {
   syncAll() { this.all.forEach((sync) => sync()); },
 };
 document.addEventListener("click", () => Dropdown.close && Dropdown.close());
-
-/* ── presets ─────────────────────────────────────────────── */
-function fillPresets(list, pick) {
-  fillSelect($("presetSel"), [PLACEHOLDER, ...(list.length ? list : [NONE])], pick || PLACEHOLDER);
-  $("presetSel").options[0].disabled = true;
-}
-function wirePresets() {
-  $("presetSel").onchange = async (e) => {
-    const name = e.target.value;
-    if (name === PLACEHOLDER || name === NONE) return;
-    const r = await api.load_preset(name);
-    if (!r.ok) { UI.toast(r.message, "err"); return; }
-    Object.assign(V, r.values);
-    render();
-    UI.toast(`Preset “${name}” applied`);
-  };
-  $("savePreset").onclick = () => UI.busy($("savePreset"), async () => {
-    const typed = $("presetName").value.trim();
-    const picked = $("presetSel").value;
-    const name = typed || (picked !== PLACEHOLDER && picked !== NONE ? picked : "");
-    if (!name) { $("presetName").focus(); UI.toast("Type a name for the preset first."); return; }
-    const r = await api.save_preset(name, V);
-    if (!r.ok) { UI.toast(r.message, "err"); return; }
-    fillPresets(r.presets, name);
-    $("presetName").value = "";
-    UI.toast(`Preset “${name}” saved`);
-  });
-  $("removePreset").onclick = () => UI.busy($("removePreset"), async () => {
-    const name = $("presetSel").value;
-    if (name === PLACEHOLDER || name === NONE) return;
-    const r = await api.remove_preset(name);
-    if (!r.ok) { UI.toast(r.message, "err"); return; }
-    fillPresets(r.presets);
-    UI.toast(`Preset “${name}” removed`);
-  });
-  $("presetName").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.stopPropagation(); $("savePreset").click(); } });
-}
 
 /* ── submit ──────────────────────────────────────────────── */
 const actionButtons = () => [$("goBtn"), $("undoBtn"), $("cancelBtn"), $("altBtn")];
@@ -526,11 +487,9 @@ window.addEventListener("pywebviewready", async () => {
   buildNumbers();
   fillSelect($("trackSel"), init.items.length ? init.items : [""], V.chosen);
   fillSelect($("langSel"), init.languages, V.lang);
-  fillPresets(init.presets);
-  ["trackSel", "langSel", "presetSel"].forEach((id) => Dropdown.enhance($(id)));
+  ["trackSel", "langSel"].forEach((id) => Dropdown.enhance($(id)));
   UI.hydrateIcons();
   bindControls();
-  wirePresets();
   wireActions();
   render();
   document.body.classList.add("ready");
