@@ -1,3 +1,13 @@
+v2.0.0: new logo, Back from review, pasted scripts, safer imports, new look.
+
+- New logo: a speech bubble with two subtitle lines on the gold tile, the same in the app header, the classic window and the installer icon.
+- Review screen has a Back button. It keeps the transcript and your cue edits. Changing only timing re-cuts the same transcript with no API call; changing language, punctuation, speakers or the script offers Regenerate.
+- Reference script: a Browse file / Paste text switch. Pasted text is used exactly like a .txt script and comes back next time the app opens.
+- The Presets panel is gone from the caption studio. Preset files and the classic form's presets are untouched.
+- New captions stay off subtitle tracks that already hold cues: an earlier run's track is locked while the new one is imported, then unlocked. If Resolve refuses the import, two other ways are tried, and a failure now shows in the app instead of leaving it on "Importing subtitles..." for up to ten minutes.
+- New look: panels, buttons and switches with more depth, short descriptions under the Audio & language switches, full-size fields in the default window, and a dusk scene on the home screen.
+- 95 tests pass. Screens checked in a browser UI mock. Not yet run in a live Resolve session.
+
 v1.4.7: punctuation in the caption's own language; Urdu removed.
 
 - With Punctuation on, a sentence ends with । in Bengali, Assamese, Hindi, Nepali, Sanskrit, Punjabi and Odia instead of a full stop. Marathi, Gujarati, Tamil, Telugu, Kannada and Malayalam keep the full stop they normally use.
