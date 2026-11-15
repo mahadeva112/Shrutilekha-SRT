@@ -1,3 +1,8 @@
+v2.0.7: the playhead stays where you left it.
+
+- After a run placed its captions, the playhead was left far past the clips, often at the end of the video. Placing moves it twice: to the timeline start, as the anchor the SRT import needs, and then past whatever Resolve appended. Srutilekha now notes where the playhead was before placing and puts it back afterwards, whether the placement worked or not. This applies to Resolve 21.1 and 21.2 (the bridge) and to Resolve 21.0 and earlier (the Lua launcher).
+- 128 tests pass, including a check in Resolve's own Lua engine (fuscript) that the playhead comes back. Not yet checked in a live Resolve session.
+
 v2.0.6: the windows Resolve opens now look like the app.
 
 - Warning and error windows that open from Resolve (a paused run, a short message) used Tk with an older palette. They now open as a small WebView2 window built from the caption studio's own stylesheet: the Srutilekha title bar, gold buttons, numbered "What to do" steps, and "Show details" with Copy details. The window fits its text, opens centred on the screen Resolve is on, comes in front of Resolve, and has rounded corners on Windows 11.

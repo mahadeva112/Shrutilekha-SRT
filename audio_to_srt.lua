@@ -825,7 +825,7 @@ log(string.format("Mapped %d clip range(s); anchor=frame %d", rangeCount, tlStar
 -- old code returned all 93. That reported "Imported 92 subtitle cues" for 57,
 -- and — worse — ran the styling pass over the earlier run's cues, re-fonting
 -- and re-colouring subtitles the user had never asked to touch.
-local function import_srt_to_new_track(mp, srt_file, firstFrame)
+local function place_srt(mp, srt_file, firstFrame)
     local function item_start(item)
         local ok, f = pcall(function() return item:GetStart() end)
         if ok then return f end
@@ -1070,6 +1070,20 @@ local function import_srt_to_new_track(mp, srt_file, firstFrame)
         pcall(function() timeline:DeleteTrack("subtitle", addedTrack) end)
     end
     return true, landed, newItems, created, nil
+end
+
+-- Place the SRT and put the playhead back where the user had it. Placing
+-- moves it twice: to the timeline start, as the anchor the import needs, and
+-- then past whatever AppendToTimeline appended, which can be the end of the
+-- video. Left there, the playhead sat far past the clips after every run.
+local function import_srt_to_new_track(mp, srt_file, firstFrame)
+    local okTc, playhead = pcall(function() return timeline:GetCurrentTimecode() end)
+    local r = {pcall(place_srt, mp, srt_file, firstFrame)}
+    if okTc and playhead and playhead ~= "" then
+        pcall(function() timeline:SetCurrentTimecode(playhead) end)
+    end
+    if not r[1] then error(r[2], 0) end
+    return r[2], r[3], r[4], r[5], r[6]
 end
 
 -- How many of these cues are the user's.

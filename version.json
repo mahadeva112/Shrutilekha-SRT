@@ -1,8 +1,8 @@
 {
-  "version": "2.0.6",
+  "version": "2.0.7",
   "notes": [
-    "Warning and error windows from Resolve now look like the rest of Srutilekha: same colours, buttons and steps.",
-    "They open in the middle of the screen Resolve is on, in front of Resolve.",
+    "After captions are placed, the playhead goes back to where you left it instead of the end of the video.",
+    "Warning and error windows from Resolve look like the rest of Srutilekha.",
     "Save SRT on the done screen saves the captions this run placed as an .srt file.",
     "When a run pauses, Srutilekha shows a calm heading, what to do next, and the details folded away."
   ],

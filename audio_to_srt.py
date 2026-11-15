@@ -652,6 +652,28 @@ def first_cue_frame(srt_path, fps, tl_start):
 
 def import_srt_to_new_track(timeline, mp, srt_file, timecode, record_frame=None,
                             first_frame=None):
+    """Place the SRT (see _place_srt) and put the playhead back where it was.
+
+    Placing moves the playhead twice: to the timeline start, as the anchor the
+    import needs, and then past whatever AppendToTimeline appended, which can
+    be the end of the video. Left there, the user found the playhead far past
+    their clips after every run.
+    """
+    try:
+        playhead = timeline.GetCurrentTimecode()
+    except Exception:
+        playhead = None
+    try:
+        return _place_srt(timeline, mp, srt_file, timecode, record_frame, first_frame)
+    finally:
+        if playhead:
+            try:
+                timeline.SetCurrentTimecode(playhead)
+            except Exception:
+                pass
+
+
+def _place_srt(timeline, mp, srt_file, timecode, record_frame=None, first_frame=None):
     """Returns (ok, track_index, items, created_track, error).
 
     `items` is only the cues THIS import added, which is not the same as the
