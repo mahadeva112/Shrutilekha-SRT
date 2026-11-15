@@ -1014,7 +1014,7 @@ def do_undo(run, pm, timeline):
     different timeline the user has since switched to."""
     body = read_text(run.last_gen)
     if body is None:
-        msg = "Nothing to undo — no caption track has been generated yet."
+        msg = "All clear. There is no caption track to undo yet."
     else:
         lines = body.strip().splitlines() or [""]
         m = re.match(r"^(\S+)\s+(\d+)\s*(.*?)\s*$", lines[0])
@@ -1023,7 +1023,7 @@ def do_undo(run, pm, timeline):
             if line.startswith("off "):
                 off = [int(x) for x in re.findall(r"\d+", line)]
         if not m:
-            msg = "Nothing to undo — the undo record is empty or unreadable."
+            msg = "All clear. There is nothing to undo right now."
         else:
             ttype, tidx, tname = m.group(1), int(m.group(2)), m.group(3)
             if tname and tname != timeline.GetName():
@@ -1055,8 +1055,8 @@ def do_undo(run, pm, timeline):
                         msg += ("\nTurned %s track(s) %s back on."
                                 % (ttype, ", ".join(str(j) for j in back_on)))
                 else:
-                    msg = ("Could not remove the caption track — it may have "
-                           "been deleted or moved already.")
+                    msg = ("That caption track is no longer on the timeline, so "
+                           "there is nothing left to undo.")
     log("Undo mode: " + msg.replace("\n", " | "))
     run.report(msg)
     run.cleanup()

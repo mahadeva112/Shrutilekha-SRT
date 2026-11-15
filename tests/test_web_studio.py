@@ -159,6 +159,24 @@ class WebStudioTest(unittest.TestCase):
         api._window.destroy.assert_called_once()
         self.assertEqual(api.result["action"], "generate")
 
+    def test_save_srt_asks_where_and_writes_the_runs_captions(self):
+        api = web_studio.StudioApi(dict(PROMPT, timeline="Talk: part 1"), self.ctx)
+        api._window = mock.Mock()
+        self.assertFalse(api.save_srt()["ok"])                   # no run yet
+        fake_webview = mock.Mock(FileDialog=mock.Mock(SAVE=30))
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict("sys.modules", webview=fake_webview):
+            job = mock.Mock(srt_text="1\r\n00:00:01,000 --> 00:00:02,000\r\nHi\r\n\r\n")
+            api._job = job
+            target = str(Path(tmp) / "talk")
+            api._window.create_file_dialog.return_value = target
+            expected = str(Path(target + ".srt"))
+            self.assertEqual(api.save_srt(), {"ok": True, "path": expected})
+            job.save_srt.assert_called_once_with(expected)
+            self.assertEqual(api._window.create_file_dialog.call_args.kwargs["save_filename"],
+                             "Talk  part 1.srt")
+            api._window.create_file_dialog.return_value = None
+            self.assertEqual(api.save_srt(), {"ok": False, "cancelled": True})
+
     def test_superseded_run_closes_the_window(self):
         marker = Path(self.scratch.name) / "current_run.txt"
         marker.write_text("newer", encoding="utf-8")

@@ -66,7 +66,7 @@ class StudioFormTests(unittest.TestCase):
             if isinstance(widget,tk.Label):result.append(widget.cget('text'))
             for child in widget.winfo_children():result.extend(texts(child))
             return result
-        self.assertIn("Couldn't start captions",texts(self.root))
+        self.assertIn("Choose the track with the voice",texts(self.root))
         self.assertEqual(self.app.demo_language_var.get(),'English')
 
     def setUp(self):

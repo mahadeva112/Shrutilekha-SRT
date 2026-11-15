@@ -224,8 +224,99 @@ def alert(title, message, accent=ACCENT):
     root.mainloop()
 
 
+def build_notice_content(body, notice, on_resize=None):
+    """A stopped run, told kindly: heading, a plain sentence, numbered steps,
+    and the raw text folded under "Show details". Shared with visual previews."""
+    from ui_icons import photo
+    from settings_ui import rounded_rect
+    header = tk.Frame(body, bg=BG)
+    header.pack(fill='x', pady=(8, 16))
+    icon = tk.Canvas(header, width=48, height=48, bg=BG, highlightthickness=0)
+    icon.pack(side='left', padx=(0, 14), anchor='n')
+
+    def draw(event=None):
+        icon.delete('all')
+        rounded_rect(icon, 1, 1, 47, 47, 14, fill='#343022', outline='#594731')
+        icon._image = photo(icon, 'shield', 24, ACCENT)
+        icon.create_image(24, 24, image=icon._image)
+    icon.bind('<Configure>', draw); draw()
+    headings = tk.Frame(header, bg=BG); headings.pack(side='left', fill='x', expand=True)
+    tk.Label(headings, text='CAPTION STUDIO', font=('Segoe UI', -11, 'bold'), fg='#b7a273', bg=BG,
+             anchor='w').pack(fill='x')
+    tk.Label(headings, text=notice['title'], font=('Segoe UI', -20, 'bold'), fg=FG, bg=BG,
+             anchor='w', wraplength=380, justify='left').pack(fill='x', pady=(4, 0))
+    tk.Label(body, text=notice['message'], bg=BG, fg='#bec4cf', wraplength=450, justify='left',
+             font=('Segoe UI', -14)).pack(anchor='w', fill='x', pady=(0, 14))
+
+    if notice.get('steps'):
+        steps = tk.Frame(body, bg='#191d23', highlightthickness=1, highlightbackground=BORDER_CARD)
+        steps.pack(fill='x', pady=(0, 14))
+        tk.Label(steps, text='WHAT TO DO', font=('Segoe UI', -10, 'bold'), fg=FG_MUTE, bg='#191d23',
+                 anchor='w').pack(fill='x', padx=14, pady=(10, 4))
+        for n, step in enumerate(notice['steps'], 1):
+            row = tk.Frame(steps, bg='#191d23'); row.pack(fill='x', padx=14, pady=(0, 8))
+            badge = tk.Canvas(row, width=22, height=22, bg='#191d23', highlightthickness=0)
+            badge.pack(side='left', anchor='n', padx=(0, 10))
+            badge.create_oval(1, 1, 21, 21, fill='#3a3121', outline='#6b5634')
+            badge.create_text(11, 11, text=str(n), fill=ACCENT, font=('Segoe UI', -11, 'bold'))
+            tk.Label(row, text=step, bg='#191d23', fg=FG, wraplength=390, justify='left',
+                     anchor='w', font=('Segoe UI', -13)).pack(side='left', fill='x', expand=True)
+        tk.Frame(steps, bg='#191d23', height=2).pack()
+
+    details = (notice.get('details') or '').strip()
+    if details:
+        toggle = tk.Label(body, text='Show details', bg=BG, fg=FG_MUTE, cursor='hand2',
+                          font=('Segoe UI', -12, 'underline'), anchor='w')
+        toggle.pack(anchor='w', pady=(0, 6))
+        box = tk.Text(body, height=6, width=1, wrap='word', bg=BG_INPUT, fg=FG_DIM, bd=0,
+                      highlightthickness=1, highlightbackground=BORDER, font=('Consolas', -12),
+                      padx=10, pady=8)
+        box.insert('1.0', details[:4000])
+        box.configure(state='disabled')
+
+        def flip(event=None):
+            if box.winfo_ismapped():
+                box.pack_forget(); toggle.configure(text='Show details')
+            else:
+                box.pack(fill='x', pady=(0, 12), before=sep); toggle.configure(text='Hide details')
+            if on_resize:
+                on_resize()
+        toggle.bind('<Button-1>', flip)
+    sep = tk.Frame(body, bg='#2c323c', height=1)
+    sep.pack(fill='x', pady=(4, 14))
+    return details
+
+
 def alert_error(title, message):
-    alert(title, message, accent=CLOSE_HOVER)
+    """Show a stopped run as a friendly notice. `title` is the caller's own
+    label; the notice's heading, which names the next step, replaces it."""
+    import notices
+    notice = notices.describe(message)
+    root, body, _ = _dark_window(notice['title'])
+
+    def fit():
+        root.update_idletasks()
+        root.geometry('%dx%d+%d+%d' % (root.winfo_reqwidth(), root.winfo_reqheight(),
+                                       root.winfo_x(), root.winfo_y()))
+        root.update_idletasks()
+        root.after(40, lambda: _round_dialog(root))
+    details = build_notice_content(body, notice, on_resize=fit)
+    btn_frm = tk.Frame(body, bg=BG)
+    btn_frm.pack(fill='x')
+    if details:
+        def copy():
+            root.clipboard_clear(); root.clipboard_append(details)
+            copy_btn.set_text('Copied')
+        copy_btn = _accent_button(btn_frm, 'Copy details', copy, width=11, primary=False)
+        copy_btn.pack(side='left')
+    _accent_button(btn_frm, 'Got it', root.destroy, width=8).pack(side='right')
+    root.bind('<Return>', lambda e: root.destroy())
+    root.bind('<Escape>', lambda e: root.destroy())
+    center(root)
+    _make_draggable(root)
+    root.lift()
+    root.attributes('-topmost', True)
+    root.mainloop()
 
 
 def pick(title, prompt, items):

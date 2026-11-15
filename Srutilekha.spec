@@ -16,7 +16,7 @@ for package in ('pystray', 'psutil', 'Pillow', 'six', 'pywebview', 'pythonnet', 
 # Both processes share one runtime directory. The worker keeps a console
 # subsystem for its UTF-8 progress pipe, but is started with CREATE_NO_WINDOW.
 gui = Analysis(['app.py'], pathex=[str(root)], binaries=[], datas=datas,
-               hiddenimports=['dialog', 'web_ui', 'web_home', 'web_studio', 'web_run', 'web_review', 'transcribe', 'release_updater', 'studio_form', 'truststore',
+               hiddenimports=['dialog', 'notices', 'web_ui', 'web_home', 'web_studio', 'web_run', 'web_review', 'transcribe', 'release_updater', 'studio_form', 'truststore',
                               'tkinter.font', 'tkinter.filedialog', 'six', 'PIL.ImageWin'],
                hookspath=[], hooksconfig={}, runtime_hooks=[], excludes=['pystray'], noarchive=False)
 worker = Analysis(['worker.py'], pathex=[str(root)], binaries=[], datas=datas,

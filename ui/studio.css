@@ -202,6 +202,22 @@ input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.18); }
 .done-meta .saved { grid-column: 1 / -1; color: var(--green); display: flex; align-items: center; gap: 8px; }
 .done-meta .saved svg { width: 15px; height: 15px; stroke-width: 2.4; }
 .done-foot .btn.primary { min-width: 150px; height: 42px; }
+.done-steps { margin: 18px 0 0; padding: 14px 16px 12px; border-radius: 14px; background: linear-gradient(180deg, #e9be680d, #e9be6805); border: 1px solid #e9be6826; text-align: left; }
+.run-card .done-steps .kicker { display: block; margin-bottom: 9px; padding: 0; border: 0; background: none; border-radius: 0; text-transform: uppercase; font-size: 10px; color: #c9b27f; }
+.done-steps ol { list-style: none; counter-reset: step; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.done-steps li { counter-increment: step; position: relative; padding-left: 32px; min-height: 22px; font-size: 13.5px; line-height: 1.55; color: var(--text); user-select: text; }
+.done-steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; color: var(--gold); background: #e9be681f; border: 1px solid #e9be6845; }
+.done-details { margin: 12px 0 0; text-align: left; }
+.done-details summary { cursor: pointer; width: max-content; font-size: 12.5px; color: var(--dim); list-style: none; padding: 2px 0; }
+.done-details summary::-webkit-details-marker { display: none; }
+.done-details summary::before { content: "›"; display: inline-block; margin-right: 6px; transition: transform .15s; }
+.done-details[open] summary::before { transform: rotate(90deg); }
+.done-details summary:hover { color: var(--muted); }
+.done-details pre { margin: 8px 0 6px; max-height: 120px; overflow: auto; padding: 10px 12px; border-radius: 10px; background: #0000002e; border: 1px solid var(--line); font: 12px/1.5 Consolas, "Cascadia Mono", monospace; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.done-actions { display: flex; gap: 10px; align-items: center; }
+.done-actions .btn { height: 42px; }
+.done-actions .btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.done-saved-to { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; text-align: center; }
 
 /* ── review & split ────────────────────────────────────── */
 .review-meta { display: flex; align-items: center; gap: 12px; }

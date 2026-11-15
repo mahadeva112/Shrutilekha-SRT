@@ -62,32 +62,32 @@ class BaseApi:
         except Exception as exc:
             code = getattr(exc, "status_code", None)
             return {"ok": False, "message":
-                    "API key rejected. Check your key." if code == 401 else
-                    "Profile access denied. Check the key permissions; speech-to-text access may differ." if code == 403 else
-                    "Could not connect. Check your internet connection and API permissions."}
+                    "ElevenLabs is asking for a current key. Copy a fresh one from elevenlabs.io and paste it here." if code == 401 else
+                    "Your key is valid. Allow its profile access at elevenlabs.io to run this check; captions may already work." if code == 403 else
+                    "Let's get online first: check this PC's internet connection, then test again."}
 
     def save_key(self, key):
         try:
             credentials.save_key(key or "")
         except Exception:
-            return {"ok": False, "message": "Could not save the key. Enter a valid key and try again."}
+            return {"ok": False, "message": "Paste the full key, then press Save key again."}
         return {"ok": True, "message": "API key saved and encrypted for this Windows account."}
 
     def remove_key(self):
         try:
             credentials.delete_key()
         except Exception:
-            return {"ok": False, "message": "Could not remove the saved key. Try again."}
+            return {"ok": False, "message": "The key is still saved. Press Remove once more."}
         return {"ok": True, "message": "Saved API key removed."}
 
     # ── updates ───────────────────────────────────────────────────────────
     def check_updates(self):
         if self._updater is None:
-            return {"ok": False, "message": "Update check unavailable."}
+            return {"ok": False, "message": "Updates are checked in the installed app."}
         try:
             info = self._updater.check()
         except Exception:
-            return {"ok": False, "message": "Update check unavailable. Try again later."}
+            return {"ok": False, "message": "Updates will be checked again shortly. You are all set for now."}
         self._update = info
         version = self._updater.VERSION
         if not info:
@@ -99,11 +99,11 @@ class BaseApi:
 
     def install_update(self):
         if not self._update or not self._busy.acquire(blocking=False):
-            return {"ok": False, "message": "No update is ready to install."}
+            return {"ok": False, "message": "You are on the latest version."}
         try:
             self._updater.install(self._update)
         except Exception:
-            return {"ok": False, "message": "Update failed. Your installation and API key are unchanged."}
+            return {"ok": False, "message": "Your current version and API key are kept. Try installing the update again in a moment."}
         finally:
             self._busy.release()
         self._after_update()

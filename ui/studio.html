@@ -164,16 +164,29 @@
   <section class="run-card done-card" id="doneCard" hidden>
     <div class="done-mark" id="doneMark">
       <svg viewBox="0 0 52 52" class="tick"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-16"/></svg>
-      <svg viewBox="0 0 52 52" class="warn"><circle cx="26" cy="26" r="24"/><path d="M26 15v14m0 7v1"/></svg>
+      <svg viewBox="0 0 52 52" class="warn"><circle cx="26" cy="26" r="24"/><path d="M26 23v13m0-20v1"/></svg>
     </div>
     <h2 id="doneTitle">Done</h2>
     <p class="done-head" id="doneHeadline"></p>
     <div class="done-tiles" id="doneTiles"></div>
     <ul class="done-body" id="doneBody"></ul>
     <dl class="done-meta" id="doneMeta"></dl>
+    <div class="done-steps" id="doneSteps" hidden>
+      <span class="kicker">What to do</span>
+      <ol id="doneStepList"></ol>
+    </div>
+    <details class="done-details" id="doneDetails" hidden>
+      <summary>Show details</summary>
+      <pre id="doneDetailsText"></pre>
+      <button class="btn sm ghost" id="doneCopy" type="button">Copy details</button>
+    </details>
+    <p class="done-saved-to" id="doneSavedTo" hidden></p>
     <div class="done-foot">
       <span class="elapsed" id="doneElapsed"></span>
-      <button class="btn primary" id="doneClose">Close</button>
+      <div class="done-actions">
+        <button class="btn" id="doneSave" data-icon="download" hidden title="Save the captions this run placed as an .srt file. Edits you make later in Resolve are not in it."><span class="lbl">Save SRT…</span></button>
+        <button class="btn primary" id="doneClose">Close</button>
+      </div>
     </div>
   </section>
 </div>

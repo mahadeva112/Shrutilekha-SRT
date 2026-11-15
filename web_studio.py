@@ -173,7 +173,7 @@ class StudioApi(web_ui.BaseApi):
             with open(self._preset_path(name), encoding="utf-8") as f:
                 data = json.load(f)
         except (OSError, ValueError):
-            return {"ok": False, "message": "Could not read that preset."}
+            return {"ok": False, "message": "That preset needs a fresh save. Choose your settings and save it again."}
         values = {k: data[k] for k in PRESET_KEYS if k in data}
         settings = data.get("_settings")
         if isinstance(settings, list) and len(settings) == len(SETTINGS_KEYS):
@@ -189,7 +189,7 @@ class StudioApi(web_ui.BaseApi):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=1)
         except (OSError, ValueError) as exc:
-            return {"ok": False, "message": "Cannot save preset: %s" % exc}
+            return {"ok": False, "message": "Let's try saving that preset under another name. (%s)" % exc}
         return {"ok": True, "presets": self.list_presets()}
 
     def remove_preset(self, name):
@@ -198,7 +198,7 @@ class StudioApi(web_ui.BaseApi):
             if os.path.exists(path):
                 os.remove(path)
         except (OSError, ValueError):
-            return {"ok": False, "message": "Could not remove that preset."}
+            return {"ok": False, "message": "That preset is staying for now. Try removing it once more."}
         return {"ok": True, "presets": self.list_presets()}
 
     # ── files ─────────────────────────────────────────────────────────────
@@ -214,21 +214,52 @@ class StudioApi(web_ui.BaseApi):
             return ""
         return os.path.normpath(picked[0]) if picked else ""
 
+    def default_srt_name(self):
+        name = str(self._prompt.get("timeline") or self._prompt.get("timeline_name") or "").strip()
+        name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", name).strip(" .")
+        return (name or "Captions") + ".srt"
+
+    def save_srt(self):
+        """Save SRT… on the done screen: the captions this run placed."""
+        job = getattr(self, "_job", None)
+        if job is None or not job.srt_text:
+            return {"ok": False, "message": "Captions to save will appear here after a run."}
+        import webview
+        dialog = getattr(getattr(webview, "FileDialog", None), "SAVE", None) or webview.SAVE_DIALOG
+        try:
+            picked = self._window.create_file_dialog(
+                dialog, save_filename=self.default_srt_name(),
+                file_types=("Subtitle file (*.srt)", "All files (*.*)"))
+        except Exception as exc:
+            return {"ok": False, "message": "The save window will open on the next try. (%s)" % exc}
+        if isinstance(picked, (list, tuple)):
+            picked = picked[0] if picked else ""
+        if not picked:
+            return {"ok": False, "cancelled": True}
+        path = os.path.normpath(str(picked))
+        if not os.path.splitext(path)[1]:
+            path += ".srt"
+        try:
+            job.save_srt(path)
+        except OSError as exc:
+            return {"ok": False, "message": "Let's save the SRT to another folder, such as Documents. (%s)" % exc}
+        return {"ok": True, "path": path}
+
     # ── submit / cancel ───────────────────────────────────────────────────
     def submit(self, action, values):
         if action not in ("generate", "sync", "undo"):
-            return {"ok": False, "message": "Unknown action."}
+            return {"ok": False, "message": "Choose Generate or Sync to begin."}
         if action != "undo":
             if self._ctx.get("frozen") and not self._has_key():
                 return {"ok": False, "needKey": True, "message": "Add your ElevenLabs API key to continue."}
             if not str(values.get("chosen") or "").strip():
                 return {"ok": False, "message": "Choose an audio track first."}
             if action == "sync" and not str(values.get("sync_srt") or "").strip():
-                return {"ok": False, "message": "Enter the path to the existing SRT to sync."}
+                return {"ok": False, "message": "Choose the SRT you would like to sync."}
             try:
                 values = resolve_script(values)
             except OSError as exc:
-                return {"ok": False, "message": "Could not save the pasted script: %s" % exc}
+                return {"ok": False, "message": "Let's try the script as a file instead: use Browse file. (%s)" % exc}
         if not self._ctx.get("paths"):
             # No Resolve job attached: hand the values back to the caller.
             self.result = {"action": action, "values": values}
@@ -240,7 +271,7 @@ class StudioApi(web_ui.BaseApi):
         try:
             job.start(sel, review_wanted=bool(int(values.get("review") or 0)))
         except OSError as exc:
-            return {"ok": False, "message": "Cannot write selection file: %s" % exc}
+            return {"ok": False, "message": "Srutilekha needs a fresh start. Run it again from Workspace > Scripts. (%s)" % exc}
         self._job = job
         return {"ok": True, "running": True}
 
@@ -261,7 +292,7 @@ class StudioApi(web_ui.BaseApi):
         try:
             out = web_review.resplit([web_review.live_segment(x) for x in segs], s)
         except Exception as exc:
-            return {"ok": False, "message": "Could not re-split: %s" % exc}
+            return {"ok": False, "message": "Those split values need a small change. Try a slightly different number. (%s)" % exc}
         self._review_s = s
         return {"ok": True, "segs": out, "s": s}
 
@@ -284,19 +315,19 @@ class StudioApi(web_ui.BaseApi):
 
     def review_apply(self, segs):
         job = getattr(self, "_job", None)
-        return job.apply_review(segs) if job else {"ok": False, "message": "Nothing to apply."}
+        return job.apply_review(segs) if job else {"ok": False, "message": "Your captions are already on their way."}
 
     def regenerate(self, values):
         """Back from review, then Regenerate: transcribe again, same track."""
         job = getattr(self, "_job", None)
         if job is None:
-            return {"ok": False, "message": "Nothing to regenerate."}
+            return {"ok": False, "message": "Start a run first, then you can regenerate from review."}
         if self._ctx.get("frozen") and not self._has_key():
             return {"ok": False, "needKey": True, "message": "Add your ElevenLabs API key to continue."}
         try:
             values = resolve_script(values)
         except OSError as exc:
-            return {"ok": False, "message": "Could not save the pasted script: %s" % exc}
+            return {"ok": False, "message": "Let's try the script as a file instead: use Browse file. (%s)" % exc}
         import web_run
         sel = web_run.build_selection("generate", values, self._prompt, self._ctx, timeline_res)
         return job.regenerate(sel)
