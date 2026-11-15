@@ -762,74 +762,42 @@ def import_srt_to_new_track(timeline, mp, srt_file, timecode, record_frame=None,
                 continue
         return None
 
-    placed = False
-    if added_track:
-        info = {"mediaPoolItem": clip, "trackIndex": added_track}
-        if record_frame is not None:
-            info["recordFrame"] = record_frame
-        placed = attempt("asking for the new track at the timeline start",
-                         lambda: mp.AppendToTimeline([info]))
-        if not placed:
-            relock = []
-            for i in range(1, before_tracks + 1):
-                if is_locked(i) is False:
-                    try:
-                        if timeline.SetTrackLock("subtitle", i, True):
-                            relock.append(i)
-                    except Exception:
-                        pass
-            if relock:
-                try:
-                    placed = attempt("with %d other subtitle track(s) locked" % len(relock),
-                                     lambda: mp.AppendToTimeline([{"mediaPoolItem": clip}]))
-                finally:
-                    for i in relock:
-                        try:
-                            timeline.SetTrackLock("subtitle", i, False)
-                        except Exception:
-                            pass
-    if not placed:
-        # Resolve 21.1 documents clip-info dictionaries as the supported append
-        # form; the older bare MediaPoolItem overload is deprecated.
-        placed = attempt("with a plain append",
-                         lambda: mp.AppendToTimeline([{"mediaPoolItem": clip}]))
-    if not placed:
-        drop_added()
-        return False, None, None, False, \
-            "Resolve could not append the SRT to the timeline."
+    def find_new():
+        """(track, this run's cues, cue count already on it) for the subtitle
+        track that grew most. An item at a start frame that was not occupied
+        before this import is one of ours. Items stay in timeline order, so
+        items[0] is the first cue of this run."""
+        landed, new_items, prior_count = None, [], 0
+        for i in range(1, timeline.GetTrackCount("subtitle") + 1):
+            prior = before.get(i, set())
+            added = []
+            for item in track_items(i):
+                f = item_start(item)
+                # No readable start frame: treat as ours. Leaving a cue of this
+                # run unstyled is worse than the unlikely alternative, and a
+                # handle that cannot answer GetStart is broken anyway.
+                if f is None or f not in prior:
+                    added.append(item)
+            if len(added) > len(new_items):
+                landed, new_items, prior_count = i, added, len(prior)
+        return landed, new_items, prior_count
 
-    # Which track grew, and by which items? Both answers come from the same
-    # pass: an item at a start frame that was not occupied before this import is
-    # one of ours. Items stay in timeline order, so items[0] is the first cue of
-    # this run.
-    landed, new_items, prior_count = None, [], 0
-    for i in range(1, timeline.GetTrackCount("subtitle") + 1):
-        prior = before.get(i, set())
-        added = []
-        for item in track_items(i):
-            f = item_start(item)
-            # No readable start frame: treat as ours. Leaving a cue of this run
-            # unstyled is worse than the unlikely alternative, and a handle that
-            # cannot answer GetStart is broken anyway.
-            if f is None or f not in prior:
-                added.append(item)
-        if len(added) > len(new_items):
-            landed, new_items, prior_count = i, added, len(prior)
+    def settle(landed, new_items, prior_count):
+        """Put this run's cues on the new track at their own time when Resolve
+        put them elsewhere. Returns (landed, new_items, prior_count, off): off
+        is how many frames the first caption still is from where it belongs,
+        or None when that cannot be told.
 
-    if not landed:
-        drop_added()
-        return False, None, None, False, \
-            "The SRT imported but Resolve placed no cues on any subtitle track."
-
-    log("SRT cues landed on subtitle track %d: %d new, %d cue(s) already "
-        "there (left untouched)." % (landed, len(new_items), prior_count))
-
-    # Resolve 21.2 ignores trackIndex for an SRT and appends it after the cues
-    # already on track 1 (45 cues landed 1431 frames late on 2026-11-14). Move
-    # exactly this run's cues onto the new track at the frame their first
-    # caption belongs at; MoveItems keeps their spacing.
-    if added_track and first_frame is not None and new_items:
+        Resolve 21.2 ignores trackIndex for an SRT and appends it after the
+        cues already on track 1 (45 cues landed 1431 frames late on
+        2026-11-14). MoveItems moves exactly this run's cues and keeps their
+        spacing. Older Resolve has no MoveItems, so there `off` stays as it
+        is and the caller tries the next way of placing them."""
+        if first_frame is None or not new_items:
+            return landed, new_items, prior_count, None
         starts = [item_start(item) for item in new_items]
+        if None in starts:
+            return landed, new_items, prior_count, None
         ref = 0
         for k, item in enumerate(new_items):
             try:
@@ -838,25 +806,108 @@ def import_srt_to_new_track(timeline, mp, srt_file, timecode, record_frame=None,
                     break
             except Exception:
                 pass
-        if None not in starts:
-            shift = first_frame - starts[ref]
-            if landed != added_track or abs(shift) > 2:
-                target = min(starts) + shift
-                moved, why = False, ""
+        shift = first_frame - starts[ref]
+        if not added_track or (landed == added_track and abs(shift) <= 2):
+            return landed, new_items, prior_count, abs(shift)
+        target = min(starts) + shift
+        moved, why = False, ""
+        try:
+            moved = timeline.MoveItems(
+                new_items, {"trackIndex": added_track, "startFrame": target}, False)
+        except Exception as exc:
+            why = " (%s)" % exc
+        on_new = track_items(added_track) if moved else []
+        if moved and len(on_new) >= len(new_items):
+            log("Moved the %d new cue(s) from subtitle track %d to track %d, "
+                "first caption at frame %d (was %d)."
+                % (len(new_items), landed, added_track, first_frame, starts[ref]))
+            return added_track, on_new, 0, 0
+        log("Could not move the new cues onto track %d%s." % (added_track, why))
+        return landed, new_items, prior_count, abs(shift)
+
+    def take_back(items):
+        """Delete this run's cues again. True only when they are all gone."""
+        was = cue_total()
+        try:
+            timeline.DeleteClips(items, False)
+        except Exception as exc:
+            log("Could not take the misplaced cues back (%s)." % exc)
+            return False
+        return cue_total() <= was - len(items)
+
+    def by_clip_info():
+        info = {"mediaPoolItem": clip, "trackIndex": added_track}
+        if record_frame is not None:
+            info["recordFrame"] = record_frame
+        return attempt("asking for the new track at the timeline start",
+                       lambda: mp.AppendToTimeline([info]))
+
+    def with_others_locked():
+        relock = []
+        for i in range(1, before_tracks + 1):
+            if is_locked(i) is False:
                 try:
-                    moved = timeline.MoveItems(
-                        new_items, {"trackIndex": added_track, "startFrame": target}, False)
-                except Exception as exc:
-                    why = " (%s)" % exc
-                on_new = track_items(added_track) if moved else []
-                if moved and len(on_new) >= len(new_items):
-                    log("Moved the %d new cue(s) from subtitle track %d to track %d, "
-                        "first caption at frame %d (was %d)."
-                        % (len(new_items), landed, added_track, first_frame, starts[ref]))
-                    landed, new_items, prior_count = added_track, on_new, 0
-                else:
-                    log("Could not move the new cues onto track %d%s."
-                        % (added_track, why))
+                    if timeline.SetTrackLock("subtitle", i, True):
+                        relock.append(i)
+                except Exception:
+                    pass
+        if not relock:
+            return False
+        try:
+            return attempt("with %d other subtitle track(s) locked" % len(relock),
+                           lambda: mp.AppendToTimeline([{"mediaPoolItem": clip}]))
+        finally:
+            for i in relock:
+                try:
+                    timeline.SetTrackLock("subtitle", i, False)
+                except Exception:
+                    pass
+
+    def plain():
+        # Resolve 21.1 documents clip-info dictionaries as the supported append
+        # form; the older bare MediaPoolItem overload is deprecated. This is
+        # how v1.4.7 placed every run.
+        return attempt("with a plain append",
+                       lambda: mp.AppendToTimeline([{"mediaPoolItem": clip}]))
+
+    # A placement only counts when the first caption is where it belongs. On
+    # an older Resolve the clipInfo append can put the whole run at the END of
+    # the video, and there is no MoveItems to bring it back. Then this run's
+    # cues are taken off the timeline again and the next way is tried; the
+    # last way's result is kept whatever it is, as before.
+    ways = ([by_clip_info, with_others_locked] if added_track else []) + [plain]
+    landed, new_items, prior_count, took_back = None, [], 0, False
+    for n, way in enumerate(ways):
+        if not way():
+            continue
+        landed, new_items, prior_count = find_new()
+        if not landed:
+            drop_added()
+            return False, None, None, False, \
+                "The SRT imported but Resolve placed no cues on any subtitle track."
+        log("SRT cues landed on subtitle track %d: %d new, %d cue(s) already "
+            "there (left untouched)." % (landed, len(new_items), prior_count))
+        landed, new_items, prior_count, off = settle(landed, new_items, prior_count)
+        if off is None or off <= 2 or n == len(ways) - 1:
+            break
+        if not take_back(new_items):
+            log("Keeping the cues where Resolve put them, %d frame(s) from "
+                "where they belong." % off)
+            break
+        log("Took the %d new cue(s) off track %d again: the first caption was "
+            "%d frame(s) from where it belongs. Trying another way."
+            % (len(new_items), landed, off))
+        landed, new_items, prior_count, took_back = None, [], 0, True
+
+    if not landed:
+        drop_added()
+        if took_back:
+            return False, None, None, False, \
+                "Resolve put the captions in the wrong place and would not " \
+                "place them again."
+        return False, None, None, False, \
+            "Resolve could not append the SRT to the timeline."
+
     if prior_count:
         log("WARNING: the new cues share a track with earlier ones; Resolve may "
             "have placed them after those cues rather than at their own times.")
@@ -891,14 +942,67 @@ def count_real_cues(items):
     return n
 
 
-def record_undo(run, timeline, kind, idx, created):
+def subtitle_track_enabled(timeline, i):
+    """True/False, or None when this Resolve cannot say."""
+    # Resolve 21.2 has GetIsTrackEnabled; older versions GetTrackEnable.
+    for name in ("GetIsTrackEnabled", "GetTrackEnable"):
+        try:
+            state = getattr(timeline, name)("subtitle", i)
+        except Exception:
+            continue
+        if state is not None:
+            return bool(state)
+    return None
+
+
+def turn_off_other_subtitle_tracks(timeline, keep):
+    """Turn off every other subtitle track, so the viewer and the render show
+    this run's captions and not an earlier run's on top of or instead of them.
+    Nothing is deleted. Returns the tracks this turned off, for Undo to turn
+    back on; a track the user had already turned off is left out."""
+    try:
+        count = timeline.GetTrackCount("subtitle")
+    except Exception:
+        return []
+    try:
+        timeline.SetTrackEnable("subtitle", keep, True)
+    except Exception:
+        pass
+    off = []
+    for i in range(1, count + 1):
+        if i == keep or subtitle_track_enabled(timeline, i) is False:
+            continue
+        try:
+            if timeline.SetTrackEnable("subtitle", i, False) is not False:
+                off.append(i)
+        except Exception as exc:
+            log("Could not turn off subtitle track %d (%s)." % (i, exc))
+    if off:
+        log("Turned off subtitle track(s) %s so only the new track %d shows."
+            % (", ".join(str(i) for i in off), keep))
+    return off
+
+
+def record_undo(run, timeline, kind, idx, created, turned_off=()):
     """Remember the track for Undo only when we created it ourselves. Undo
     deletes a whole track, so pointing it at a track that already held the
-    user's cues would turn "undo my captions" into "delete my subtitles"."""
+    user's cues would turn "undo my captions" into "delete my subtitles".
+    A second line lists the tracks this run turned off, which Undo turns back
+    on."""
     if created:
-        write_text(run.last_gen, "%s %d %s" % (kind, idx, timeline.GetName()))
+        body = "%s %d %s" % (kind, idx, timeline.GetName())
+        if turned_off:
+            body += "\noff %s" % ",".join(str(i) for i in turned_off)
+        write_text(run.last_gen, body)
     else:
         rm(run.last_gen)
+
+
+def place_and_record(run, timeline, strack, created):
+    """After an import: turn the other subtitle tracks off when the captions
+    have a track of their own, and record the run for Undo."""
+    turned_off = turn_off_other_subtitle_tracks(timeline, strack) if created else []
+    record_undo(run, timeline, "subtitle", strack, created, turned_off)
 
 
 # ── Undo mode ───────────────────────────────────────────────────────────────
@@ -912,7 +1016,12 @@ def do_undo(run, pm, timeline):
     if body is None:
         msg = "Nothing to undo — no caption track has been generated yet."
     else:
-        m = re.match(r"^(\S+)\s+(\d+)\s*(.*?)\s*$", body.strip())
+        lines = body.strip().splitlines() or [""]
+        m = re.match(r"^(\S+)\s+(\d+)\s*(.*?)\s*$", lines[0])
+        off = []
+        for line in lines[1:]:
+            if line.startswith("off "):
+                off = [int(x) for x in re.findall(r"\d+", line)]
         if not m:
             msg = "Nothing to undo — the undo record is empty or unreadable."
         else:
@@ -928,10 +1037,23 @@ def do_undo(run, pm, timeline):
                 except Exception:
                     removed = False
                 if removed:
+                    # Turn back on the tracks that run turned off. Tracks after
+                    # the deleted one moved down by one.
+                    back_on = []
+                    for i in off:
+                        j = i if i < tidx else i - 1
+                        try:
+                            if j >= 1 and timeline.SetTrackEnable(ttype, j, True) is not False:
+                                back_on.append(j)
+                        except Exception:
+                            pass
                     rm(run.last_gen)
                     pm.SaveProject()
                     msg = ("Removed the last generated caption track (%s track "
                            "%d).\nProject saved." % (ttype, tidx))
+                    if back_on:
+                        msg += ("\nTurned %s track(s) %s back on."
+                                % (ttype, ", ".join(str(j) for j in back_on)))
                 else:
                     msg = ("Could not remove the caption track — it may have "
                            "been deleted or moved already.")
@@ -1354,7 +1476,7 @@ def main():
             alert_error("Srutilekha", ierr or "Could not import the synced SRT.")
             run.cleanup()
             return
-        record_undo(run, timeline, "subtitle", strack, created)
+        place_and_record(run, timeline, strack, created)
 
         cue_count = count_real_cues(items)
         pm.SaveProject()
@@ -1465,7 +1587,7 @@ def main():
         alert_error("Srutilekha", ierr or "Could not import the SRT file.")
         run.cleanup()
         return
-    record_undo(run, timeline, "subtitle", strack, created)
+    place_and_record(run, timeline, strack, created)
 
     # Any blank anchor cue that did survive is still styled below, so it stays
     # invisible rather than becoming a differently-fonted blank frame.

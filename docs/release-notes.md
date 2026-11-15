@@ -1,3 +1,10 @@
+v2.0.4: captions land in the right place on older Resolve; earlier subtitle tracks are turned off.
+
+- On older Resolve a new run could land at the end of the video. Asked for the new track at the timeline start, Resolve put the whole run where the video ends, and there is no `Timeline.MoveItems` there to bring it back. Each placement is now checked: when the first caption is more than 2 frames from where it belongs and cannot be moved, this run's cues are deleted again and the next way is tried (other subtitle tracks locked, then a plain append as in v1.4.7). Your earlier cues are never moved or deleted.
+- When the new captions have a track of their own, every other subtitle track is turned off, so only they show. A track you had already turned off is left as it is. Undo deletes the new track and turns back on only the tracks that run turned off.
+- The Lua script for Resolve 21.0 and earlier gets the same checks, and now finds a track's lock with `GetTrackLock` too, so its locked-append way runs there.
+- 110 tests: 109 pass, including the import in Resolve's own Lua with a fake older Resolve. The one error is the tray test needing `pystray`, which is not installed on the build PC and errors the same way before this change. Not yet run live on an older Resolve.
+
 v2.0.3: captions open sooner after a script click.
 
 - The tray helper looked for a click once a second, and scanned every running process (about 0.2 s) each time. It now reads the bridge's small launch marker every 0.1 s and scans processes only when a click is new. The large Fusion.prefs, which only an older bridge uses, is read every 2 seconds.

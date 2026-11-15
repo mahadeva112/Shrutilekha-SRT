@@ -200,6 +200,87 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual([i.GetStart() for i in items],[86406,86446])
         self.assertEqual([i.GetStart() for i in tracks[1]],[86406,87802])   # the user's cues, untouched
 
+    def _old_resolve_timeline(self, can_delete=True):
+        """An older Resolve as reported on 2026-11-15: a clipInfo append puts the
+        SRT at the END of the video, and there is no MoveItems. A plain append
+        goes to the first unlocked subtitle track: at the SRT's own times when
+        that track is empty, after its cues otherwise."""
+        class Cue:
+            def __init__(self,start,text='cue'):self.start,self.text=start,text
+            def GetStart(self):return self.start
+            def GetName(self):return self.text
+        video_end=95000
+        tracks={1:[Cue(86406),Cue(87802)]};locks={};enabled={}
+        def append(infos):
+            info=infos[0]
+            if 'trackIndex' in info:
+                tracks[info['trackIndex']].extend([Cue(video_end),Cue(video_end+40)]);return [object()]
+            target=next(i for i in sorted(tracks) if not locks.get(i))
+            begin=tracks[target][-1].start+30 if tracks[target] else 86406
+            tracks[target].extend([Cue(begin),Cue(begin+40)]);return [object()]
+        def delete(items,ripple):
+            for track in tracks.values():
+                track[:]=[i for i in track if i not in items]
+            return True
+        timeline=SimpleNamespace(GetTrackCount=lambda kind:len(tracks),GetItemListInTrack=lambda kind,i:list(tracks[i]),
+                                 AddTrack=lambda kind:tracks.__setitem__(len(tracks)+1,[]) or True,
+                                 DeleteTrack=lambda kind,i:tracks.pop(i),SetCurrentTimecode=lambda tc:True,
+                                 GetTrackLock=lambda kind,i:locks.get(i,False),
+                                 SetTrackLock=lambda kind,i,v:locks.__setitem__(i,v) or True,
+                                 GetTrackEnable=lambda kind,i:enabled.get(i,True),
+                                 SetTrackEnable=lambda kind,i,v:enabled.__setitem__(i,v) or True,
+                                 GetName=lambda:'Main')
+        if can_delete:timeline.DeleteClips=delete
+        pool=SimpleNamespace(ImportMedia=lambda paths:[object()],AppendToTimeline=append)
+        return timeline,pool,tracks,locks,enabled
+
+    def test_cues_put_at_the_video_end_are_taken_back_and_placed_again(self):
+        timeline,pool,tracks,locks,enabled=self._old_resolve_timeline()
+        with patch.object(workflow,'log') as log:
+            ok,index,items,created,error=workflow.import_srt_to_new_track(
+                timeline,pool,'demo.srt','01:00:00:00',86400,86406)
+        self.assertTrue(ok);self.assertEqual((index,created),(2,True))
+        self.assertEqual([i.GetStart() for i in items],[86406,86446])
+        self.assertEqual([i.GetStart() for i in tracks[2]],[86406,86446])   # nothing left at the end
+        self.assertEqual([i.GetStart() for i in tracks[1]],[86406,87802])   # the user's cues, untouched
+        self.assertEqual(locks,{1:False})
+        logged=' '.join(str(c) for c in log.call_args_list)
+        self.assertIn('Took the 2 new cue(s) off track 2 again',logged)
+        self.assertIn('with 1 other subtitle track(s) locked',logged)
+
+    def test_misplaced_cues_stay_when_they_cannot_be_taken_back(self):
+        timeline,pool,tracks,locks,enabled=self._old_resolve_timeline(can_delete=False)
+        with patch.object(workflow,'log') as log:
+            ok,index,items,created,error=workflow.import_srt_to_new_track(
+                timeline,pool,'demo.srt','01:00:00:00',86400,86406)
+        self.assertTrue(ok);self.assertEqual(index,2)
+        self.assertEqual(sum(len(t) for t in tracks.values()),4)            # placed once, never twice
+        self.assertIn('Keeping the cues where Resolve put them',' '.join(str(c) for c in log.call_args_list))
+
+    def test_other_subtitle_tracks_are_turned_off_and_undo_turns_them_on(self):
+        timeline,pool,tracks,locks,enabled=self._old_resolve_timeline()
+        tracks[2]=[];tracks[3]=[];enabled[2]=False                         # track 2 was already off
+        with tempfile.TemporaryDirectory() as tmp:
+            run=SimpleNamespace(last_gen=str(Path(tmp)/'last_gen.txt'),report=lambda msg:None,cleanup=lambda:None)
+            with patch.object(workflow,'log'):
+                workflow.place_and_record(run,timeline,3,True)
+            self.assertEqual(enabled,{1:False,2:False,3:True})
+            self.assertEqual(Path(run.last_gen).read_text(),'subtitle 3 Main\noff 1')
+            pm=SimpleNamespace(SaveProject=lambda:True)
+            with patch.object(workflow,'log'):
+                workflow.do_undo(run,pm,timeline)
+            self.assertEqual(sorted(tracks),[1,2])
+            self.assertEqual(enabled,{1:True,2:False,3:True})               # only what that run turned off
+            self.assertFalse(Path(run.last_gen).exists())
+
+    def test_cues_sharing_an_old_track_turn_nothing_off(self):
+        timeline,pool,tracks,locks,enabled=self._old_resolve_timeline()
+        with tempfile.TemporaryDirectory() as tmp:
+            run=SimpleNamespace(last_gen=str(Path(tmp)/'last_gen.txt'))
+            workflow.place_and_record(run,timeline,1,False)
+            self.assertEqual(enabled,{})
+            self.assertFalse(Path(run.last_gen).exists())
+
     def test_first_cue_time_skips_the_blank_anchor(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'a.srt'

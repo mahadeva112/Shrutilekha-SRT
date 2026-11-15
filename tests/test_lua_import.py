@@ -44,9 +44,25 @@ local function make_timeline(tracks, opts)
     function tl:AddTrack(kind) self.tracks[#self.tracks + 1] = {items = {}, locked = false}; return true end
     function tl:DeleteTrack(kind, i) table.remove(self.tracks, i); return true end
     function tl:SetCurrentTimecode(t) return true end
-    if not opts.no_locks then
+    if opts.old_lock_names then
+        -- Resolve 21.0 and earlier: GetTrackLock, no GetIsTrackLocked.
+        function tl:GetTrackLock(kind, i) return self.tracks[i].locked end
+        function tl:SetTrackLock(kind, i, v) self.tracks[i].locked = v; return true end
+    elseif not opts.no_locks then
         function tl:GetIsTrackLocked(kind, i) return self.tracks[i].locked end
         function tl:SetTrackLock(kind, i, v) self.tracks[i].locked = v; return true end
+    end
+    if opts.delete then
+        function tl:DeleteClips(items, ripple)
+            local gone = {}
+            for _, it in ipairs(items) do gone[it:GetStart()] = true end
+            for _, t in ipairs(self.tracks) do
+                local keep = {}
+                for _, f in ipairs(t.items) do if not gone[f] then keep[#keep + 1] = f end end
+                t.items = keep
+            end
+            return true
+        end
     end
     return tl
 end
@@ -65,6 +81,12 @@ local function make_pool(tl, opts)
         if opts.fail then return nil end
         local info = clips[1]
         if info.mediaPoolItem then
+            if opts.video_end then
+                -- An older Resolve: the whole run lands at the end of the video.
+                local t = tl.tracks[info.trackIndex]
+                for _, f in ipairs(CUES) do t.items[#t.items + 1] = f + opts.video_end end
+                return nil
+            end
             if not opts.clipinfo then return nil end
             local t = tl.tracks[info.trackIndex]
             for _, f in ipairs(CUES) do t.items[#t.items + 1] = f + info.recordFrame end
@@ -102,9 +124,9 @@ local function report(name, tl, ok, landed, items, created, err)
     logs = {}
 end
 
-local function run(name, tracks, topts, popts)
+local function run(name, tracks, topts, popts, firstFrame)
     timeline = make_timeline(tracks, topts)
-    report(name, timeline, import_srt_to_new_track(make_pool(timeline, popts), "x.srt"))
+    report(name, timeline, import_srt_to_new_track(make_pool(timeline, popts), "x.srt", firstFrame))
 end
 
 run("clipinfo", {{items = {5000, 9000}, locked = false}}, {}, {clipinfo = true})
@@ -113,6 +135,10 @@ run("refused", {{items = {5000, 9000}, locked = false}}, {}, {refuse_locked = tr
 run("userlock", {{items = {5000}, locked = true}, {items = {7000}, locked = false}}, {}, {})
 run("nolocks", {{items = {5000}, locked = false}}, {no_locks = true}, {})
 run("failed", {{items = {5000}, locked = false}}, {}, {fail = true})
+run("videoend", {{items = {5000, 9000}, locked = false}}, {old_lock_names = true, delete = true},
+    {video_end = 20000}, 100)
+run("videoend_nodelete", {{items = {5000, 9000}, locked = false}}, {old_lock_names = true},
+    {video_end = 20000}, 100)
 """
 
 
@@ -181,6 +207,21 @@ class LuaImportTest(unittest.TestCase):
             out = subprocess.run([FUSCRIPT, "-l", "lua", str(check)], capture_output=True,
                                  text=True, encoding="utf-8", errors="replace", timeout=60)
         self.assertEqual((out.stdout + out.stderr).count("COMPILED"), 2, out.stdout + out.stderr)
+
+    def test_cues_put_at_the_video_end_are_taken_back_and_placed_again(self):
+        # An older Resolve: the clipInfo append put the run at the end of the
+        # video and there is no MoveItems to bring it back.
+        r = self.result("videoend")
+        self.assertEqual((r["ok"], r["landed"], r["created"]), ("true", "2", "true"))
+        self.assertEqual(r["starts"], "100,200,300")
+        self.assertEqual(r["locks"], "--")
+        self.assertIn("Took the 3 new cue(s) off track 2 again", self.logs["videoend"])
+        self.assertIn("Placed the captions with 1 other subtitle track(s) locked", self.logs["videoend"])
+
+    def test_misplaced_cues_stay_when_they_cannot_be_taken_back(self):
+        r = self.result("videoend_nodelete")
+        self.assertEqual((r["ok"], r["landed"], r["starts"]), ("true", "2", "20100,20200,20300"))
+        self.assertIn("Keeping the cues where Resolve put them", self.logs["videoend_nodelete"])
 
     def test_nothing_placed_reports_failure_and_drops_the_empty_track(self):
         r = self.result("failed")

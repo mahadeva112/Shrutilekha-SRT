@@ -673,8 +673,13 @@ if action == "undo" then
         msg = "Nothing to undo — no caption track has been generated yet."
     else
         local body = lf:read("*a") or ""; lf:close()
-        local ttype, tidx, tname = body:match("(%S+)%s+(%d+)%s+(.-)%s*$")
+        local first = body:match("^[^\r\n]*") or ""
+        local ttype, tidx, tname = first:match("(%S+)%s+(%d+)%s+(.-)%s*$")
         tidx = tonumber(tidx)
+        local offList = {}
+        for n in (body:match("\noff ([%d,]+)") or ""):gmatch("%d+") do
+            offList[#offList + 1] = tonumber(n)
+        end
         if not ttype or not tidx then
             msg = "Nothing to undo — the undo record is empty or unreadable."
         elseif tname and tname ~= "" and tname ~= timeline:GetName() then
@@ -687,10 +692,22 @@ if action == "undo" then
                 end
             end)
             if ok then
+                -- Turn back on the tracks that run turned off. Tracks after
+                -- the deleted one moved down by one.
+                local backOn = {}
+                for _, i in ipairs(offList) do
+                    local j = (i < tidx) and i or (i - 1)
+                    local okSet, r = pcall(function() return timeline:SetTrackEnable(ttype, j, true) end)
+                    if j >= 1 and okSet and r ~= false then backOn[#backOn + 1] = j end
+                end
                 os.remove(lastGenPath)
                 pm:SaveProject()
                 msg = "Removed the last generated caption track ("
                     .. ttype .. " track " .. tidx .. ").\nProject saved."
+                if #backOn > 0 then
+                    msg = msg .. "\nTurned " .. ttype .. " track(s) "
+                        .. table.concat(backOn, ", ") .. " back on."
+                end
             else
                 msg = "Could not remove the caption track — it may have been "
                     .. "deleted or moved already."
@@ -808,7 +825,7 @@ log(string.format("Mapped %d clip range(s); anchor=frame %d", rangeCount, tlStar
 -- old code returned all 93. That reported "Imported 92 subtitle cues" for 57,
 -- and — worse — ran the styling pass over the earlier run's cues, re-fonting
 -- and re-colouring subtitles the user had never asked to touch.
-local function import_srt_to_new_track(mp, srt_file)
+local function import_srt_to_new_track(mp, srt_file, firstFrame)
     local function item_start(item)
         local ok, f = pcall(function() return item:GetStart() end)
         if ok then return f end
@@ -883,68 +900,162 @@ local function import_srt_to_new_track(mp, srt_file)
         return false, nil, nil, false, "Resolve could not import the SRT file."
     end
     local clip = imported[1]
-    local placed = false
-    if addedTrack then
-        placed = try("on the new track at the timeline start", function()
+
+    -- Which track grew, and by which items? An item at a start frame that was
+    -- not occupied before this import is one of ours. Items stay in timeline
+    -- order, so items[1] is the first cue of this run.
+    local function find_new()
+        local landed, newItems, priorCount = nil, {}, 0
+        for i = 1, timeline:GetTrackCount("subtitle") do
+            local prior = before[i] or {}
+            local added = {}
+            for _, item in ipairs(timeline:GetItemListInTrack("subtitle", i) or {}) do
+                local f = item_start(item)
+                -- No readable start frame: treat as ours. Leaving a cue of
+                -- this run unstyled is worse than the unlikely alternative,
+                -- and a handle that cannot answer GetStart is broken anyway.
+                if not f or not prior[f] then added[#added + 1] = item end
+            end
+            if #added > #newItems then
+                landed, newItems = i, added
+                local n = 0
+                for _ in pairs(prior) do n = n + 1 end
+                priorCount = n
+            end
+        end
+        return landed, newItems, priorCount
+    end
+
+    -- Put this run's cues on the new track at their own time when Resolve put
+    -- them elsewhere. Returns landed, newItems, priorCount, off: off is how
+    -- many frames the first caption still is from where it belongs, or nil
+    -- when that cannot be told. Without MoveItems (older Resolve) off stays as
+    -- it is and the caller tries the next way of placing them.
+    local function settle(landed, newItems, priorCount)
+        if not firstFrame or #newItems == 0 then return landed, newItems, priorCount, nil end
+        local starts, low = {}, nil
+        for k, item in ipairs(newItems) do
+            local f = item_start(item)
+            if not f then return landed, newItems, priorCount, nil end
+            starts[k] = f
+            if not low or f < low then low = f end
+        end
+        local ref = 1
+        for k, item in ipairs(newItems) do
+            local okName, name = pcall(function() return item:GetName() end)
+            if okName and tostring(name or ""):match("%S") then ref = k; break end
+        end
+        local shift = firstFrame - starts[ref]
+        if not addedTrack or (landed == addedTrack and math.abs(shift) <= 2) then
+            return landed, newItems, priorCount, math.abs(shift)
+        end
+        local okMove, moved = pcall(function()
+            return timeline:MoveItems(newItems, {trackIndex = addedTrack, startFrame = low + shift}, false)
+        end)
+        local onNew = {}
+        if okMove and moved then
+            onNew = timeline:GetItemListInTrack("subtitle", addedTrack) or {}
+        end
+        if okMove and moved and #onNew >= #newItems then
+            log(string.format("Moved the %d new cue(s) from subtitle track %d to track %d, "
+                .. "first caption at frame %d (was %d).",
+                #newItems, landed, addedTrack, firstFrame, starts[ref]))
+            return addedTrack, onNew, 0, 0
+        end
+        log(string.format("Could not move the new cues onto track %d%s.", addedTrack,
+            okMove and "" or (" (" .. tostring(moved) .. ")")))
+        return landed, newItems, priorCount, math.abs(shift)
+    end
+
+    -- Delete this run's cues again. True only when they are all gone.
+    local function take_back(items)
+        local was = cue_total()
+        local okDel, err = pcall(function() return timeline:DeleteClips(items, false) end)
+        if not okDel then
+            log("Could not take the misplaced cues back (" .. tostring(err) .. ").")
+            return false
+        end
+        return cue_total() <= was - #items
+    end
+
+    -- Resolve 21.2 renamed GetTrackLock to GetIsTrackLocked; this script runs
+    -- on 21.0 and earlier, which have only the old name.
+    local function track_locked(i)
+        for _, name in ipairs({"GetIsTrackLocked", "GetTrackLock"}) do
+            local okGet, locked = pcall(function() return timeline[name](timeline, "subtitle", i) end)
+            if okGet and locked ~= nil then return locked == true end
+        end
+        return nil
+    end
+
+    local function by_clip_info()
+        return try("on the new track at the timeline start", function()
             return mp:AppendToTimeline({{mediaPoolItem = clip, trackIndex = addedTrack,
                                          recordFrame = tlStart}})
         end)
-        if not placed then
-            local relock = {}
-            for i = 1, beforeTracks do
-                local okGet, locked = pcall(function() return timeline:GetIsTrackLocked("subtitle", i) end)
-                if okGet and not locked
-                        and pcall(function() return timeline:SetTrackLock("subtitle", i, true) end) then
-                    relock[#relock + 1] = i
-                end
-            end
-            if #relock > 0 then
-                placed = try(string.format("with %d other subtitle track(s) locked", #relock),
-                             function() return mp:AppendToTimeline({clip}) end)
-                for _, i in ipairs(relock) do
-                    pcall(function() return timeline:SetTrackLock("subtitle", i, false) end)
-                end
+    end
+    local function with_others_locked()
+        local relock = {}
+        for i = 1, beforeTracks do
+            if track_locked(i) == false
+                    and pcall(function() return timeline:SetTrackLock("subtitle", i, true) end) then
+                relock[#relock + 1] = i
             end
         end
+        if #relock == 0 then return false end
+        local placed = try(string.format("with %d other subtitle track(s) locked", #relock),
+                           function() return mp:AppendToTimeline({clip}) end)
+        for _, i in ipairs(relock) do
+            pcall(function() return timeline:SetTrackLock("subtitle", i, false) end)
+        end
+        return placed
     end
-    if not placed then
-        placed = try("with a plain append", function() return mp:AppendToTimeline({clip}) end)
-    end
-    if not placed then
-        if addedTrack then pcall(function() timeline:DeleteTrack("subtitle", addedTrack) end) end
-        return false, nil, nil, false, "Resolve could not append the SRT to the timeline."
+    local function plain()
+        return try("with a plain append", function() return mp:AppendToTimeline({clip}) end)
     end
 
-    -- Which track grew, and by which items? Both answers come from the same
-    -- pass: an item at a start frame that was not occupied before this import
-    -- is one of ours. Items stay in timeline order, so items[1] is the first
-    -- cue of this run.
-    local landed, newItems, priorCount = nil, {}, 0
-    for i = 1, timeline:GetTrackCount("subtitle") do
-        local prior = before[i] or {}
-        local added = {}
-        for _, item in ipairs(timeline:GetItemListInTrack("subtitle", i) or {}) do
-            local f = item_start(item)
-            -- No readable start frame: treat as ours. Leaving a cue of this
-            -- run unstyled is worse than the unlikely alternative, and a
-            -- handle that cannot answer GetStart is broken anyway.
-            if not f or not prior[f] then added[#added + 1] = item end
-        end
-        if #added > #newItems then
-            landed, newItems = i, added
-            local n = 0
-            for _ in pairs(prior) do n = n + 1 end
-            priorCount = n
+    -- A placement only counts when the first caption is where it belongs. On
+    -- an older Resolve the clipInfo append can put the whole run at the END of
+    -- the video, with no MoveItems to bring it back. Then this run's cues are
+    -- taken off the timeline again and the next way is tried; the last way's
+    -- result is kept whatever it is, as before.
+    local ways = {}
+    if addedTrack then ways = {by_clip_info, with_others_locked} end
+    ways[#ways + 1] = plain
+    local landed, newItems, priorCount, tookBack = nil, {}, 0, false
+    for n, way in ipairs(ways) do
+        if way() then
+            landed, newItems, priorCount = find_new()
+            if not landed then
+                if addedTrack then pcall(function() timeline:DeleteTrack("subtitle", addedTrack) end) end
+                return false, nil, nil, false,
+                    "The SRT imported but Resolve placed no cues on any subtitle track."
+            end
+            log(string.format("SRT cues landed on subtitle track %d: %d new, "
+                .. "%d cue(s) already there (left untouched).",
+                landed, #newItems, priorCount))
+            local off
+            landed, newItems, priorCount, off = settle(landed, newItems, priorCount)
+            if off == nil or off <= 2 or n == #ways then break end
+            if not take_back(newItems) then
+                log(string.format("Keeping the cues where Resolve put them, %d frame(s) "
+                    .. "from where they belong.", off))
+                break
+            end
+            log(string.format("Took the %d new cue(s) off track %d again: the first "
+                .. "caption was %d frame(s) from where it belongs. Trying another way.",
+                #newItems, landed, off))
+            landed, newItems, priorCount, tookBack = nil, {}, 0, true
         end
     end
     if not landed then
         if addedTrack then pcall(function() timeline:DeleteTrack("subtitle", addedTrack) end) end
-        return false, nil, nil, false,
-            "The SRT imported but Resolve placed no cues on any subtitle track."
+        if tookBack then
+            return false, nil, nil, false,
+                "Resolve put the captions in the wrong place and would not place them again."
+        end
+        return false, nil, nil, false, "Resolve could not append the SRT to the timeline."
     end
-    log(string.format("SRT cues landed on subtitle track %d: %d new, "
-        .. "%d cue(s) already there (left untouched).",
-        landed, #newItems, priorCount))
     if priorCount > 0 then
         log("WARNING: the new cues share a track with earlier ones; Resolve may "
             .. "have placed them after those cues rather than at their own times.")
@@ -981,16 +1092,71 @@ end
 -- Remember the track for Undo only when we created it ourselves. Undo deletes a
 -- whole track, so pointing it at a track that already held the user's cues
 -- would turn "undo my captions" into "delete my subtitles".
-local function record_undo(kind, idx, created)
+-- A second line lists the tracks this run turned off, which Undo turns back on.
+local function record_undo(kind, idx, created, turnedOff)
     if created then
         local gf = io.open(lastGenPath, "w")
         if gf then
-            gf:write(string.format("%s %d %s", kind, idx, timeline:GetName()))
+            local body = string.format("%s %d %s", kind, idx, timeline:GetName())
+            if turnedOff and #turnedOff > 0 then
+                body = body .. "\noff " .. table.concat(turnedOff, ",")
+            end
+            gf:write(body)
             gf:close()
         end
     else
         os.remove(lastGenPath)
     end
+end
+
+-- Turn off every other subtitle track, so the viewer and the render show this
+-- run's captions and not an earlier run's. Nothing is deleted. Returns the
+-- tracks this turned off; a track the user had already turned off is left out.
+local function turn_off_other_subtitle_tracks(keep)
+    local off = {}
+    pcall(function() return timeline:SetTrackEnable("subtitle", keep, true) end)
+    for i = 1, timeline:GetTrackCount("subtitle") do
+        if i ~= keep then
+            local state = nil
+            for _, name in ipairs({"GetIsTrackEnabled", "GetTrackEnable"}) do
+                local okGet, v = pcall(function() return timeline[name](timeline, "subtitle", i) end)
+                if okGet and v ~= nil then state = (v == true); break end
+            end
+            if state ~= false then
+                local okSet, r = pcall(function() return timeline:SetTrackEnable("subtitle", i, false) end)
+                if okSet and r ~= false then off[#off + 1] = i end
+            end
+        end
+    end
+    if #off > 0 then
+        log(string.format("Turned off subtitle track(s) %s so only the new track %d shows.",
+            table.concat(off, ", "), keep))
+    end
+    return off
+end
+
+-- After an import: turn the other subtitle tracks off when the captions have
+-- a track of their own, and record the run for Undo.
+local function place_and_record(strack, created)
+    local off = created and turn_off_other_subtitle_tracks(strack) or nil
+    record_undo("subtitle", strack, created, off)
+end
+
+-- Timeline frame the first SRT cue with text belongs at, or nil. The blank
+-- anchor cue at 0 is skipped: Resolve drops it on import.
+local function srt_first_cue_frame(path)
+    local f = io.open(path, "r")
+    if not f then return nil end
+    local body = (f:read("*a") or ""):gsub("\r\n", "\n")
+    f:close()
+    for block in (body .. "\n\n"):gmatch("(.-)\n%s*\n") do
+        local h, m, s, ms, rest = block:match("(%d+):(%d+):(%d+)[,.](%d+)%s*%-%->[^\n]*\n?(.*)")
+        if h and rest:match("%S") then
+            local secs = tonumber(h) * 3600 + tonumber(m) * 60 + tonumber(s) + tonumber(ms) / 1000
+            return tlStart + math.floor(secs * fps)
+        end
+    end
+    return nil
 end
 
 -- ── Sync mode: re-time an existing SRT against this audio, text unchanged ──
@@ -1057,13 +1223,13 @@ if action == "sync" then
 
     local mp = project:GetMediaPool()
     local ok, strack, items, created, ierr =
-        import_srt_to_new_track(mp, srtOutPath)
+        import_srt_to_new_track(mp, srtOutPath, srt_first_cue_frame(srtOutPath))
     os.remove(srtOutPath)
     if not ok then
         fail_after_done(ierr or "Could not import the synced SRT.")
         return
     end
-    record_undo("subtitle", strack, created)
+    place_and_record(strack, created)
 
     local cueCount = count_real_cues(items)
     pm:SaveProject()
@@ -1429,14 +1595,14 @@ end
 local count = 0
 local scriptCounts, fontUsed = {}, {}
 
-local ok, strack, items, created, ierr = import_srt_to_new_track(mp, srtPath)
+local ok, strack, items, created, ierr = import_srt_to_new_track(mp, srtPath, srt_first_cue_frame(srtPath))
 os.remove(srtPath); os.remove(capPath)
 if not ok then
     fail_after_done(ierr or "Could not import the SRT file.")
     return
 end
 local subtitleTrack = strack
-record_undo("subtitle", strack, created)
+place_and_record(strack, created)
 
 -- Any blank anchor cue that did survive is still styled below, so it stays
 -- invisible rather than becoming a differently-fonted blank frame.
