@@ -1,10 +1,10 @@
 {
-  "version": "2.0.5",
+  "version": "2.0.6",
   "notes": [
+    "Warning and error windows from Resolve now look like the rest of Srutilekha: same colours, buttons and steps.",
+    "They open in the middle of the screen Resolve is on, in front of Resolve.",
     "Save SRT on the done screen saves the captions this run placed as an .srt file.",
-    "When a run pauses, Srutilekha now shows a calm heading, what to do next, and the details folded away.",
-    "Older Resolve: captions go on a new subtitle track at their own time instead of the end of the video.",
-    "Earlier subtitle tracks are turned off so only the new captions show. Undo turns them back on."
+    "When a run pauses, Srutilekha shows a calm heading, what to do next, and the details folded away."
   ],
   "mandatory": false,
   "min_version": ""
