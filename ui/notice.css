@@ -1,0 +1,47 @@
+/* The popup Resolve opens when a run stops or needs a word: the same tokens,
+   buttons and step list as the caption studio, in a window of its own. The
+   window is sized to this page's height, so nothing here scrolls but details. */
+html, body.notice-window { height: auto; }
+body.notice-window {
+  display: block;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% -12%, #3a2f1a 0%, transparent 62%),
+    linear-gradient(180deg, #1d1b17, #16191b 48%, #131617);
+  border-color: #e9be6838;
+}
+.sheet { display: flex; flex-direction: column; }
+.notice-window .titlebar { height: 48px; padding: 0 8px 0 16px; }
+.notice-window .mark { width: 28px; height: 28px; border-radius: 8px; }
+.notice-window .mark svg { width: 17px; height: 17px; }
+.notice-window .name { font-size: 14px; }
+
+.notice-body { padding: 20px 24px 4px; }
+.notice-head { display: flex; align-items: center; gap: 14px; }
+.notice-glyph { display: grid; place-items: center; width: 46px; height: 46px; flex-shrink: 0; border-radius: 13px; color: var(--gold); background: linear-gradient(180deg, #e9be6824, #e9be680d); border: 1px solid #e9be6840; box-shadow: inset 0 1px 0 #ffffff12, 0 0 22px -6px #e9be6855; }
+.notice-glyph svg { width: 24px; height: 24px; stroke-width: 2; display: none; }
+.notice-window[data-kind="error"] .notice-glyph .warn,
+.notice-window[data-kind="info"] .notice-glyph .info { display: block; }
+.notice-titles { min-width: 0; }
+.notice-titles .kicker { display: block; text-transform: uppercase; color: #c9b27f; }
+.notice-titles h2 { margin: 4px 0 0; font-size: 21px; line-height: 1.25; overflow-wrap: anywhere; }
+.notice-message { margin: 16px 0 0; font-size: 14px; line-height: 1.55; color: #b9c0c2; user-select: text; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Step list and details: the studio's done-card styles, reused as they are. */
+.done-steps { margin: 18px 0 0; padding: 14px 16px 12px; border-radius: 14px; background: linear-gradient(180deg, #e9be680d, #e9be6805); border: 1px solid #e9be6826; }
+.done-steps .kicker { display: block; margin-bottom: 9px; text-transform: uppercase; font-size: 10px; color: #c9b27f; }
+.done-steps ol { list-style: none; counter-reset: step; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.done-steps li { counter-increment: step; position: relative; padding-left: 32px; min-height: 22px; font-size: 13.5px; line-height: 1.55; color: var(--text); user-select: text; }
+.done-steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; color: var(--gold); background: #e9be681f; border: 1px solid #e9be6845; }
+.done-details { margin: 14px 0 0; }
+.done-details summary { cursor: pointer; width: max-content; font-size: 12.5px; color: var(--dim); list-style: none; padding: 2px 0; }
+.done-details summary::-webkit-details-marker { display: none; }
+.done-details summary::before { content: "›"; display: inline-block; margin-right: 6px; transition: transform .15s; }
+.done-details[open] summary::before { transform: rotate(90deg); }
+.done-details summary:hover { color: var(--muted); }
+.done-details pre { margin: 8px 0 0; max-height: 132px; overflow: auto; padding: 10px 12px; border-radius: 10px; background: #0000002e; border: 1px solid var(--line); font: 12px/1.5 Consolas, "Cascadia Mono", monospace; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+
+.notice-foot { display: flex; align-items: center; gap: 10px; margin: 20px 24px 0; padding: 16px 0 20px; border-top: 1px solid var(--line); }
+.notice-foot .btn { height: 40px; }
+.notice-foot .btn.primary { min-width: 120px; }

@@ -15,20 +15,20 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
-# ── Dark palette (mirrors loader.pyw so dialogs match the main UI) ──────────
-BG_OUTER     = "#0b0d10"   # window backdrop / 1px border
-BG           = "#14171c"   # card interior
-BG_INPUT     = "#0f1217"   # text inputs (darker than card)
-BG_HOVER     = "#1b2030"
-BORDER       = "#1f242d"
-BORDER_CARD  = "#23272f"
-FG           = "#e6e9ef"
-FG_DIM       = "#9aa1b1"
-FG_MUTE      = "#7b8190"
-FG_LABEL     = "#8a93a4"
-ACCENT       = "#eed185"
-ACCENT_DARK  = "#c5ab63"
-ACCENT_HOVER = "#f0d99a"
+# ── Dark palette: the app's tokens from ui/common.css, for the Tk fallback ──
+BG_OUTER     = "#2a2f32"   # 1px window edge (--line)
+BG           = "#16191b"   # card interior (--panel)
+BG_INPUT     = "#0f1112"   # text inputs (--field)
+BG_HOVER     = "#1c2022"
+BORDER       = "#2a2f32"
+BORDER_CARD  = "#3a4044"
+FG           = "#eceeed"
+FG_DIM       = "#8f989b"
+FG_MUTE      = "#677074"
+FG_LABEL     = "#b6bdc0"
+ACCENT       = "#e9be68"
+ACCENT_DARK  = "#dcaa55"
+ACCENT_HOVER = "#f3d18f"
 CLOSE_HOVER  = "#c42b1c"
 
 
@@ -91,7 +91,7 @@ def _dark_window(title):
 def _accent_button(parent, text, command, width=10, primary=True):
     from settings_ui import RoundedAction
     colors=dict(accent=ACCENT,text=FG,muted=FG_DIM,font='Segoe UI',button_size=-14,
-                button_fill='#2b3039',button_hover='#373e49',button_border='#414957',radius=9)
+                button_fill='#24292c',button_hover='#2d3236',button_border='#3a4044',radius=9)
     return RoundedAction(parent,text,command,colors,primary=primary,width=width*9+24,height=38)
 
 
@@ -195,20 +195,32 @@ def build_alert_content(body, title, message, error=False):
     def draw(event=None):
         icon.delete('all')
         rounded_rect(icon,1,1,47,47,14,fill='#382d25' if error else '#343022',outline='#594731')
-        icon._image=photo(icon,'warning' if error else 'shield',24,'#eac987')
+        icon._image=photo(icon,'warning' if error else 'shield',24,ACCENT)
         icon.create_image(24,24,image=icon._image)
     icon.bind('<Configure>',draw);draw()
     headings=tk.Frame(header,bg=BG);headings.pack(side='left',fill='x',expand=True)
-    tk.Label(headings,text='CAPTION STUDIO',font=('Segoe UI',-11,'bold'),fg='#b7a273',bg=BG,
+    tk.Label(headings,text='SRUTILEKHA',font=('Segoe UI',-11,'bold'),fg='#c9b27f',bg=BG,
              anchor='w').pack(fill='x')
     tk.Label(headings,text=title,font=('Segoe UI',-20,'bold'),fg=FG,bg=BG,
              anchor='w',wraplength=380,justify='left').pack(fill='x',pady=(4,0))
-    tk.Label(body,text=message,bg=BG,fg='#bec4cf',wraplength=450,justify='left',
+    tk.Label(body,text=message,bg=BG,fg='#b9c0c2',wraplength=450,justify='left',
              font=('Segoe UI',-14)).pack(anchor='w',fill='x',pady=(0,20))
-    tk.Frame(body,bg='#2c323c',height=1).pack(fill='x',pady=(0,14))
+    tk.Frame(body,bg='#2a2f32',height=1).pack(fill='x',pady=(0,14))
+
+
+def _web_popup(notice):
+    """The app-styled WebView2 popup; False sends the caller to the Tk one."""
+    try:
+        import web_notice
+        return web_notice.show(notice)
+    except Exception:
+        return False
 
 
 def alert(title, message, accent=ACCENT):
+    if _web_popup({"kind": "info" if accent == ACCENT else "error", "kicker": "",
+                   "title": title, "message": message, "button": "OK"}):
+        return
     root, body, _ = _dark_window(title)
     build_alert_content(body,title,message,error=accent!=ACCENT)
     btn_frm = tk.Frame(body, bg=BG)
@@ -241,27 +253,27 @@ def build_notice_content(body, notice, on_resize=None):
         icon.create_image(24, 24, image=icon._image)
     icon.bind('<Configure>', draw); draw()
     headings = tk.Frame(header, bg=BG); headings.pack(side='left', fill='x', expand=True)
-    tk.Label(headings, text='CAPTION STUDIO', font=('Segoe UI', -11, 'bold'), fg='#b7a273', bg=BG,
+    tk.Label(headings, text='ONE MORE STEP', font=('Segoe UI', -11, 'bold'), fg='#c9b27f', bg=BG,
              anchor='w').pack(fill='x')
     tk.Label(headings, text=notice['title'], font=('Segoe UI', -20, 'bold'), fg=FG, bg=BG,
              anchor='w', wraplength=380, justify='left').pack(fill='x', pady=(4, 0))
-    tk.Label(body, text=notice['message'], bg=BG, fg='#bec4cf', wraplength=450, justify='left',
+    tk.Label(body, text=notice['message'], bg=BG, fg='#b9c0c2', wraplength=450, justify='left',
              font=('Segoe UI', -14)).pack(anchor='w', fill='x', pady=(0, 14))
 
     if notice.get('steps'):
-        steps = tk.Frame(body, bg='#191d23', highlightthickness=1, highlightbackground=BORDER_CARD)
+        steps = tk.Frame(body, bg='#1c1c19', highlightthickness=1, highlightbackground='#3a3426')
         steps.pack(fill='x', pady=(0, 14))
-        tk.Label(steps, text='WHAT TO DO', font=('Segoe UI', -10, 'bold'), fg=FG_MUTE, bg='#191d23',
+        tk.Label(steps, text='WHAT TO DO', font=('Segoe UI', -10, 'bold'), fg=FG_MUTE, bg='#1c1c19',
                  anchor='w').pack(fill='x', padx=14, pady=(10, 4))
         for n, step in enumerate(notice['steps'], 1):
-            row = tk.Frame(steps, bg='#191d23'); row.pack(fill='x', padx=14, pady=(0, 8))
-            badge = tk.Canvas(row, width=22, height=22, bg='#191d23', highlightthickness=0)
+            row = tk.Frame(steps, bg='#1c1c19'); row.pack(fill='x', padx=14, pady=(0, 8))
+            badge = tk.Canvas(row, width=22, height=22, bg='#1c1c19', highlightthickness=0)
             badge.pack(side='left', anchor='n', padx=(0, 10))
-            badge.create_oval(1, 1, 21, 21, fill='#3a3121', outline='#6b5634')
+            badge.create_oval(1, 1, 21, 21, fill='#3a3121', outline='#5e4b2c')
             badge.create_text(11, 11, text=str(n), fill=ACCENT, font=('Segoe UI', -11, 'bold'))
-            tk.Label(row, text=step, bg='#191d23', fg=FG, wraplength=390, justify='left',
+            tk.Label(row, text=step, bg='#1c1c19', fg=FG, wraplength=390, justify='left',
                      anchor='w', font=('Segoe UI', -13)).pack(side='left', fill='x', expand=True)
-        tk.Frame(steps, bg='#191d23', height=2).pack()
+        tk.Frame(steps, bg='#1c1c19', height=2).pack()
 
     details = (notice.get('details') or '').strip()
     if details:
@@ -282,7 +294,7 @@ def build_notice_content(body, notice, on_resize=None):
             if on_resize:
                 on_resize()
         toggle.bind('<Button-1>', flip)
-    sep = tk.Frame(body, bg='#2c323c', height=1)
+    sep = tk.Frame(body, bg='#2a2f32', height=1)
     sep.pack(fill='x', pady=(4, 14))
     return details
 
@@ -292,6 +304,8 @@ def alert_error(title, message):
     label; the notice's heading, which names the next step, replaces it."""
     import notices
     notice = notices.describe(message)
+    if _web_popup(dict(notice, kind="error", kicker="One more step", button="Got it")):
+        return
     root, body, _ = _dark_window(notice['title'])
 
     def fit():
