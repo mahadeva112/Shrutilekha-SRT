@@ -1,3 +1,4 @@
+import hidden_windows  # noqa: F401  (keeps test windows off screen)
 import unittest
 from unittest.mock import patch
 import app
