@@ -339,10 +339,36 @@ function wireActions() {
   $("close").onclick = () => (Run.phase === "done" ? api.close_done() : api.cancel());
   $("runCancel").onclick = () => { $("runCancel").disabled = true; api.cancel(); };
   $("doneClose").onclick = () => api.close_done();
+  $("doneDetails").addEventListener("toggle", () => {
+    $("doneDetails").querySelector("summary").textContent = $("doneDetails").open ? "Hide details" : "Show details";
+  });
+  $("doneCopy").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText($("doneDetailsText").textContent);
+      $("doneCopy").textContent = "Copied";
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents($("doneDetailsText"));
+      getSelection().removeAllRanges(); getSelection().addRange(range);
+      UI.toast("Details selected. Press Ctrl+C to copy them.");
+    }
+  };
+  $("doneSave").onclick = () => UI.busy($("doneSave"), async () => {
+    const r = await api.save_srt();
+    if (r.ok) {
+      $("doneSave").querySelector(".lbl").textContent = "Save again…";
+      const note = $("doneSavedTo");
+      note.textContent = "SRT saved to " + r.path;
+      note.hidden = false;
+    } else if (!r.cancelled) UI.toast(r.message, "err");
+  });
   $("versionPill").onclick = () => (UI.state.update ? UI.showUpdate() : UI.checkUpdates());
   document.addEventListener("keydown", (e) => {
     if (UI.modalOpen() || e.defaultPrevented) return;
-    if (Run.phase === "done") { if (e.key === "Enter" || e.key === "Escape") api.close_done(); return; }
+    if (Run.phase === "done") {
+      if (e.key === "Escape" || (e.key === "Enter" && document.activeElement !== $("doneSave"))) api.close_done();
+      return;
+    }
     if (Run.phase && !Back.active) return;            // no shortcuts while a job runs
     const tag = document.activeElement?.tagName;
     if (e.key === "Escape") api.cancel();
@@ -437,7 +463,11 @@ const Run = {
     $("progressCard").hidden = true;
     $("doneCard").hidden = false;
     $("doneMark").classList.toggle("failed", !!s.failed);
-    $("doneTitle").textContent = s.failed ? "Couldn't start captions" : "Done";
+    $("doneTitle").textContent = s.failed ? "One more step" : "Done";
+    $("doneSave").hidden = !s.can_save;
+    $("doneSavedTo").hidden = true;
+    $("doneSteps").hidden = $("doneDetails").hidden = true;
+    if (s.failed && s.notice) { this.notice(s); return; }
     const lines = String(s.message || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     $("doneHeadline").textContent = lines[0] || "Done.";
     const body = [], meta = [];
@@ -472,7 +502,30 @@ const Run = {
       dl.append(dt, dd);
     }
     if (saved) dl.insertAdjacentHTML("beforeend", `<div class="saved">${UI.icon("check")}Project saved</div>`);
-    $("doneElapsed").textContent = (s.failed ? "Stopped after " : "Finished in ") + fmtTime(s.elapsed_final ?? s.elapsed);
+    $("doneElapsed").textContent = (s.failed ? "Paused after " : "Finished in ") + fmtTime(s.elapsed_final ?? s.elapsed);
+    setTimeout(() => $("doneClose").focus(), 300);
+  },
+
+  // A run that stopped: a calm heading that names the next step, what to do,
+  // and the raw report folded away under "Show details".
+  notice(s) {
+    const n = s.notice;
+    $("doneTitle").textContent = n.title;
+    $("doneHeadline").textContent = n.message;
+    $("doneTiles").replaceChildren();
+    $("doneBody").replaceChildren();
+    $("doneMeta").replaceChildren();
+    $("doneStepList").replaceChildren(...(n.steps || []).map((step) => {
+      const li = document.createElement("li");
+      li.textContent = step;
+      return li;
+    }));
+    $("doneSteps").hidden = !(n.steps || []).length;
+    $("doneDetailsText").textContent = n.details || "";
+    $("doneDetails").open = false;
+    $("doneDetails").hidden = !n.details;
+    $("doneCopy").textContent = "Copy details";
+    $("doneElapsed").textContent = "Paused after " + fmtTime(s.elapsed_final ?? s.elapsed);
     setTimeout(() => $("doneClose").focus(), 300);
   },
 };

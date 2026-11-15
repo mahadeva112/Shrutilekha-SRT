@@ -1,10 +1,10 @@
 {
-  "version": "2.0.4",
+  "version": "2.0.5",
   "notes": [
-    "Older Resolve: captions no longer land at the end of the video; they go on a new subtitle track at their own time.",
-    "Earlier subtitle tracks are turned off so only the new captions show. Undo turns them back on.",
-    "Captions open sooner after Workspace > Scripts > Srutilekha: the tray helper notices the click within 0.1 s.",
-    "On Resolve 21.2 new captions are moved onto their own new subtitle track, at the right time."
+    "Save SRT on the done screen saves the captions this run placed as an .srt file.",
+    "When a run pauses, Srutilekha now shows a calm heading, what to do next, and the details folded away.",
+    "Older Resolve: captions go on a new subtitle track at their own time instead of the end of the video.",
+    "Earlier subtitle tracks are turned off so only the new captions show. Undo turns them back on."
   ],
   "mandatory": false,
   "min_version": ""

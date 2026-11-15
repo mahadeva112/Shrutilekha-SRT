@@ -1,3 +1,11 @@
+v2.0.5: Save SRT, and friendlier guidance when a run pauses.
+
+- **Save SRT…** on the done screen saves the captions this run placed (with any review edits) as an .srt file. The blank anchor cue is left out and cues are numbered from 1. Sync runs can be saved too. Edits made later in Resolve are not in the file; use Resolve's Export Subtitle for those.
+- When a run pauses, every place that reports it (the caption studio's done screen, the classic window, and the window Resolve opens) now shows a heading that names the next step, one plain sentence, numbered "What to do" steps, and the original report folded under "Show details" with a Copy details button. 17 situations are recognised, such as no project or timeline open, no audio, the ElevenLabs key missing or out of date, the ElevenLabs allowance used up, no internet, and Resolve not answering. Anything else gets a general notice with the same layout.
+- Short messages (toasts, the API key window, review, Undo) are worded the same way, and their colour is a soft gold instead of red.
+- When Resolve does not answer within 10 minutes, the done screen now shows that as a paused run instead of "Done".
+- 120 tests: 119 pass. The one error is the tray test needing `pystray`, which is not installed on the build PC and errors the same way before this change. Screens checked in a browser mock and the Resolve-side window rendered locally; not yet run in a live Resolve session.
+
 v2.0.4: captions land in the right place on older Resolve; earlier subtitle tracks are turned off.
 
 - On older Resolve a new run could land at the end of the video. Asked for the new track at the timeline start, Resolve put the whole run where the video ends, and there is no `Timeline.MoveItems` there to bring it back. Each placement is now checked: when the first caption is more than 2 frames from where it belongs and cannot be moved, this run's cues are deleted again and the next way is tried (other subtitle tracks locked, then a plain append as in v1.4.7). Your earlier cues are never moved or deleted.

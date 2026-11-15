@@ -5495,7 +5495,44 @@ class App:
                  lambda e, l=lbl: l.configure(wraplength=max(140, e.width - 2)))
         return lbl
 
+    def _fill_notice_card(self, parent, message):
+        """A run that stopped, told kindly: a heading that names the next step,
+        a plain sentence, numbered steps, and the raw report in small print."""
+        import notices
+        notice = notices.describe(message)
+        head = tk.Frame(parent, bg=BG_CARD)
+        head.pack(fill="x")
+        mark = tk.Canvas(head, width=22, height=22, bg=BG_CARD,
+                         highlightthickness=0, bd=0)
+        from ui_icons import photo
+        mark._image = photo(mark, 'shield', 22, ACCENT)
+        mark.create_image(11, 11, image=mark._image)
+        mark.pack(side="left", padx=(0, 11))
+        tk.Label(head, text=notice["title"], bg=BG_CARD, fg=FG,
+                 font=(UI_FONT, 15, "bold")).pack(side="left")
+        self._wrap_label(parent, notice["message"], FG, 11).pack(fill="x", pady=(14, 0))
+        if notice["steps"]:
+            tk.Label(parent, text="WHAT TO DO", bg=BG_CARD, fg=FG_MUTE, anchor="w",
+                     font=(UI_FONT, 8, "bold")).pack(fill="x", pady=(16, 2))
+        for n, step in enumerate(notice["steps"], 1):
+            row = tk.Frame(parent, bg=BG_CARD)
+            row.pack(fill="x", pady=(6, 0))
+            badge = tk.Canvas(row, width=20, height=20, bg=BG_CARD,
+                              highlightthickness=0, bd=0)
+            badge.create_oval(1, 1, 19, 19, fill="#3a3121", outline="#6b5634")
+            badge.create_text(10, 10, text=str(n), fill=ACCENT, font=(UI_FONT, 8, "bold"))
+            badge.pack(side="left", padx=(0, 10), anchor="n")
+            self._wrap_label(row, step, FG_DIM, 10).pack(side="left", fill="x", expand=True)
+        details = notice["details"]
+        if details:
+            tk.Frame(parent, bg=DIVIDER, height=1).pack(fill="x", pady=(16, 10))
+            short = details if len(details) <= 300 else details[:300].rstrip() + "…"
+            self._wrap_label(parent, "Details: " + short, FG_MUTE, 8).pack(fill="x")
+
     def _fill_done_card(self, parent, message, failed=False):
+        if failed:
+            self._fill_notice_card(parent, message)
+            return
         lines = [ln.strip() for ln in (message or "").splitlines()]
         lines = [ln for ln in lines if ln]
         headline = lines[0] if lines else "Done."

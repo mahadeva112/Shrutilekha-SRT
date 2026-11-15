@@ -85,6 +85,8 @@ class RunControllerTest(unittest.TestCase):
         job.start({"action": "generate"}, review_wanted=False)
         self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "done"))
         self.assertTrue(job.snapshot()["failed"])
+        self.assertEqual(job.snapshot()["notice"]["title"], "Choose the track with the voice")
+        self.assertEqual(job.snapshot()["notice"]["details"], "No audio on track 3.")
         self.assertEqual(job.exit_code, 1)
 
     def test_review_pauses_then_apply_writes_edits_and_imports(self):
@@ -118,6 +120,57 @@ class RunControllerTest(unittest.TestCase):
         job.start({"action": "generate"}, review_wanted=True)
         self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "done"))
         self.assertEqual(Path(self.paths["done"]).read_text(), "0")
+
+    SRT = ("1\n00:00:00,000 --> 00:00:00,001\n \n\n"
+           "2\n00:00:00,058 --> 00:00:01,225\nনমস্কার\n\n"
+           "3\n00:00:01,300 --> 00:00:02,000\nSecond line\nand more\n")
+
+    def test_clean_srt_drops_the_blank_anchor_and_renumbers(self):
+        self.assertEqual(web_run.clean_srt("\ufeff" + self.SRT),
+                         "1\r\n00:00:00,058 --> 00:00:01,225\r\nনমস্কার\r\n\r\n"
+                         "2\r\n00:00:01,300 --> 00:00:02,000\r\nSecond line\r\nand more\r\n\r\n")
+        self.assertEqual(web_run.clean_srt("1\n00:00:00,000 --> 00:00:00,001\n \n"), "")
+
+    def test_output_srt_path_reads_generate_and_sync_args(self):
+        args = self.dir / "a.txt"
+        args.write_text("C:/a.wav\nC:/out.srt\n15\n", encoding="utf-8")
+        self.assertEqual(web_run.output_srt_path(str(args)), "C:/out.srt")
+        args.write_text("SYNC\nC:/a.wav\nC:/in.srt\nC:/synced.srt\nbn\n", encoding="utf-8")
+        self.assertEqual(web_run.output_srt_path(str(args)), "C:/synced.srt")
+        self.assertEqual(web_run.output_srt_path(str(self.dir / "missing")), "")
+
+    def test_done_run_can_save_the_srt_resolve_imported_and_deleted(self):
+        srt = self.dir / "out.srt"
+        srt.write_text(self.SRT, encoding="utf-8")
+        self.worker("print('PROGRESS|100|done', flush=True)\n")
+        self.resolve(srt=srt)
+        job = self.job()
+        job.start({"action": "generate"}, review_wanted=False)
+        self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "done"))
+        self.assertTrue(job.snapshot()["can_save"])
+        srt.unlink()                                             # Resolve removes it after import
+        target = self.dir / "saved.srt"
+        job.save_srt(str(target))
+        self.assertEqual(target.read_bytes().decode("utf-8"), web_run.clean_srt(self.SRT))
+
+    def test_failed_import_offers_no_save(self):
+        srt = self.dir / "out.srt"
+        srt.write_text(self.SRT, encoding="utf-8")
+        self.worker("print('PROGRESS|100|done', flush=True)\n")
+        self.resolve(srt=srt, result="ERROR\nResolve could not import the SRT file.")
+        job = self.job()
+        job.start({"action": "generate"}, review_wanted=False)
+        self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "done"))
+        self.assertFalse(job.snapshot()["can_save"])
+
+    def test_undo_offers_no_save(self):
+        job = self.job()
+        Path(self.paths["result"]).write_text("Removed the last generated caption track.", encoding="utf-8")
+        job.start({"action": "undo"}, review_wanted=False)
+        self.assertTrue(wait_for(lambda: job.snapshot()["phase"] == "done"))
+        self.assertFalse(job.snapshot()["can_save"])
+        with self.assertRaises(OSError):
+            job.save_srt(str(self.dir / "x.srt"))
 
     REGEN_SEL = {"settings": "20,2,3.5", "punct": 1, "lang_code": "bn", "diarize": 1, "cps": "18",
                  "min_secs": "0.6", "words_per": "4", "ref_script": "C:/script ’s.docx"}

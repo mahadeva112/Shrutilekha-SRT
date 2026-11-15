@@ -12,7 +12,7 @@ const Review = {
     $("reviewView").classList.add("entering");
     Back.ran = pick(TRANSCRIBE_KEYS);                 // what this transcript was made with
     const r = await api.review_init({ ...V });
-    if (!r) { UI.toast("The transcript could not be opened for review.", "err"); return; }
+    if (!r) { UI.toast("Review will open on the next run. Your captions can still be applied.", "err"); return; }
     Object.assign(this, { colors: r.colors, fields: r.fields, recipes: r.recipes });
     this.buildControls();
     this.rebuild(r.segs, r.s);

@@ -15,6 +15,7 @@ on_close callback.
 """
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -103,6 +104,41 @@ def write_args(path, sel):
     os.replace(tmp, path)
 
 
+SRT_TIME = re.compile(r"^\s*\d+:\d+:\d+[,.]\d+\s*-->\s*\d+:\d+:\d+[,.]\d+")
+
+
+def output_srt_path(args_path):
+    """The SRT this job hands to Resolve: line 1 of a generate args file, line 3
+    of a SYNC one. "" when the args file cannot say."""
+    try:
+        with open(args_path, encoding="utf-8") as f:
+            lines = [ln.rstrip("\r\n") for ln in f]
+    except OSError:
+        return ""
+    if lines and lines[0] == "SYNC":
+        return lines[3] if len(lines) > 3 else ""
+    return lines[1] if len(lines) > 1 else ""
+
+
+def clean_srt(text):
+    """The SRT to give the user: only cues with text, numbered from 1.
+
+    The SRT Resolve imports starts with a blank cue at 00:00:00,000 that pins
+    the clip to the timeline start; Resolve drops it, and so does this. Line
+    endings become CRLF, which every subtitle tool reads."""
+    cues = []
+    for block in re.split(r"\r?\n\s*\r?\n", (text or "").lstrip("﻿")):
+        lines = block.strip("\r\n").splitlines()
+        for k, line in enumerate(lines):
+            if SRT_TIME.match(line):
+                body = [ln.rstrip() for ln in lines[k + 1:]]
+                if any(ln.strip() for ln in body):
+                    cues.append([line.strip()] + body)
+                break
+    return "".join("%d\r\n%s\r\n\r\n" % (n, "\r\n".join(cue))
+                   for n, cue in enumerate(cues, 1))
+
+
 class RunController:
     def __init__(self, paths, on_close):
         # paths: selection, args, done, log, result, ack, python, script
@@ -113,6 +149,7 @@ class RunController:
         self.cancelled = False
         self.exit_code = None
         self.review = None
+        self.srt_text = ""           # the captions handed to Resolve, for Save SRT
         self.outcome = None          # what loader.pyw should do after the window
         self.started = time.time()
         self.state = {"phase": "progress", "pct": 0, "msg": "Preparing…",
@@ -137,8 +174,20 @@ class RunController:
         self._set(pct=pct, **({"msg": msg} if msg else {}))
 
     def _done(self, message, failed=False):
+        import notices
         self._set(phase="done", message=message, failed=failed,
+                  notice=notices.describe(message) if failed else None,
+                  can_save=bool(self.srt_text) and not failed,
                   elapsed_final=round(time.time() - self.started, 1))
+
+    def save_srt(self, path):
+        """Write the captions this run gave Resolve to `path`. Raises OSError."""
+        if not self.srt_text:
+            raise OSError("this run has no captions to save")
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8", newline="") as f:
+            f.write(self.srt_text)
+        os.replace(tmp, path)
 
     # ── start ─────────────────────────────────────────────────────────────
     def start(self, sel, review_wanted):
@@ -206,16 +255,16 @@ class RunController:
         import web_review
         review = getattr(self, "review", None)
         if review is None or self.state.get("phase") != "review":
-            return {"ok": False, "message": "Nothing to apply."}
+            return {"ok": False, "message": "Your captions are already on their way."}
         final = [seg for seg in (web_review.live_segment(x) for x in segs) if seg["text"]]
         if not final:
-            return {"ok": False, "message": "Every cue was deleted or emptied, so there is nothing to "
-                                            "apply. Undo a deletion, or press Cancel to leave the "
-                                            "timeline untouched."}
+            return {"ok": False, "message": "Keep at least one caption with text to apply. Undo a "
+                                            "deletion to bring one back, or press Cancel to leave the "
+                                            "timeline as it is."}
         try:
             web_review.write_srt_cap(review["srt"], review["cap"], review["header"], final)
         except Exception as exc:
-            return {"ok": False, "message": "Cannot write edited captions: %s" % exc}
+            return {"ok": False, "message": "Your edits are safe on screen. Press Apply once more. (%s)" % exc}
         self._set(phase="progress", title="Applying captions", stages=[], pct=80,
                   msg="Placing captions on the timeline…")
         threading.Thread(target=self._finish, args=(0,), daemon=True).start()
@@ -231,11 +280,11 @@ class RunController:
         track and its clip ranges stay as Resolve wrote them.
         """
         if self.review is None or self.state.get("phase") != "review":
-            return {"ok": False, "message": "Nothing to regenerate."}
+            return {"ok": False, "message": "Start a run first, then you can regenerate from review."}
         try:
             write_args(self.paths["args"], sel)
         except OSError as exc:
-            return {"ok": False, "message": "Cannot update the worker settings: %s" % exc}
+            return {"ok": False, "message": "Let's keep the current transcript for now. Press Regenerate once more. (%s)" % exc}
         self.review = None
         self.started = time.time()
         self._set(phase="progress", pct=0, msg="Preparing…", title="Transcribing audio",
@@ -325,6 +374,15 @@ class RunController:
     def _finish(self, code):
         """Tell Resolve's wait loop how the worker ended, then follow it."""
         self.exit_code = code
+        if code == 0:
+            # Read the SRT now: Resolve deletes it once it has imported it. Any
+            # review edits are already in it.
+            try:
+                with open(output_srt_path(self.paths["args"]), encoding="utf-8-sig",
+                          errors="replace") as f:
+                    self.srt_text = clean_srt(f.read())
+            except (OSError, ValueError):
+                self.srt_text = ""
         try:
             with open(self.paths["done"], "w", encoding="utf-8") as f:
                 f.write(str(code))
@@ -358,12 +416,15 @@ class RunController:
                     self._done("DaVinci Resolve never reported back.\n\n"
                                "The Srutilekha script is no longer running there — it may have "
                                "been stopped, or Resolve was closed. Nothing was changed on "
-                               "the timeline. Start the script again from Workspace ▸ Scripts.")
+                               "the timeline. Start the script again from Workspace ▸ Scripts.",
+                               failed=True)
                 else:
+                    self.exit_code = 1
                     self._done("The subtitles were written, but DaVinci Resolve never "
                                "reported back.\n\nThe Srutilekha script is no longer running "
                                "there — it may have been stopped, or Resolve was closed. "
-                               "Start the script again from Workspace ▸ Scripts.")
+                               "Start the script again from Workspace ▸ Scripts.",
+                               failed=True)
                 return
             time.sleep(0.25 if undo else 0.2)
 
