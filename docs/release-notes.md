@@ -1,3 +1,10 @@
+v2.0.6: the windows Resolve opens now look like the app.
+
+- Warning and error windows that open from Resolve (a paused run, a short message) used Tk with an older palette. They now open as a small WebView2 window built from the caption studio's own stylesheet: the Srutilekha title bar, gold buttons, numbered "What to do" steps, and "Show details" with Copy details. The window fits its text, opens centred on the screen Resolve is on, comes in front of Resolve, and has rounded corners on Windows 11.
+- PCs without WebView2, or with `SRUTILEKHA_CLASSIC_UI=1`, still get the Tk window. Its colours now match the app.
+- The test suite no longer flashes windows over the screen while it runs.
+- 126 tests pass. The new window was opened and checked locally (error notice, plain message, and the Tk fallback); not yet run in a live Resolve session.
+
 v2.0.5: Save SRT, and friendlier guidance when a run pauses.
 
 - **Save SRT…** on the done screen saves the captions this run placed (with any review edits) as an .srt file. The blank anchor cue is left out and cues are numbered from 1. Sync runs can be saved too. Edits made later in Resolve are not in the file; use Resolve's Export Subtitle for those.
