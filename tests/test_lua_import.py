@@ -19,8 +19,11 @@ FUSCRIPT = shutil.which("fuscript") or os.path.join(
 
 def import_function():
     text = (ROOT / "audio_to_srt.lua").read_text(encoding="utf-8").replace("\r\n", "\n")
-    start = text.index("local function import_srt_to_new_track(")
-    end = text.index("\nend\n", start) + len("\nend\n")
+    # place_srt does the work; import_srt_to_new_track wraps it to put the
+    # playhead back, so both are taken, in the order the script has them.
+    start = text.index("local function place_srt(")
+    wrapper = text.index("local function import_srt_to_new_track(", start)
+    end = text.index("\nend\n", wrapper) + len("\nend\n")
     return text[start:end]
 
 
@@ -33,7 +36,7 @@ local CUES = {100, 200, 300}          -- the SRT's cue start frames
 
 local function make_timeline(tracks, opts)
     opts = opts or {}
-    local tl = {tracks = tracks}
+    local tl = {tracks = tracks, playhead = "01:00:10:00"}   -- where the user left it
     local function item(f) return {GetStart = function() return f end, GetName = function() return "cue" end} end
     function tl:GetTrackCount(kind) return #self.tracks end
     function tl:GetItemListInTrack(kind, i)
@@ -43,7 +46,8 @@ local function make_timeline(tracks, opts)
     end
     function tl:AddTrack(kind) self.tracks[#self.tracks + 1] = {items = {}, locked = false}; return true end
     function tl:DeleteTrack(kind, i) table.remove(self.tracks, i); return true end
-    function tl:SetCurrentTimecode(t) return true end
+    function tl:GetCurrentTimecode() return self.playhead end
+    function tl:SetCurrentTimecode(t) self.playhead = t; return true end
     if opts.old_lock_names then
         -- Resolve 21.0 and earlier: GetTrackLock, no GetIsTrackLocked.
         function tl:GetTrackLock(kind, i) return self.tracks[i].locked end
@@ -78,6 +82,7 @@ local function make_pool(tl, opts)
     local mp = {}
     function mp:ImportMedia(files) return {{}} end
     function mp:AppendToTimeline(clips)
+        tl.playhead = "01:59:00:00"       -- Resolve leaves it past the appended clip
         if opts.fail then return nil end
         local info = clips[1]
         if info.mediaPoolItem then
@@ -117,9 +122,9 @@ end
 local function report(name, tl, ok, landed, items, created, err)
     local locks = {}
     for i, t in ipairs(tl.tracks) do locks[#locks + 1] = t.locked and "L" or "-" end
-    print(string.format("RESULT %s ok=%s landed=%s created=%s starts=%s locks=%s tracks=%d err=%s",
+    print(string.format("RESULT %s ok=%s landed=%s created=%s starts=%s locks=%s tracks=%d playhead=%s err=%s",
         name, tostring(ok), tostring(landed), tostring(created), starts(items),
-        table.concat(locks), #tl.tracks, (tostring(err):gsub("%s", "_"))))
+        table.concat(locks), #tl.tracks, tostring(tl.playhead), (tostring(err):gsub("%s", "_"))))
     print("LOGS " .. name .. " " .. table.concat(logs, " | "))
     logs = {}
 end
@@ -222,6 +227,11 @@ class LuaImportTest(unittest.TestCase):
         r = self.result("videoend_nodelete")
         self.assertEqual((r["ok"], r["landed"], r["starts"]), ("true", "2", "20100,20200,20300"))
         self.assertIn("Keeping the cues where Resolve put them", self.logs["videoend_nodelete"])
+
+    def test_playhead_goes_back_where_the_user_left_it(self):
+        for name in ("clipinfo", "locks", "failed", "videoend"):
+            with self.subTest(name=name):
+                self.assertEqual(self.result(name)["playhead"], "01:00:10:00")
 
     def test_nothing_placed_reports_failure_and_drops_the_empty_track(self):
         r = self.result("failed")

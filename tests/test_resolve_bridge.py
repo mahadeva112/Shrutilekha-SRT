@@ -162,6 +162,27 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual([i.GetStart() for i in items],[86400])
         self.assertEqual(len(tracks[1]),1)
 
+    def test_playhead_goes_back_where_the_user_left_it(self):
+        """Placing sets the playhead to the timeline start and AppendToTimeline
+        leaves it past the appended clip; the user's position comes back."""
+        for appended in (True, False):
+            with self.subTest(appended=appended):
+                state={'tc':'01:00:10:00'};tracks={1:[]}
+                def append(items):
+                    state['tc']='01:59:00:00'
+                    if appended:tracks[len(tracks)].append(SimpleNamespace(GetStart=lambda:86400,GetName=lambda:'cue'))
+                    return True
+                def add(kind):tracks[len(tracks)+1]=[];return True
+                def set_tc(tc):state['tc']=tc;return True
+                timeline=SimpleNamespace(GetTrackCount=lambda kind:len(tracks),GetItemListInTrack=lambda kind,i:tracks[i],
+                                         AddTrack=add,DeleteTrack=lambda kind,i:tracks.pop(i),
+                                         GetCurrentTimecode=lambda:state['tc'],SetCurrentTimecode=set_tc)
+                pool=SimpleNamespace(ImportMedia=lambda paths:[object()],AppendToTimeline=append)
+                with patch.object(workflow,'log'):
+                    ok=workflow.import_srt_to_new_track(timeline,pool,'demo.srt','01:00:00:00',86400)[0]
+                self.assertEqual(ok,appended)
+                self.assertEqual(state['tc'],'01:00:10:00')
+
     def test_import_locks_old_tracks_when_resolve_refuses_track_index(self):
         timeline,pool,tracks,locks=self._resolve_212_timeline(False,True)
         with patch.object(workflow,'log') as log:
