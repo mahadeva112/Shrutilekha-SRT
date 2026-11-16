@@ -35,10 +35,13 @@
   <!-- ── settings ────────────────────────────────────────── -->
   <div class="settings">
     <section class="panel hero">
-      <div class="panel-head"><span class="sec-icon" data-icon="wave"></span><h3>Audio &amp; language</h3></div>
-      <div class="pair">
-        <label class="fld" data-lock><span>Audio track</span><select data-key="chosen" id="trackSel"></select></label>
-        <label class="fld" title="Auto-detect follows the audio; a fixed language pins the transcript to its script"><span>Language</span><select data-key="lang" id="langSel"></select></label>
+      <div class="hero-main">
+        <div class="panel-head"><span class="sec-icon" data-icon="wave"></span><h3>Audio &amp; language</h3></div>
+        <div class="pair">
+          <label class="fld" data-lock><span>Audio track</span><select data-key="chosen" id="trackSel"></select></label>
+          <label class="fld" title="Auto-detect follows the audio; a fixed language pins the transcript to its script"><span>Language</span><select data-key="lang" id="langSel"></select></label>
+        </div>
+        <p class="panel-note"><span data-icon="sparkle"></span>Pick a language to keep every caption in its script. Auto-detect follows the audio.</p>
       </div>
       <div class="row-toggle" title="Adds commas and full stops to the transcript"><span>Punctuation<small>Commas and full stops in the transcript</small></span><input type="checkbox" class="switch" data-key="punct"></div>
       <div class="row-toggle" title="Colours each voice differently"><span>Separate speakers<small>Each voice gets its own colour</small></span><input type="checkbox" class="switch" data-key="diarize"></div>
