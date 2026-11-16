@@ -2448,6 +2448,81 @@ def _slice_cache_key(path, model_id, language, diarize, start, end):
     return hashlib.sha1(raw.encode()).hexdigest()
 
 
+# Slice keys are hashes, so the cache cannot be searched for "a window that
+# contains this one". Each source therefore keeps a small index of the windows
+# already transcribed for it, beside the whole-file key. Shrinking a trim
+# changes the window, and with it the key — the index is what lets that
+# smaller window be served from the larger transcript instead of paying again.
+def _window_index_path(path, model_id, language, diarize):
+    base = _cache_key(path, model_id, language, diarize)
+    if not base:
+        return None
+    return os.path.join(_cache_dir(), base + ".windows.json")
+
+
+def _window_index_load(idx_path):
+    if not idx_path or not os.path.exists(idx_path):
+        return []
+    try:
+        import json
+        with open(idx_path, encoding="utf-8") as f:
+            data = json.load(f)
+        return [(float(s), float(e)) for s, e in data.get("windows", [])]
+    except Exception:
+        return []
+
+
+def _window_index_add(path, model_id, language, diarize, start, end):
+    """Record that [start, end) of ``path`` is cached. Best-effort; never
+    raises — a missing index only costs the covering lookup, never a hit on
+    the exact key."""
+    idx_path = _window_index_path(path, model_id, language, diarize)
+    if not idx_path:
+        return
+    try:
+        import json
+        windows = _window_index_load(idx_path)
+        if (start, end) in windows:
+            return
+        windows.append((float(start), float(end)))
+        tmp = idx_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"ver": _CACHE_VER,
+                       "windows": [[s, e] for s, e in sorted(windows)]}, f)
+        os.replace(tmp, idx_path)
+    except Exception:
+        pass
+
+
+def _cached_window_words(path, model_id, language, diarize, start, end):
+    """Cached raw words for the window [start, end) of ``path``, or None.
+
+    The exact window is tried first. Failing that, any cached window that
+    contains this one serves it: its words are cut down to [start, end), so
+    disjoint windows drawn from the same larger transcript never repeat a
+    word. The smallest such window wins, being the nearest match to what a
+    fresh upload of this window would have returned."""
+    got = _cache_load(_slice_cache_key(path, model_id, language, diarize,
+                                       start, end))
+    if got is not None:
+        # Windows cached before the index existed join it on first reuse.
+        _window_index_add(path, model_id, language, diarize, start, end)
+        return got
+    eps = 1e-6
+    covering = [(s, e) for s, e in _window_index_load(
+                    _window_index_path(path, model_id, language, diarize))
+                if s <= start + eps and e >= end - eps]
+    for s, e in sorted(covering, key=lambda w: w[1] - w[0]):
+        got = _cache_load(_slice_cache_key(path, model_id, language, diarize,
+                                           s, e))
+        if got is not None:
+            print("Cache hit: %s [%.1fs-%.1fs] from cached [%.1fs-%.1fs] "
+                  "(no API call)" % (os.path.basename(path), start, end, s, e))
+            return [w for w in got
+                    if start <= float(getattr(w, "start", 0) or 0) < end]
+    return None
+
+
 def _cached_words_for_windows(path, windows, model_id, language, diarize):
     """Raw words for ``path`` in source timebase, from cache only — no API.
 
@@ -2462,8 +2537,7 @@ def _cached_words_for_windows(path, windows, model_id, language, diarize):
         return None
     out = []
     for ws, we in windows:
-        got = _cache_load(_slice_cache_key(path, model_id, language,
-                                           diarize, ws, we))
+        got = _cached_window_words(path, model_id, language, diarize, ws, we)
         if got is None:
             return None
         out.extend(got)
@@ -2529,7 +2603,8 @@ def fetch_words_ranged(path, windows, lang_code, diarize, client):
     out = []
     for ws, we in windows:
         key = _slice_cache_key(path, "scribe_v2", lang_code, diarize, ws, we)
-        cached = _cache_load(key)
+        cached = _cached_window_words(path, "scribe_v2", lang_code, diarize,
+                                      ws, we)
         if cached is not None:
             print("Cache hit: %s [%.1fs-%.1fs] (%d words, no API call)"
                   % (name, ws, we, len(cached)))
@@ -2569,6 +2644,7 @@ def fetch_words_ranged(path, windows, lang_code, diarize, client):
                          getattr(w, "speaker_id", None))
                    for w in words]
         _cache_store(key, shifted)
+        _window_index_add(path, "scribe_v2", lang_code, diarize, ws, we)
         out.extend(shifted)
 
     if not out:
