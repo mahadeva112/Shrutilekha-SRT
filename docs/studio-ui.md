@@ -24,7 +24,7 @@ pixel-identical.
 | Numeric range feedback and reading comfort | Timing fields and compact comfort strip |
 | Reference script: Browse a file or Paste the text | Script & files panel; pasted text is saved to `scripts/pasted_script.txt` in the data folder and passed to the worker as the script path |
 | Existing SRT path and Browse | Always-visible row; enabled in Sync mode |
-| Save/load/remove named presets | Presets panel; existing JSON format retained, caption style fields no longer saved |
+| Save/load/remove named presets | Not in the Studio form since v2.0.0; the classic Tkinter form keeps them. The `list/load/save/remove_preset` API and JSON format are retained, caption style fields no longer saved |
 | Cue preview at the timeline's frame | Review editor, after Generate |
 | Caption editing, local re-split, recipes, filters, merge/split and apply | Existing review editor retained |
 | Undo last captions, cancel | Footer |
@@ -37,8 +37,10 @@ transform and composite keys), so font, size, colour, outline, shadow and
 position never reached Resolve; set them in Resolve under Inspector > Track >
 Track Style. The real cues are previewed in the review editor after Generate.
 
-The setup form has no tabs or scrolling canvas. All four settings panels stay
-visible. Controls are checked at 1180 × 820, 1040 × 780
+The setup form has no tabs or scrolling canvas. All three settings panels stay
+visible. In Audio & language the heading, both dropdowns and a one-line
+language note stack on the left at the same height as the three switches on the
+right; the selected track's full name is in the dropdown's tooltip. Controls are checked at 1180 × 820, 1040 × 780
 and 1040 × 720 on the development Windows display. The initial window is 1180 × 820 and the minimum is
 1040 × 720, clamped to the screen. Unusually small screens or different DPI settings need separate
 validation. The review editor still scrolls its cue list, which can contain

@@ -25,17 +25,19 @@ h1 { margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -.3px; }
 .sec-icon svg { width: 15px; height: 15px; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
 
-.panel.hero { grid-column: 1 / -1; display: grid; grid-template-columns: 1.5fr 1fr; column-gap: 34px; row-gap: 12px; padding: 22px 26px; border-color: #e9be6845;
+.panel.hero { grid-column: 1 / -1; display: grid; grid-template-columns: 1.75fr 1fr; column-gap: 34px; row-gap: 12px; padding: 22px 26px; border-color: #e9be6845;
   background: radial-gradient(ellipse 60% 120% at 0% 0%, #e9be681c, transparent 60%), linear-gradient(180deg, var(--panel-2), var(--panel)); }
-.panel.hero > .panel-head { grid-column: 1 / -1; }
-.panel.hero > .panel-head h3 { font-size: 19px; }
-.panel.hero > .pair { grid-column: 1; grid-row: 2 / span 3; align-self: center; gap: 14px; }
-.panel.hero > .pair .fld > span { font-size: 13px; }
+/* Heading and the two dropdowns stack on the left; the three switches fill the
+   right column from the top, so the left side has no empty band. */
+.panel.hero > .hero-main { grid-column: 1; grid-row: 1 / span 3; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; min-width: 0; }
+.panel.hero .panel-head h3 { font-size: 19px; }
+.panel.hero .pair { grid-template-columns: 1.3fr 1fr; gap: 14px; }
+.panel.hero .pair .fld > span { font-size: 13px; }
+.panel.hero .panel-note { margin: 0; }
 .panel.hero { row-gap: 0; }
-.panel.hero > .panel-head { margin-bottom: 16px; }
 .panel.hero > .row-toggle { grid-column: 2; padding: 10px 14px; background: #0b0d0eb3; border: 1px solid var(--line); border-top-color: #ffffff08; transition: background .18s; }
 .panel.hero > .row-toggle:hover { background: #111416cc; }
-.panel.hero > .pair + .row-toggle { border-top-color: var(--line); border-radius: 12px 12px 0 0; }
+.panel.hero > .hero-main + .row-toggle { border-top-color: var(--line); border-radius: 12px 12px 0 0; }
 .panel.hero > hr + .row-toggle { border-radius: 0 0 12px 12px; }
 .panel.hero > hr { display: none; }
 
@@ -95,7 +97,7 @@ input:disabled, button:disabled { opacity: .45; }
 .path { display: flex; gap: 7px; }
 .path input { flex: 1; font-size: 13.5px; }
 .row-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 550; }
-.row-toggle small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--dim); }
+.row-toggle small { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 400; color: var(--muted); }
 .panel-note { margin: auto 0 0; display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border-radius: 10px; background: #e9be6809; border: 1px dashed #e9be6826; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
 .panel-note svg { width: 14px; height: 14px; margin-top: 2px; color: var(--gold); }
 

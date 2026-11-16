@@ -238,7 +238,11 @@ const Dropdown = {
     const btn = dd.querySelector(".dd-btn"), list = dd.querySelector(".dd-list"), search = dd.querySelector(".dd-search input");
     const tick = svg('<path d="m5 12 4 4L19 6"/>');
 
-    const sync = () => { dd.querySelector(".dd-label").innerHTML = this.label(sel, sel.options[sel.selectedIndex]) || "—"; };
+    const sync = () => {
+      const o = sel.options[sel.selectedIndex];
+      dd.querySelector(".dd-label").innerHTML = this.label(sel, o) || "—";
+      btn.title = o ? o.text : "";          // full name when the label is cut short
+    };
     const choose = (o) => { sel.value = o.value; sel.dispatchEvent(new Event("change")); close(); sync(); btn.focus(); };
     const build = () => {
       const q = (search ? search.value : "").trim().toLowerCase();
