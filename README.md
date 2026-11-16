@@ -63,9 +63,10 @@ splitting, timing, styling and placement all run locally.
 
 | | |
 | --- | --- |
-| OS | Windows (the Resolve-side script is cross-platform; setup and UI are Windows-first) |
+| OS | Windows 10 or 11 (the Resolve-side script is cross-platform; setup and UI are Windows-first) |
+| WebView2 | Microsoft Edge WebView2 Runtime. Built into Windows 11; Setup installs it on PCs that lack it |
 | DaVinci Resolve | 21.x recommended; 21.0 and earlier supported via the Lua script |
-| Python | 3.10+ with `tkinter` |
+| Python | 3.10+ with `pywebview` (source install only; the installer bundles its own runtime) |
 | API key | [ElevenLabs](https://elevenlabs.io) |
 | Optional | `ffmpeg` on `PATH` — enables trimmed uploads |
 
@@ -110,11 +111,11 @@ outline, shadow or position, so the form does not offer them. Style the
 subtitle track in Resolve under **Inspector → Track → Track Style**; it applies
 to every cue on the track.
 
-### Frame presets (classic form)
+### Frame and placement
 
-The classic Tkinter form's preview switches between **Reel** (9:16) and **HD**
-(16:9) and opens on the timeline's actual shape. Caption size is a share of frame *height* and all
-positions are frame-relative, so the default placement differs:
+The run picks **Reel** (9:16) or **HD** (16:9) from the timeline's actual
+shape. Caption size is a share of frame *height* and all positions are
+frame-relative, so the default placement differs:
 
 | Frame | Height above bottom | Rationale |
 | --- | --- | --- |
@@ -122,7 +123,7 @@ positions are frame-relative, so the default placement differs:
 | Reel | `0.28` | Clears the caption, handle and action-button overlays used by Instagram, TikTok and Shorts |
 
 The chosen fraction is converted against timeline height and sent as
-`srt_posy`. A manually dragged value is preserved across frame switches. If
+`srt_posy`. If
 Resolve reports no resolution, `srt_posy` is omitted and the script's built-in
 `posY` (620) applies.
 
@@ -233,11 +234,12 @@ third-party package — just a data file loaded lazily on the first Latin word.
 | --- | --- |
 | [audio_to_srt.py](audio_to_srt.py) | Runs inside Resolve. Reads tracks and clip ranges, drives the UI and worker, imports and styles the SRT, owns Undo and Sync. Installed as `Srutilekha.py`. |
 | [audio_to_srt.lua](audio_to_srt.lua) | Lua equivalent for Resolve 21.0 and earlier. Not installed by setup. |
-| [loader.pyw](loader.pyw) | Tkinter UI — settings form (fallback), live preview, cue review/editor, progress. |
-| [web_studio.py](web_studio.py), [web_home.py](web_home.py), [web_ui.py](web_ui.py) | WebView2 windows for the Studio form and the home page; pages live in `ui/`. Set `SRUTILEKHA_CLASSIC_UI=1` to use the Tkinter UI instead. |
-| [web_run.py](web_run.py), [web_review.py](web_review.py) | Tk-free job runner (selection, worker, Resolve handshake) and review logic behind the WebView2 studio. |
+| [loader.pyw](loader.pyw) | Caption window entry point: languages, frames and installed fonts, then opens the WebView2 studio for the run. |
+| [web_studio.py](web_studio.py), [web_home.py](web_home.py), [web_ui.py](web_ui.py) | WebView2 windows for the Studio form and the home page; pages live in `ui/`. WebView2 (pywebview) is the only interface. |
+| [web_run.py](web_run.py), [web_review.py](web_review.py) | Job runner (selection, worker, Resolve handshake) and review logic behind the WebView2 studio. |
+| [web_notice.py](web_notice.py) | WebView2 popup for alerts and paused runs; a plain Windows message box if WebView2 is missing. |
 | [transcribe.py](transcribe.py) | Worker. Calls Scribe, normalizes and transliterates, builds cues, writes the SRT and `.cap` sidecar. |
-| [dialog.py](dialog.py) | Dark-themed alert/pick/input dialogs used by the Lua script. |
+| [dialog.py](dialog.py) | Alert entry point used by the Resolve-side scripts; shows them through `web_notice.py`. |
 | [updater.py](updater.py) | Version check and in-place install. Standard library only. |
 | `version.json` | Published release metadata. Read over HTTPS by every install. |
 | `data/translit_*.json.gz` | Generated English→Devanagari/Bengali pronunciation spellings. |

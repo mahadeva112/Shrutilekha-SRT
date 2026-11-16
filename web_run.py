@@ -1,7 +1,7 @@
 """Run a caption job for the WebView2 studio: selection → worker → Resolve.
 
-A Tk-free port of App._on_submit, _wait_for_args_and_run, _run_transcribe,
-_pump, _finish_after_transcribe and the result polling in loader.pyw. The
+Ported from the retired Tkinter window (App._on_submit, _wait_for_args_and_run,
+_run_transcribe, _pump, _finish_after_transcribe and its result polling). The
 files exchanged with the Resolve-side script are byte-for-byte the same:
 
   selection  written atomically by us, read by Resolve

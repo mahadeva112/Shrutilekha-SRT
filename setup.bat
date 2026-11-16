@@ -128,15 +128,25 @@ if errorlevel 1 (
     echo   OK -- truststore
 )
 
-:: ── 3. tkinter (bundled with Python on Windows — just verify) ─
+:: ── 3. pywebview (draws every Srutilekha window with Edge WebView2) ─
 echo.
-echo [ 3 / 5 ]  Checking tkinter...
-%PYEXE% -c "import tkinter" >nul 2>&1
-if errorlevel 1 (
-    echo   WARNING: tkinter not found.
-    echo   Re-install Python and make sure "tcl/tk" option is checked.
+echo [ 3 / 5 ]  Installing pywebview...
+if exist certs.pem (
+    %PYEXE% -m pip install --quiet --user --cert "%CD%\certs.pem" pywebview
 ) else (
-    echo   OK
+    %PYEXE% -m pip install --quiet --user pywebview
+)
+if errorlevel 1 (
+    echo   WARNING: pywebview was not installed. Srutilekha's windows need it.
+    echo   Try again with:  %PYEXE% -m pip install --user pywebview
+) else (
+    echo   OK -- pywebview
+)
+:: WebView2 itself ships with Windows 11; older PCs get it from Microsoft.
+reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv >nul 2>&1 || reg query "HKCU\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv >nul 2>&1
+if errorlevel 1 (
+    echo   WARNING: Microsoft Edge WebView2 Runtime was not found.
+    echo   Install it from https://go.microsoft.com/fwlink/p/?LinkId=2124703
 )
 
 :: ── 4. Save project path for the Resolve script ───────────────

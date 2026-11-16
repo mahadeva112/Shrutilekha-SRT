@@ -1,8 +1,9 @@
-"""Caption review for the WebView2 studio: Tk-free ports of App's review logic.
+"""Caption review for the WebView2 studio: cut, split, merge and write cues.
 
-Each function mirrors the App method named in its docstring, so a cut,
-split, merge or Apply from the web page produces the same cues and the same
-SRT/.cap files as the Tk review editor. Segments travel to and from the page
+Each function was ported from the method of the retired Tkinter editor
+(loader.pyw's App) named in its docstring. tests/data/tk_editor_golden.json
+holds what that editor produced, so a cut, split, merge or Apply from the page
+still gives the same cues and the same SRT/.cap files. Segments travel to and from the page
 as {"s", "e", "spk", "words": [[start, end, text], ...], "text"}.
 """
 

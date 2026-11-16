@@ -3,7 +3,7 @@
 
 Transcribes the audio on the current timeline via ElevenLabs and imports the
 result as a subtitle track. Cross-platform: Mac + Windows. All dialogs use
-dialog.py (tkinter), the form and progress window is loader.pyw, and the
+dialog.py (WebView2), the form and progress window is loader.pyw, and the
 transcription itself is transcribe.py -- this file is only the Resolve-side
 half: it reads the timeline, launches the window, and imports what comes back.
 

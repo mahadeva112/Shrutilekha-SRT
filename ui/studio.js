@@ -1,6 +1,6 @@
 "use strict";
-/* Master Studio form. Mirrors the Tk form's variables one to one; submit hands
-   the values back to Python, which runs the existing selection/handshake path. */
+/* Master Studio form. submit hands the values to Python (web_studio.py), which
+   runs the selection/handshake path with Resolve. */
 let api, init;
 const V = {};                       // current form values, same keys as web_studio
 const NUMBERS = [

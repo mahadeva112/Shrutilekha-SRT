@@ -1,4 +1,3 @@
-import hidden_windows  # noqa: F401  (keeps test windows off screen)
 import json
 import os
 from pathlib import Path
@@ -7,9 +6,7 @@ import sys
 import tempfile
 import threading
 import time
-import tkinter as tk
 import unittest
-from unittest import mock
 
 import web_run
 import web_studio
@@ -235,35 +232,22 @@ class RunControllerTest(unittest.TestCase):
 
 
 class SelectionParityTest(unittest.TestCase):
-    """build_selection must write what the Tk form's _on_submit writes."""
+    """build_selection must write what the retired Tk form's _on_submit wrote."""
     def test_matches_tk_form(self):
-        scratch = tempfile.TemporaryDirectory()
-        self.addCleanup(scratch.cleanup)
+        golden = json.loads((ROOT / "tests" / "data" / "tk_editor_golden.json").read_text(encoding="utf-8"))
         ns = runpy.run_path(str(ROOT / "loader.pyw"))
-        ns["App"].__init__.__globals__.update(
-            updater=None, data_dir=lambda: scratch.name,
-            _steal_focus=lambda root: None, _keep_topmost=lambda root: None)
         ctx = dict(languages=ns["LANGUAGES"], language_codes=ns["LANGUAGE_CODES"],
                    frames=ns["FRAME_FORMATS"], default_frame=ns["DEFAULT_FRAME"],
                    caption_fonts=ns["CAPTION_FONTS"], font_styles=ns["FONT_STYLES"])
         values = web_studio.initial_values(PROMPT, ctx)
         values.update(aspect="HD", srt_posy="0.137", max_lines="", cps=" 21 ", diarize=1,
                       sync_srt=" C:/x.srt ", color=" #abcdef ", font_style="")
-        root = tk.Tk()
-        root.withdraw()
-        p = Path(scratch.name)
-        with mock.patch.object(ns["App"], "_wait_for_args_and_run", lambda self: None):
-            ns["App"](root, PROMPT, str(p / "tk-sel"), str(p / "a"), str(p / "d"), str(p / "l"),
-                      "u", "u", str(p / "r"), str(p / "k"), prefill={"action": "sync", "values": values})
-            ctx["srt_fonts"] = ns["encode_subtitle_fonts"](ns["resolve_subtitle_fonts"]())
-        try:
-            root.update()
-        except tk.TclError:
-            pass
-        root.destroy()
-        tk_sel = json.loads((p / "tk-sel").read_text(encoding="utf-8"))
         web_sel = web_run.build_selection("sync", values, PROMPT, ctx, web_studio.timeline_res)
-        self.assertEqual(web_sel, tk_sel)
+        self.assertEqual(web_sel, golden["sync_selection"])
+        # The per-script subtitle fonts ride along exactly as given.
+        ctx["srt_fonts"] = "deva=Vesper Libre|taml=Nirmala UI"
+        web_sel = web_run.build_selection("sync", values, PROMPT, ctx, web_studio.timeline_res)
+        self.assertEqual(web_sel, dict(golden["sync_selection"], srt_fonts=ctx["srt_fonts"]))
 
 
 if __name__ == "__main__":

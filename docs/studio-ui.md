@@ -1,18 +1,19 @@
 # Master Studio UI feature mapping
 
-The Studio form opens as a WebView2 page (`ui/studio.*`, driven by
-`web_studio.py`) when pywebview and WebView2 are available. It collects the same
-values as the Tkinter form. `web_run.py` then writes the same selection file,
-runs the worker, shows progress and the done report in the same window, and
-exchanges the done/result/ack files with Resolve exactly as `App` does. When
-"Review captions first" is on, the same window shows the review editor
-(`ui/review.js`); every re-cut, split, merge, delete and Apply goes through
-`web_review.py`, a Tk-free port of the Tkinter editor's logic that tests pin to
-the same cues and the same SRT/.cap bytes. Presets use the same JSON files in
-both forms. Without
-WebView2, or with `SRUTILEKHA_CLASSIC_UI=1`, the Tkinter form in
-`studio_form.py` is shown instead. Browser and native font rendering are not
-pixel-identical.
+The Studio form is a WebView2 page (`ui/studio.*`, driven by `web_studio.py`).
+It is the only interface: the earlier Tkinter window has been removed, and
+Setup installs the WebView2 runtime on PCs that lack it. If the runtime is
+missing anyway, Srutilekha shows a plain Windows message box saying how to add
+it, and tells Resolve's side the run was cancelled.
+
+`web_run.py` writes the selection file, runs the worker, shows progress and the
+done report in the same window, and exchanges the done/result/ack files with
+Resolve. When "Review captions first" is on, the same window shows the review
+editor (`ui/review.js`); every re-cut, split, merge, delete and Apply goes
+through `web_review.py`. `tests/data/tk_editor_golden.json` records what the
+retired Tkinter form and editor produced (initial values, selections, presets,
+cues and SRT/.cap bytes), and the tests hold the web path to it. Preset files
+keep the same JSON format.
 
 | Existing feature | Studio location |
 | --- | --- |
