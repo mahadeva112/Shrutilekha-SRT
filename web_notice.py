@@ -4,8 +4,8 @@ The page (ui/notice.*) uses the studio's own stylesheet, so a paused run or a
 short message looks like the rest of the app. The window starts hidden; once
 the page has laid itself out it reports its height, and the window is sized
 to it, centred on the monitor under the mouse (where Resolve is) and brought
-in front of Resolve. show() returns False whenever WebView2 cannot be used,
-and dialog.py then draws the Tk version instead.
+in front of Resolve. show() returns False whenever WebView2 cannot be used;
+tell() then falls back to a plain Windows message box with the same words.
 """
 import ctypes
 import ctypes.wintypes
@@ -15,6 +15,19 @@ import threading
 import web_ui
 
 WIDTH = 540            # CSS pixels
+
+# What every entry point says when this PC has no WebView2 runtime. Setup
+# installs it, so this is for a runtime removed later or a blocked install.
+MISSING_RUNTIME = {
+    "kind": "error", "kicker": "One more step", "button": "Got it",
+    "title": "Let's add Microsoft Edge WebView2",
+    "message": "Srutilekha draws its windows with Microsoft Edge WebView2, "
+               "and this PC does not have it right now.",
+    "steps": ["Run the Srutilekha installer again: it adds WebView2 for you.",
+              "Or install the WebView2 Runtime from Microsoft: " + web_ui.WEBVIEW2_DOWNLOAD,
+              "Then open Srutilekha again."],
+    "details": "",
+}
 _HWND_TOPMOST = -1
 _SWP_NOACTIVATE = 0x0010
 _SWP_SHOWWINDOW = 0x0040
@@ -160,6 +173,32 @@ def show(notice):
     return True
 
 
+def as_text(notice):
+    """The notice as one block of text, for the Windows message box."""
+    import notices
+    text = notices.as_text(dict(notice, steps=notice.get("steps") or []))
+    details = (notice.get("details") or "").strip()
+    if details:
+        text += "\n\nDetails:\n" + details[-1200:]
+    return text
+
+
+def tell(notice):
+    """Show `notice`: the WebView2 popup when it can open, otherwise a native
+    message box with the same words. Without WebView2 the box also says how
+    to get it back, since every other Srutilekha window needs it too."""
+    try:
+        if show(notice):
+            return
+    except Exception:
+        pass
+    text = as_text(notice)
+    if notice is not MISSING_RUNTIME and not web_ui.available():
+        text += "\n\n" + MISSING_RUNTIME["message"] + "\n" + MISSING_RUNTIME["steps"][1]
+    web_ui.message_box(notice.get("title") or "Srutilekha", text,
+                       error=notice.get("kind", "error") == "error")
+
+
 if __name__ == "__main__" and len(sys.argv) > 1:
     import notices
-    show(dict(notices.describe(" ".join(sys.argv[1:])), kind="error", kicker="One more step"))
+    tell(dict(notices.describe(" ".join(sys.argv[1:])), kind="error", kicker="One more step"))

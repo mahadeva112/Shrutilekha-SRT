@@ -49,7 +49,8 @@ class Api(web_ui.BaseApi):
 
 
 def run():
-    """Show the home window. Returns False when WebView2 is unavailable."""
+    """Show the home window. Returns False when WebView2 is unavailable; an
+    error while opening it is raised for app.py to report."""
     page = web_ui.page("home.html")
     if not web_ui.available() or page is None:
         return False
@@ -61,12 +62,9 @@ def run():
         except Exception:
             open_settings = True
     api = Api(open_settings)
-    try:
-        api._window = webview.create_window(
-            "Srutilekha", url=str(page), js_api=api, width=940, height=660,
-            min_size=(760, 560), frameless=True, easy_drag=False,
-            background_color="#0d0f10")
-        webview.start(gui="edgechromium", private_mode=True)
-    except Exception:
-        return False
+    api._window = webview.create_window(
+        "Srutilekha", url=str(page), js_api=api, width=940, height=660,
+        min_size=(760, 560), frameless=True, easy_drag=False,
+        background_color="#0d0f10")
+    webview.start(gui="edgechromium", private_mode=True)
     return True

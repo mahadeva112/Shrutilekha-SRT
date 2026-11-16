@@ -1,6 +1,6 @@
 -- audio_to_srt.lua  —  Srutilekha  (Workspace -> Scripts -> Srutilekha)
 -- Transcribes the first audio track via ElevenLabs and imports subtitles.
--- Cross-platform: Mac + Windows. All dialogs use dialog.py (tkinter).
+-- Cross-platform: Mac + Windows. All dialogs use dialog.py (WebView2).
 
 -- Do NOT use package.config here. Resolve 21.1's Lua script host stopped
 -- exposing the `package` table, so `package.config:sub(1,1)` errors with

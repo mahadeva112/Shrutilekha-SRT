@@ -1,13 +1,15 @@
 """WebView2 Master Studio form.
 
-loader.pyw calls run() before it builds any Tk window. The page collects the
-same values as the Tk form; the result goes back to loader, which feeds them
-into App._on_submit so the selection file, Resolve handshake, progress and
-review all stay on the existing, tested path.
+loader.pyw calls run() for every caption run Resolve starts. The page collects
+the form values; web_run.py then writes the selection file, runs the worker,
+shows progress and review, and exchanges the done/result/ack files with
+Resolve, all in this one window.
 
-run() returns None when the web UI is unavailable (the caller then shows the
-Tk form), or a dict: {"action": "cancel" | "superseded"} or
-{"action": "generate" | "sync" | "undo", "values": {...}}.
+run() returns None when WebView2 is unavailable, or a dict:
+{"action": "cancel" | "superseded"}, {"action": "finished", "code": n} once a
+run is over, or {"action": "failed", "details": traceback} when the window
+could not open. Without Resolve paths in ctx (tests), submit() hands the values
+back as {"action": "generate" | "sync" | "undo", "values": {...}}.
 """
 import json
 import os
@@ -17,7 +19,7 @@ import threading
 import web_ui
 from app_runtime import data_dir, frozen, user_dir
 
-# What a preset stores. Preset files keep the Tk form's format: these keys
+# What a preset stores. Preset files keep the classic form's format: these keys
 # plus "_settings" = [max chars, lines, max secs]. Caption style (font, size,
 # colour, outline, shadow, position) is left out: Resolve's scripting API cannot
 # style subtitle cues, so the page no longer offers it and an older preset's
@@ -28,6 +30,23 @@ SETTINGS_KEYS = ("max_chars", "max_lines", "max_secs")
 SETTINGS_DEFAULTS = ("15", "1", "2")
 PASTED_SCRIPT = "pasted_script.txt"   # under data_dir()/scripts
 TOGGLES = ("punct", "diarize", "outline", "shadow", "safe_zone", "review")
+
+# Presentation examples only; never written into generated captions or presets.
+DEMO_CAPTIONS = {
+    "English": "Your story.\nYour voice.",
+    "Assamese": "আপোনাৰ কাহিনী।\nআপোনাৰ কণ্ঠ।",
+    "Bengali": "আপনার গল্প।\nআপনার কণ্ঠ।",
+    "Gujarati": "તમારી વાર્તા.\nતમારો અવાજ.",
+    "Hindi": "आपकी कहानी।\nआपकी आवाज़।",
+    "Kannada": "ನಿಮ್ಮ ಕಥೆ.\nನಿಮ್ಮ ಧ್ವನಿ.",
+    "Malayalam": "നിങ്ങളുടെ കഥ.\nനിങ്ങളുടെ ശബ്ദം.",
+    "Marathi": "तुमची गोष्ट.\nतुमचा आवाज.",
+    "Nepali": "तपाईंको कथा।\nतपाईंको आवाज।",
+    "Odia": "ଆପଣଙ୍କ କାହାଣୀ।\nଆପଣଙ୍କ ସ୍ୱର।",
+    "Punjabi": "ਤੁਹਾਡੀ ਕਹਾਣੀ।\nਤੁਹਾਡੀ ਆਵਾਜ਼।",
+    "Tamil": "உங்கள் கதை.\nஉங்கள் குரல்.",
+    "Telugu": "మీ కథ.\nమీ స్వరం.",
+}
 
 
 def timeline_res(prompt):
@@ -50,7 +69,7 @@ def timeline_crumb(prompt):
 
 
 def initial_values(prompt, ctx):
-    """The Tk form's _declare_vars, as plain data."""
+    """The form's starting values, from the prompt Resolve's side wrote."""
     d = prompt.get("defaults", {}) or {}
     items = prompt.get("items", []) or []
     parts = [p.strip() for p in str(d.get("settings", ",".join(SETTINGS_DEFAULTS))).split(",")]
@@ -411,6 +430,7 @@ def run(prompt, ctx):
         webview.start(api._watch, (closed,), gui="edgechromium", private_mode=True)
     except Exception:
         if api.result is None and getattr(api, "_job", None) is None:
-            return None
+            import traceback
+            return {"action": "failed", "details": traceback.format_exc()}
     closed.set()
     return api._outcome()

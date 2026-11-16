@@ -1,3 +1,13 @@
+Unreleased: one interface, WebView2 everywhere.
+
+- The classic Tkinter windows are gone. Every Srutilekha window (home, caption studio, review, and the notices Resolve opens) is the WebView2 one, so there is no second, older-looking app any more. `SRUTILEKHA_CLASSIC_UI` no longer does anything.
+- Setup now checks for the Microsoft Edge WebView2 runtime and, when a PC lacks it, downloads Microsoft's installer and adds it before installing Srutilekha. Windows 11 already has it. If the download fails, Setup says so and lets you try again.
+- If WebView2 is missing anyway (removed later, or blocked), Srutilekha shows a plain Windows message saying how to add it, instead of an old-style window. A caption run started from Resolve is cancelled cleanly in that case; the timeline is left untouched.
+- Srutilekha checks for the real WebView2 runtime, not just the pywebview library. Without the runtime, pywebview quietly used Internet Explorer's engine.
+- The font list in the caption studio comes straight from Windows. Legacy aliases such as "Arial CYR" no longer appear in it.
+- Tcl/Tk is no longer shipped, so the install is smaller.
+- 127 tests pass. They now check the web form, presets and review editor against what the classic form and editor produced, recorded before removal. The new Setup step compiles and finds WebView2 on this PC; the download-and-install path still needs a run on a PC without WebView2. Not yet checked in a live Resolve session.
+
 v2.0.7: the playhead stays where you left it.
 
 - After a run placed its captions, the playhead was left far past the clips, often at the end of the video. Placing moves it twice: to the timeline start, as the anchor the SRT import needs, and then past whatever Resolve appended. Srutilekha now notes where the playhead was before placing and puts it back afterwards, whether the placement worked or not. This applies to Resolve 21.1 and 21.2 (the bridge) and to Resolve 21.0 and earlier (the Lua launcher).

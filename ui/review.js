@@ -1,7 +1,7 @@
 "use strict";
-/* Review & split. Mirrors the Tk review editor: the page owns the cue cards
-   and live statistics; Python owns every structural change (re-cut, split,
-   merge, delete) so the cues match what the Tk editor would produce. */
+/* Review & split. The page owns the cue cards and live statistics; Python
+   (web_review.py) owns every structural change (re-cut, split, merge,
+   delete), so the cues match what the earlier Tk editor produced. */
 const Review = {
   rows: [], s: null, colors: {}, fields: [], recipes: [], sel: -1,
   filter: "all", ver: 0, timer: null, busy: false,

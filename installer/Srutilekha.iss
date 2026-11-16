@@ -42,7 +42,68 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{app}\Srutilekha.exe"; Parameters: "--tray"; Flags: nowait runhidden; Check: UseBridgeLauncher
 Filename: "{app}\Srutilekha.exe"; Description: "Open Srutilekha and enter your API key"; Flags: nowait postinstall skipifsilent
 [Code]
+// Every Srutilekha window is drawn by Microsoft Edge WebView2 (the Evergreen
+// runtime). Windows 11 ships it; a PC without it gets it from Microsoft's
+// bootstrapper before any file is installed. web_ui.py checks the same keys.
+const
+  WebView2Client = 'Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  WebView2Bootstrapper = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
 var ResolvePage: TInputOptionWizardPage;
+    WebView2Page: TDownloadWizardPage;
+function WebView2Found(RootKey: Integer; SubKey: String): Boolean;
+var Version: String;
+begin
+  Result := RegQueryStringValue(RootKey, SubKey, 'pv', Version) and (Version <> '') and (Version <> '0.0.0.0');
+end;
+function WebView2Installed: Boolean;
+begin
+  // Per machine (the 32-bit registry view on 64-bit Windows) or per user.
+  Result := WebView2Found(HKLM32, 'SOFTWARE\' + WebView2Client) or
+            WebView2Found(HKLM64, 'SOFTWARE\' + WebView2Client) or
+            WebView2Found(HKCU, 'Software\' + WebView2Client);
+end;
+function InstallWebView2: Boolean;
+var Code: Integer;
+begin
+  Result := True;
+  if WebView2Installed then
+    Exit;
+  WebView2Page.Clear;
+  WebView2Page.Add(WebView2Bootstrapper, 'MicrosoftEdgeWebview2Setup.exe', '');
+  WebView2Page.Show;
+  try
+    try
+      WebView2Page.Download;
+      WebView2Page.SetText('Installing Microsoft Edge WebView2...',
+        'Srutilekha draws its windows with WebView2. This can take a minute.');
+      WebView2Page.ProgressBar.Style := npbstMarquee;
+      // Not elevated, the bootstrapper installs WebView2 for this Windows user.
+      if not Exec(ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe'), '/silent /install', '',
+                  SW_HIDE, ewWaitUntilTerminated, Code) then
+        RaiseException('The WebView2 installer did not start: ' + SysErrorMessage(Code));
+      if not WebView2Installed then
+        RaiseException(Format('The WebView2 installer finished (code %d), but WebView2 is still missing.', [Code]));
+      Log('Microsoft Edge WebView2 installed.');
+    except
+      Result := False;
+      if not WebView2Page.AbortedByUser then
+        SuppressibleMsgBox('Srutilekha needs Microsoft Edge WebView2, and Setup could not add it yet.' + #13#10#13#10 +
+          GetExceptionMessage + #13#10#13#10 +
+          'Check the internet connection and click Install to try again, or install the WebView2 Runtime from ' +
+          WebView2Bootstrapper + ' and then run this Setup again.', mbError, MB_OK, IDOK);
+    end;
+  finally
+    WebView2Page.ProgressBar.Style := npbstNormal;
+    WebView2Page.Hide;
+  end;
+end;
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  // Also called on silent installs; False there ends Setup before installing.
+  Result := True;
+  if CurPageID = wpReady then
+    Result := InstallWebView2;
+end;
 function UsePythonLauncher: Boolean;
 begin
   Result := ResolvePage.SelectedValueIndex = 2;
@@ -73,6 +134,8 @@ begin
   ResolvePage.Add('Resolve 21.1 or newer, Studio ONLY (Python menu launcher)');
   if DefaultBridge then ResolvePage.SelectedValueIndex := 1
   else ResolvePage.SelectedValueIndex := 0;
+  WebView2Page := CreateDownloadPage('Microsoft Edge WebView2',
+    'Srutilekha needs WebView2 for its windows. Setup is adding it from Microsoft.', nil);
 end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var BridgeText: AnsiString; Text, Mailbox, ScriptPath: String;

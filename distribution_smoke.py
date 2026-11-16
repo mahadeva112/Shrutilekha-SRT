@@ -1,11 +1,12 @@
 """Runs inside the packaged GUI to verify runtime, form, worker and key storage."""
+import importlib.util
 import json
 import os
 from pathlib import Path
 import runpy
 import subprocess
+import sys
 import tempfile
-import tkinter as tk
 from app_runtime import resources, install_dir, prepare_environment
 
 
@@ -33,69 +34,60 @@ def run(output):
         assert callable(ElevenLabs(api_key="distribution-test-key").user.get)
         assert len(transcribe.languages.LANGUAGES) == 13
         assert (resources() / "data" / "translit_beng.json.gz").is_file()
-        root = tk.Tk()
         import dpi
+        dpi.enable()
         if os.name == 'nt':
             import ctypes
             u = ctypes.windll.user32
             u.GetThreadDpiAwarenessContext.restype = ctypes.c_void_p
             u.AreDpiAwarenessContextsEqual.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
             assert u.AreDpiAwarenessContextsEqual(u.GetThreadDpiAwarenessContext(), ctypes.c_void_p(-4))
-        root.withdraw()
+        # Every window is WebView2: pywebview and the pages ship, Tcl/Tk does not.
+        if getattr(sys, "frozen", False):
+            assert importlib.util.find_spec("tkinter") is None
+        import webview  # noqa: F401
+        import web_ui
+        import web_notice  # noqa: F401
+        for page in ("home.html", "studio.html", "notice.html"):
+            assert web_ui.page(page) is not None, page
         namespace = runpy.run_path(str(resources() / "loader.pyw"))
-        app_class = namespace["App"]
-        app_class.__init__.__globals__["updater"] = None
-        p = Path(scratch)
-        app = app_class(root, {"items": ["A1 â€” Test voice"], "defaults": {}},
-                        str(p / "selection"), str(p / "args"), str(p / "done"),
-                        str(p / "log"), "unused", "unused", str(p / "result"), str(p / "ack"))
-        root.update_idletasks()
-        assert app.lang_var.get() == "Auto-detect"
-        assert set(app._studio_sections) == {"Audio", "Timing", "Files", "Presets", "Style"}
-        assert app._scroll_canvas is None
-        from studio_form import DEMO_CAPTIONS
-        assert app.demo_language_var.get() == "English"
-        assert app._preview.SAMPLE == DEMO_CAPTIONS["English"]
-        app.demo_language_var.set("Tamil")
-        assert app._preview.SAMPLE == DEMO_CAPTIONS["Tamil"]
-        assert app.lang_var.get() == "Auto-detect"
-        app._set_task("Sync Existing")
-        assert app.studio_controls["sync_srt"].entry.cget("state") == "normal"
-        app._set_task("Generate")
-        assert app.studio_controls["sync_srt"].entry.cget("state") == "disabled"
-        from settings_ui import ApiSettingsPanel
-        bindings = {key: root.bind(key) for key in ("<Return>", "<Escape>")}
-        panel = ApiSettingsPanel(root)
-        assert panel.winfo_toplevel() is root
-        panel.value.set("distribution-test-key")
-        panel.save()
+        families = namespace["font_families"]()
+        assert families and not any(f.startswith("@") for f in families)
+        import web_studio
+        ctx = dict(languages=namespace["LANGUAGES"], language_codes=namespace["LANGUAGE_CODES"],
+                   frames=namespace["FRAME_FORMATS"], default_frame=namespace["DEFAULT_FRAME"],
+                   caption_fonts=namespace["CAPTION_FONTS"], font_styles=namespace["FONT_STYLES"],
+                   families=families, demo_captions=web_studio.DEMO_CAPTIONS, updater=None,
+                   frozen=True, run_id=None, run_marker=None)
+        studio = web_studio.StudioApi({"items": ["A1 - Test voice"], "defaults": {}}, ctx).initial()
+        assert studio["values"]["lang"] == "Auto-detect"
+        assert set(web_studio.DEMO_CAPTIONS) == set(namespace["LANGUAGES"]) - {"Auto-detect"}
+        api = web_ui.BaseApi()
+        assert api.save_key("distribution-test-key")["ok"]
         assert credentials.get_key() == "distribution-test-key"
-        assert all(root.bind(key) == script for key, script in bindings.items())
-        ui_errors=[]
-        root.report_callback_exception=lambda kind,value,tb:ui_errors.append(str(value))
-        # Large reviews formerly recursively drained Tk's event queue and
-        # failed only after transcription had completed in the packaged app.
-        segments=[{'s':i*2.,'e':i*2.+1.8,'spk':0,'text':'A clear story',
-                   'words':[(i*2.,i*2.+.5,'A'),(i*2.+.6,i*2.+1.,'clear'),(i*2.+1.1,i*2.+1.8,'story')]}
-                  for i in range(255)]
-        srt=str(p/'review.srt');cap=srt+'.cap'
-        app._build_review(srt,cap,[],segments)
-        root.update_idletasks()
-        assert len(app._review_rows)==255
-        app.settings_vars[0].set('30')
-        app._apply_review(srt,cap,[])
-        root.update_idletasks()
-        assert (p/'done').read_text()=='0'
-        assert Path(srt).stat().st_size
-        assert not ui_errors,ui_errors
-        root.destroy()
+        assert api.key_state() == {"hasKey": True}
+        assert api.remove_key()["ok"] and not credentials.get_key()
+        # A large review: re-cut and written locally, as Apply does.
+        import web_review
+        segments = [{'s': i * 2., 'e': i * 2. + 1.8, 'spk': 0, 'text': 'A clear story',
+                     'words': [(i * 2., i * 2. + .5, 'A'), (i * 2. + .6, i * 2. + 1., 'clear'),
+                               (i * 2. + 1.1, i * 2. + 1.8, 'story')]} for i in range(255)]
+        live = [web_review.live_segment(seg) for seg in segments]
+        cut = web_review.resplit(live, web_review.settings({"max_chars": "30", "lang": "English"},
+                                                           namespace["LANGUAGE_CODES"]))
+        assert len(cut) >= 255
+        srt = Path(scratch) / 'review.srt'
+        web_review.write_srt_cap(str(srt), str(srt) + '.cap', [], cut)
+        assert srt.stat().st_size
         worker = subprocess.run([str(install_dir() / "Srutilekha-worker.exe"), "--self-test"],
                                 capture_output=True, text=True, encoding="utf-8", timeout=30,
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         if worker.returncode:
             raise RuntimeError(worker.stdout + worker.stderr)
-        report = {"gui": "ok", "resolve_form": "ok", "master_studio": "all sections", "demo_languages": "independent", "encrypted_key": "ok", "api_settings": "in-window",
-                  "tray": "native icon and menu", "dpi": "PerMonitorV2 and native pixel fonts",
-                  "review": "255 cues, local re-split and Apply handshake",
+        report = {"gui": "ok", "resolve_form": "ok", "master_studio": "web studio state",
+                  "demo_languages": "all", "encrypted_key": "ok", "api_settings": "in-window",
+                  "webview2": web_ui.runtime_version() or "missing", "tkinter": "not shipped",
+                  "tray": "native icon and menu", "dpi": "PerMonitorV2",
+                  "review": "255 cues, local re-cut and SRT/.cap write",
                   "worker": worker.stdout.strip()}
         Path(output).write_text(json.dumps(report, indent=2), encoding="utf-8")

@@ -1,7 +1,12 @@
-"""Shared pywebview plumbing for the WebView2 windows (home and studio).
+"""Shared pywebview plumbing for the WebView2 windows (home, studio, notices).
 
 Pages call these methods through window.pywebview.api. The saved API key never
 crosses into a page: JavaScript only learns whether one exists.
+
+Every Srutilekha window is a WebView2 page; there is no other interface. Setup
+installs the WebView2 Evergreen runtime when a PC lacks it. If it is missing
+anyway, message_box() tells the user with a plain Windows message box, the one
+window that needs no WebView2.
 """
 import os
 import sys
@@ -10,16 +15,64 @@ import threading
 import credentials
 from app_runtime import resources
 
+# Microsoft's WebView2 Evergreen runtime: its EdgeUpdate client id, and the
+# permanent link to its bootstrapper (installer/Srutilekha.iss uses both too).
+WEBVIEW2_CLIENT = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+WEBVIEW2_DOWNLOAD = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+
+
+def runtime_version():
+    """The installed WebView2 runtime's version, or "" when there is none.
+
+    Microsoft's documented check: the EdgeUpdate client key's "pv" value, per
+    machine (32- and 64-bit views) or per user. Empty or 0.0.0.0 means the
+    runtime was removed. pywebview cannot be asked instead: without the runtime
+    it quietly draws the pages in Internet Explorer's engine."""
+    if sys.platform != "win32":
+        return ""
+    import winreg
+    keys = ((winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\"),
+            (winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\"),
+            (winreg.HKEY_CURRENT_USER, "Software\\Microsoft\\EdgeUpdate\\Clients\\"))
+    for hive, clients in keys:
+        path = clients + WEBVIEW2_CLIENT
+        try:
+            with winreg.OpenKey(hive, path) as key:
+                version = str(winreg.QueryValueEx(key, "pv")[0] or "").strip()
+        except OSError:
+            continue
+        if version and version != "0.0.0.0":
+            return version
+    return ""
+
 
 def available():
-    """True when the web UI can be used on this machine."""
-    if sys.platform != "win32" or os.environ.get("SRUTILEKHA_CLASSIC_UI") == "1":
+    """True when the WebView2 windows can open on this machine."""
+    if sys.platform != "win32":
         return False
     try:
         import webview  # noqa: F401
     except ImportError:
         return False
-    return True
+    return bool(runtime_version())
+
+
+def message_box(title, text, error=True):
+    """A native Windows message box, for when no WebView2 window can open.
+
+    Topmost and brought to the front, so it is seen over Resolve. Elsewhere it
+    prints to stderr."""
+    if sys.platform == "win32":
+        import ctypes
+        flags = 0x10 if error else 0x40                  # MB_ICONERROR / MB_ICONINFORMATION
+        flags |= 0x40000 | 0x10000                       # MB_TOPMOST | MB_SETFOREGROUND
+        try:
+            ctypes.windll.user32.MessageBoxW(None, str(text), str(title), flags)
+            return
+        except (AttributeError, OSError):
+            pass
+    if sys.stderr is not None:
+        print("%s\n%s" % (title, text), file=sys.stderr)
 
 
 def page(name):

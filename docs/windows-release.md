@@ -1,12 +1,15 @@
 # Windows app and release workflow
 
-The desktop UI is still Tkinter. `browser-preview/` is a separate visual demo.
-The installed application needs no external Python. It includes a GUI EXE and
+The desktop UI is WebView2 (pywebview); Tcl/Tk is not shipped. Setup checks
+for the Microsoft Edge WebView2 Evergreen runtime and, when it is missing,
+downloads Microsoft's bootstrapper and installs it before installing any file
+(an internet connection is needed for that step). `browser-preview/` is a
+separate visual demo. The installed application needs no external Python. It includes a GUI EXE and
 a hidden console worker that reports progress to the existing Resolve form.
 
 ## Build
 
-Use Windows x64, Python 3.12+ and Inno Setup 6.
+Use Windows x64, Python 3.12+ and Inno Setup 6.1 or later (for the WebView2 download page).
 Build FFmpeg first in MSYS2 UCRT64 with GCC, make, nasm, curl, tar and xz:
 `bash scripts/build_ffmpeg.sh`. The GitHub workflow does this automatically.
 

@@ -1,13 +1,13 @@
-import hidden_windows  # noqa: F401  (keeps test windows off screen)
+import json
 from pathlib import Path
 import runpy
 import tempfile
-import tkinter as tk
 import unittest
 
 import web_review
 
 ROOT = Path(__file__).resolve().parents[1]
+GOLDEN = json.loads((ROOT / "tests" / "data" / "tk_editor_golden.json").read_text(encoding="utf-8"))["review"]
 CAP = """FPS 25
 SPK 1 #7fb3ff Speaker 1
 SPK 2 #ffb37f Speaker 2
@@ -27,90 +27,62 @@ WRD 5.050 5.500 আছে।
 """
 
 
+def plain(value):
+    """Tuples as lists, the way the recorded JSON holds them."""
+    return json.loads(json.dumps(value, ensure_ascii=False))
+
+
 class ReviewParityTest(unittest.TestCase):
-    """The web review must cut, split, merge and write exactly as the Tk editor."""
+    """The web review must cut, split, merge and write exactly as the Tk editor
+    did. GOLDEN is that editor's output for CAP, recorded before it was retired."""
 
     def setUp(self):
         scratch = tempfile.TemporaryDirectory()
         self.addCleanup(scratch.cleanup)
         self.dir = Path(scratch.name)
-        self.ns = runpy.run_path(str(ROOT / "loader.pyw"))
-        self.ns["App"].__init__.__globals__.update(
-            updater=None, data_dir=lambda: scratch.name,
-            _steal_focus=lambda root: None, _keep_topmost=lambda root: None)
+        self.codes = runpy.run_path(str(ROOT / "loader.pyw"))["LANGUAGE_CODES"]
         self.cap = self.dir / "out.srt.cap"
         self.cap.write_text(CAP, encoding="utf-8")
-        self.root = tk.Tk()
-        self.root.withdraw()
+        self.header, self.segs = web_review.parse_cap(str(self.cap))
+        self.values = dict(GOLDEN["values"])
+        self.s = web_review.settings(self.values, self.codes)
 
-        def close():
-            # Cancel at the Tcl level: after_cancel would also drop the
-            # Python callback that destroy() still expects to delete.
-            for job in self.root.tk.call("after", "info"):
-                self.root.tk.call("after", "cancel", job)
-            self.root.destroy()
-        self.addCleanup(close)
-        p = self.dir
-        self.app = self.ns["App"](self.root, {"items": ["T1"], "defaults": {"lang": "Bengali"},
-                                              "resolution": "1080x1920"},
-                                  str(p / "sel"), str(p / "args"), str(p / "done"), str(p / "log"),
-                                  "u", "u", str(p / "result"), str(p / "ack"))
-        self.header, self.segs = self.app._parse_cap(str(self.cap))
-        self.app._build_review(str(p / "out.srt"), str(self.cap), self.header, self.segs)
-        self.root.update()
-        self.values = {k: v for k, v in dict(
-            max_chars=self.app.settings_vars[0].get(), max_lines=self.app.settings_vars[1].get(),
-            max_secs=self.app.settings_vars[2].get(), cps=self.app.cps_var.get(),
-            min_secs=self.app.min_var.get(), words_per=self.app.words_per_var.get(),
-            lang=self.app.lang_var.get()).items()}
-        self.s = web_review.settings(self.values, self.ns["LANGUAGE_CODES"])
-
-    def web_live(self):
-        return [web_review.live_segment(dict(d["seg"], text=d["text"].get())) for d in self.app._review_rows]
+    def live(self):
+        return [web_review.live_segment(seg) for seg in self.segs]
 
     def test_parse_and_settings_match(self):
-        header, segs = web_review.parse_cap(str(self.cap))
-        self.assertEqual((header, segs), (self.header, self.segs))
-        self.assertEqual(web_review.spk_colors(header), self.app._parse_spk_colors(header))
-        self.assertEqual(self.s, self.app._split_settings())
+        self.assertEqual(plain([self.header, self.segs]), [GOLDEN["header"], GOLDEN["segs"]])
+        self.assertEqual(plain({str(k): v for k, v in web_review.spk_colors(self.header).items()}),
+                         GOLDEN["spk_colors"])
+        self.assertEqual(plain(self.s), GOLDEN["settings"])
+        self.assertEqual(plain(self.live()), GOLDEN["live"])
 
     def test_resplit_matches(self):
         for max_chars in ("8", "30"):
-            self.values["max_chars"] = max_chars
-            self.app.settings_vars[0].set(max_chars)
-            s = web_review.settings(self.values, self.ns["LANGUAGE_CODES"])
-            tk_segs, tk_s = self.app._resplit_segments()
-            self.assertEqual(s, tk_s)
-            self.assertEqual(web_review.resplit(self.web_live(), s), tk_segs)
+            s = web_review.settings(dict(self.values, max_chars=max_chars), self.codes)
+            expected = GOLDEN["resplit"][max_chars]
+            self.assertEqual(plain(s), expected["settings"])
+            self.assertEqual(plain(web_review.resplit(self.live(), s)), expected["segs"])
 
     def test_edited_text_split_and_merge_match(self):
-        text = self.app._review_rows[0]["text"].text
-        text.delete("1.0", "end")
-        text.insert("1.0", "আমি আজ বাড়ি ফিরব")
-        live = self.web_live()
-        self.assertEqual(live, self.app._snapshot_segs())
-        text.mark_set("insert", "1.6")
-        n_left = len(text.get("1.0", "insert").split())
-        expected_split = web_review.split(live, 0, n_left, self.s)
-        self.app._review_rows[0]["split"]()
-        self.root.update()
-        self.assertEqual(self.app._snapshot_segs(), [web_review.live_segment(x) for x in expected_split])
-        live = self.web_live()
-        expected_merge = web_review.merge(live, 1, self.s)
-        self.app._review_rows[1]["merge"]()
-        self.root.update()
-        self.assertEqual(self.app._snapshot_segs(), [web_review.live_segment(x) for x in expected_merge])
+        segs = [dict(seg) for seg in self.segs]
+        segs[0]["text"] = "আমি আজ বাড়ি ফিরব"
+        live = [web_review.live_segment(seg) for seg in segs]
+        self.assertEqual(plain(live), GOLDEN["edited_live"])
+        split = [web_review.live_segment(x) for x in
+                 web_review.split(live, 0, GOLDEN["split_n_left"], self.s)]
+        self.assertEqual(plain(split), GOLDEN["after_split"])
+        merged = [web_review.live_segment(x) for x in web_review.merge(split, 1, self.s)]
+        self.assertEqual(plain(merged), GOLDEN["after_merge"])
 
     def test_written_files_match(self):
-        live = self.web_live()
+        live = self.live()
         live[1]["text"] = "তুমি কখন আসবে"
-        tk_dir, web_dir = self.dir / "tk", self.dir / "web"
-        tk_dir.mkdir()
-        web_dir.mkdir()
-        self.app._write_srt_cap(str(tk_dir / "a.srt"), str(tk_dir / "a.cap"), self.header, live)
-        web_review.write_srt_cap(str(web_dir / "a.srt"), str(web_dir / "a.cap"), self.header, live)
-        for name in ("a.srt", "a.cap"):
-            self.assertEqual((web_dir / name).read_bytes(), (tk_dir / name).read_bytes(), name)
+        out = self.dir / "web"
+        out.mkdir()
+        web_review.write_srt_cap(str(out / "a.srt"), str(out / "a.cap"), self.header, live)
+        self.assertEqual((out / "a.srt").read_bytes(), GOLDEN["written_srt"].encode("utf-8"))
+        self.assertEqual((out / "a.cap").read_bytes(), GOLDEN["written_cap"].encode("utf-8"))
 
     def test_two_line_cues_keep_their_wrap_through_review(self):
         srt = self.dir / "out.srt"

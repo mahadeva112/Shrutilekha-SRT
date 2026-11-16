@@ -430,7 +430,7 @@ def _download(url, say):
                 buf.write(chunk)
                 got += len(chunk)
                 now = time.time()
-                if now - last > 0.25:       # don't flood the Tk event queue
+                if now - last > 0.25:       # don't flood the progress display
                     last = now
                     if total:
                         say("Downloading update... %d%%" % (got * 100 // total))

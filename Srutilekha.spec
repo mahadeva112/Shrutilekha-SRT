@@ -16,12 +16,14 @@ for package in ('pystray', 'psutil', 'Pillow', 'six', 'pywebview', 'pythonnet', 
 # Both processes share one runtime directory. The worker keeps a console
 # subsystem for its UTF-8 progress pipe, but is started with CREATE_NO_WINDOW.
 gui = Analysis(['app.py'], pathex=[str(root)], binaries=[], datas=datas,
-               hiddenimports=['dialog', 'notices', 'web_ui', 'web_notice', 'web_home', 'web_studio', 'web_run', 'web_review', 'transcribe', 'release_updater', 'studio_form', 'truststore',
-                              'tkinter.font', 'tkinter.filedialog', 'six', 'PIL.ImageWin'],
-               hookspath=[], hooksconfig={}, runtime_hooks=[], excludes=['pystray'], noarchive=False)
+               hiddenimports=['dialog', 'notices', 'web_ui', 'web_notice', 'web_home', 'web_studio', 'web_run', 'web_review', 'transcribe', 'release_updater', 'truststore',
+                              'six', 'PIL.ImageWin'],
+               hookspath=[], hooksconfig={}, runtime_hooks=[],
+               # Every window is WebView2; Tcl/Tk is not shipped.
+               excludes=['pystray', 'tkinter', '_tkinter'], noarchive=False)
 worker = Analysis(['worker.py'], pathex=[str(root)], binaries=[], datas=datas,
                   hiddenimports=['transcribe', 'truststore'], hookspath=[], hooksconfig={},
-                  runtime_hooks=[], excludes=[], noarchive=False)
+                  runtime_hooks=[], excludes=['tkinter', '_tkinter'], noarchive=False)
 gui_pyz = PYZ(gui.pure)
 worker_pyz = PYZ(worker.pure)
 gui_exe = EXE(gui_pyz, gui.scripts, [], exclude_binaries=True, name='Srutilekha',
