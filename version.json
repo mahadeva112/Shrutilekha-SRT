@@ -1,10 +1,10 @@
 {
-  "version": "2.0.7",
+  "version": "2.0.8",
   "notes": [
-    "After captions are placed, the playhead goes back to where you left it instead of the end of the video.",
-    "Warning and error windows from Resolve look like the rest of Srutilekha.",
-    "Save SRT on the done screen saves the captions this run placed as an .srt file.",
-    "When a run pauses, Srutilekha shows a calm heading, what to do next, and the details folded away."
+    "Every Srutilekha window now uses the same modern look; the old classic windows are gone.",
+    "Setup adds the Microsoft WebView2 runtime if your PC does not have it.",
+    "The Audio & language panel is tidier and shows the full audio track name.",
+    "Shortening a trim reuses the earlier transcript instead of uploading the audio again."
   ],
   "mandatory": false,
   "min_version": ""
