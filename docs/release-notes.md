@@ -1,4 +1,4 @@
-Unreleased: one interface, WebView2 everywhere.
+v2.0.8: one interface, WebView2 everywhere; a tidier caption studio; fewer re-uploads.
 
 - The classic Tkinter windows are gone. Every Srutilekha window (home, caption studio, review, and the notices Resolve opens) is the WebView2 one, so there is no second, older-looking app any more. `SRUTILEKHA_CLASSIC_UI` no longer does anything.
 - Setup now checks for the Microsoft Edge WebView2 runtime and, when a PC lacks it, downloads Microsoft's installer and adds it before installing Srutilekha. Windows 11 already has it. If the download fails, Setup says so and lets you try again.
@@ -6,7 +6,10 @@ Unreleased: one interface, WebView2 everywhere.
 - Srutilekha checks for the real WebView2 runtime, not just the pywebview library. Without the runtime, pywebview quietly used Internet Explorer's engine.
 - The font list in the caption studio comes straight from Windows. Legacy aliases such as "Arial CYR" no longer appear in it.
 - Tcl/Tk is no longer shipped, so the install is smaller.
-- 127 tests pass. They now check the web form, presets and review editor against what the classic form and editor produced, recorded before removal. The new Setup step compiles and finds WebView2 on this PC; the download-and-install path still needs a run on a PC without WebView2. Not yet checked in a live Resolve session.
+- Caption studio: in Audio & language the heading, both dropdowns and a short language note now sit together on the left, level with the three switches, so the empty band above the dropdowns is gone. The full audio track name fits (and shows in a tooltip if it is still too long), and the small descriptions under the switches are easier to read.
+- Shortening a trim no longer re-uploads audio that was already transcribed. A window that sits inside a larger cached one is cut from that transcript, with no API call and no ElevenLabs credit used.
+- The test suite's hidden windows no longer show a taskbar button or take keyboard focus while tests run.
+- 133 tests pass. They check the web form, presets and review editor against what the classic form and editor produced, recorded before removal. The new Setup step compiles and finds WebView2 on this PC; the download-and-install path still needs a run on a PC without WebView2. The caption studio layout was checked in a browser mock at 1180 × 820 and 1040 × 720. Not yet checked in a live Resolve session.
 
 v2.0.7: the playhead stays where you left it.
 
