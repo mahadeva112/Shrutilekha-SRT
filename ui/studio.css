@@ -31,7 +31,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
    right column from the top, so the left side has no empty band. */
 .panel.hero > .hero-main { grid-column: 1; grid-row: 1 / span 3; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; min-width: 0; }
 .panel.hero .panel-head h3 { font-size: 19px; }
-.panel.hero .pair { grid-template-columns: 1.3fr 1fr; gap: 14px; }
+.panel.hero .pair { grid-template-columns: 1.3fr 1fr 0.8fr; gap: 14px; }
 .panel.hero .pair .fld > span { font-size: 13px; }
 .panel.hero .panel-note { margin: 0; }
 .panel.hero { row-gap: 0; }

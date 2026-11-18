@@ -171,7 +171,8 @@ class RunControllerTest(unittest.TestCase):
             job.save_srt(str(self.dir / "x.srt"))
 
     REGEN_SEL = {"settings": "20,2,3.5", "punct": 1, "lang_code": "bn", "diarize": 1, "cps": "18",
-                 "min_secs": "0.6", "words_per": "4", "ref_script": "C:/script ’s.docx"}
+                 "min_secs": "0.6", "words_per": "4", "ref_script": "C:/script ’s.docx",
+                 "model": "scribe_v3"}
 
     def test_write_args_keeps_resolves_lines_and_replaces_the_settings(self):
         args = Path(self.paths["args"])
@@ -179,7 +180,7 @@ class RunControllerTest(unittest.TestCase):
         web_run.write_args(str(args), self.REGEN_SEL)
         self.assertEqual(args.read_text(encoding="utf-8").split("\n"),
                          ["C:/a.wav", "C:/o.srt", "20", "2", "3.5", "C:/r.txt", "1", "bn", "1", "18",
-                          "0.6", "4", "C:/script ’s.docx", ""])
+                          "0.6", "4", "C:/script ’s.docx", "scribe_v3", ""])
         args.write_text("SYNC\nC:/a.wav\n", encoding="utf-8")
         with self.assertRaises(OSError):
             web_run.write_args(str(args), self.REGEN_SEL)
@@ -248,6 +249,59 @@ class SelectionParityTest(unittest.TestCase):
         ctx["srt_fonts"] = "deva=Vesper Libre|taml=Nirmala UI"
         web_sel = web_run.build_selection("sync", values, PROMPT, ctx, web_studio.timeline_res)
         self.assertEqual(web_sel, dict(golden["sync_selection"], srt_fonts=ctx["srt_fonts"]))
+
+
+class ModelChoiceTest(unittest.TestCase):
+    """Scribe v2 is the default; Scribe v3 is the one alternative."""
+    def test_labels_map_to_model_ids_and_unknown_falls_back_to_v2(self):
+        self.assertEqual(web_run.DEFAULT_MODEL, "Scribe v2")
+        self.assertEqual(web_run.model_id("Scribe v3"), "scribe_v3")
+        self.assertEqual(web_run.model_id("Scribe v2"), "scribe_v2")
+        self.assertEqual(web_run.model_id(None), "scribe_v2")
+        self.assertEqual(web_run.model_id("Scribe v9"), "scribe_v2")
+
+    def test_form_defaults_to_v2_and_keeps_a_saved_v3(self):
+        ns = runpy.run_path(str(ROOT / "loader.pyw"))
+        ctx = dict(languages=ns["LANGUAGES"], language_codes=ns["LANGUAGE_CODES"],
+                   frames=ns["FRAME_FORMATS"], default_frame=ns["DEFAULT_FRAME"],
+                   caption_fonts=ns["CAPTION_FONTS"], font_styles=ns["FONT_STYLES"])
+        self.assertEqual(web_studio.initial_values(PROMPT, ctx)["model"], "Scribe v2")
+        prompt = dict(PROMPT, defaults=dict(PROMPT.get("defaults") or {}, model="Scribe v3"))
+        values = web_studio.initial_values(prompt, ctx)
+        self.assertEqual(values["model"], "Scribe v3")
+        sel = web_run.build_selection("generate", values, prompt, ctx, web_studio.timeline_res)
+        self.assertEqual(sel["model"], "scribe_v3")
+
+
+class TranscribeModelTest(unittest.TestCase):
+    def tearDown(self):
+        import transcribe
+        transcribe.set_model("")
+
+    def test_set_model_accepts_v3_and_falls_back_to_v2(self):
+        import transcribe
+        self.assertEqual(transcribe.MODEL_ID, "scribe_v2")
+        self.assertEqual(transcribe.set_model("scribe_v3"), "scribe_v3")
+        self.assertEqual(transcribe.set_model("whisper"), "scribe_v2")
+        self.assertEqual(transcribe.set_model(""), "scribe_v2")
+
+    def test_upload_sends_the_chosen_model(self):
+        import tempfile
+        from unittest import mock
+        import transcribe
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(b"RIFF")
+        try:
+            client = mock.Mock()
+            client.speech_to_text.convert.return_value = mock.Mock(words=[])
+            transcribe.set_model("scribe_v3")
+            transcribe._transcribe_upload(f.name, "auto", False, client)
+            self.assertEqual(client.speech_to_text.convert.call_args.kwargs["model_id"], "scribe_v3")
+            transcribe.set_model("")
+            transcribe._transcribe_upload(f.name, "auto", False, client)
+            self.assertEqual(client.speech_to_text.convert.call_args.kwargs["model_id"], "scribe_v2")
+        finally:
+            os.remove(f.name)
 
 
 if __name__ == "__main__":

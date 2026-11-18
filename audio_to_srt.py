@@ -1326,7 +1326,8 @@ def main():
         # pointless decimal so the plate reads "25 fps", not "25.0 fps".
         prompt["fps"] = re.sub(r"\.0+$", "", str(tl_fps))
     prompt["defaults"] = {
-        "settings": "15,1,2", "punct": 0, "lang": "Auto-detect", "diarize": 0,
+        "settings": "15,1,2", "punct": 0, "lang": "Auto-detect",
+        "model": "Scribe v2", "diarize": 0,
         "min_secs": "0.4", "cps": "25", "text_size": "55", "outline": 1,
         "shadow": 1, "font": "Auto (by language)", "font_style": "Auto",
         "color": "",
@@ -1357,6 +1358,9 @@ def main():
     lang_code = field(sel, "lang_code", "auto")
     include_punct = field(sel, "punct", "0")
     diarize = field(sel, "diarize", "0")
+    # Scribe v2 unless the form chose another model; transcribe.py also falls
+    # back to v2 for any id it does not know.
+    model_id = field(sel, "model", "scribe_v2")
     min_secs = field(sel, "min_secs", "0")
     cps = field(sel, "cps", "0")
     text_size = field(sel, "text_size")
@@ -1383,8 +1387,8 @@ def main():
     # Weight/style override ("Medium", "Bold", ...). "Auto" keeps defaults.
     style_override = font_style if font_style != "Auto" else None
 
-    log("Language code: %s  diarize=%s min_secs=%s cps=%s"
-        % (lang_code, diarize, min_secs, cps))
+    log("Language code: %s  diarize=%s min_secs=%s cps=%s model=%s"
+        % (lang_code, diarize, min_secs, cps, model_id))
 
     if action == "undo":
         do_undo(run, pm, timeline)
@@ -1457,7 +1461,7 @@ def main():
         log("Sync mode: re-timing %s against %s" % (srt_input_path, audio_path))
         if not write_text(run.args, "\n".join(
                 ["SYNC", audio_path, srt_input_path, srt_out, lang_code,
-                 diarize]) + "\n"):
+                 diarize, model_id]) + "\n"):
             alert_error("Srutilekha", "Cannot write args file: " + run.args)
             run.cleanup()
             return
@@ -1538,7 +1542,7 @@ def main():
     if not write_text(run.args, "\n".join(
             [audio_path, srt_path, max_chars, max_lines, max_secs, run.ranges,
              include_punct, lang_code, diarize, cps, min_secs, words_per,
-             ref_script]) + "\n"):
+             ref_script, model_id]) + "\n"):
         alert_error("Srutilekha", "Cannot write args file: " + run.args)
         run.cleanup()
         return

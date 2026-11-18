@@ -355,7 +355,7 @@ if tlFps and tostring(tlFps) ~= "" then
     jsonParts[#jsonParts + 1] = '"fps":"' .. json_escape(fps) .. '",'
 end
 
-jsonParts[#jsonParts + 1] = '"defaults":{"settings":"15,1,2","punct":0,"lang":"Auto-detect","diarize":0,"min_secs":"0.4","cps":"25","text_size":"55","outline":1,"shadow":1,"font":"Auto (by language)","font_style":"Auto","color":""}}'
+jsonParts[#jsonParts + 1] = '"defaults":{"settings":"15,1,2","punct":0,"lang":"Auto-detect","model":"Scribe v2","diarize":0,"min_secs":"0.4","cps":"25","text_size":"55","outline":1,"shadow":1,"font":"Auto (by language)","font_style":"Auto","color":""}}'
 local pf = io.open(promptPath, "wb")
 if not pf then
     alert_error("Srutilekha", "Cannot write prompt file: " .. promptPath)
@@ -573,7 +573,7 @@ local diarize, min_secs, cps
 local text_size, outline, shadow, action, srt_posy
 local srt_fonts
 local cap_font, cap_color, font_style
-local words_per, ref_script
+local words_per, ref_script, model_id
 while true do
     -- A newer launch has taken over: stop waiting, or this instance would also
     -- act on that launch's submission and race it.
@@ -600,6 +600,7 @@ while true do
         include_punct = body:match('"punct"%s*:%s*(%d+)')
         lang_code     = body:match('"lang_code"%s*:%s*"(.-)"')
         diarize       = body:match('"diarize"%s*:%s*(%d+)')
+        model_id      = body:match('"model"%s*:%s*"(.-)"')
         min_secs      = body:match('"min_secs"%s*:%s*"(.-)"')
         cps           = body:match('"cps"%s*:%s*"(.-)"')
         text_size     = body:match('"text_size"%s*:%s*"(.-)"')
@@ -631,6 +632,9 @@ if not include_punct or include_punct == "" then include_punct = "0" end
 -- is spoken; matches the form's Auto-detect default.
 if not lang_code or lang_code == "" then lang_code = "auto" end
 if not diarize  or diarize  == "" then diarize  = "0" end
+-- Scribe v2 unless the form chose another model; transcribe.py also falls
+-- back to v2 for any id it does not know.
+if not model_id or model_id == "" then model_id = "scribe_v2" end
 if not min_secs or min_secs == "" then min_secs = "0" end
 if not cps      or cps      == "" then cps      = "0" end
 if not text_size  or text_size  == "" then text_size  = "" end
@@ -660,7 +664,7 @@ local function hex_rgb3(h)
     return tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255
 end
 log("Language code: " .. lang_code .. "  diarize=" .. diarize
-    .. " min_secs=" .. min_secs .. " cps=" .. cps)
+    .. " min_secs=" .. min_secs .. " cps=" .. cps .. " model=" .. model_id)
 
 -- ── Undo mode: remove the track the last generation created ────────────
 -- Reads logs/last_gen.txt ("<video|subtitle> <trackIndex> <timelineName>").
@@ -1199,7 +1203,7 @@ if action == "sync" then
         return
     end
     af:write("SYNC\n", audioPath, "\n", srt_input_path, "\n", srtOutPath, "\n",
-             lang_code, "\n", diarize, "\n")
+             lang_code, "\n", diarize, "\n", model_id, "\n")
     af:close()
 
     local code, why = wait_for_done()
@@ -1300,7 +1304,7 @@ af:write(audioPath, "\n", srtPath, "\n",
          maxChars, "\n", maxLines, "\n", maxSecs, "\n",
          rangesPath, "\n", include_punct, "\n", lang_code, "\n",
          diarize, "\n", cps, "\n", min_secs, "\n",
-         words_per, "\n", ref_script, "\n")
+         words_per, "\n", ref_script, "\n", model_id, "\n")
 af:close()
 if ref_script ~= "" then log("Reference script: " .. ref_script) end
 

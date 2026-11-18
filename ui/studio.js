@@ -99,7 +99,7 @@ function render() {
    on Continue; the settings the worker itself reads need a fresh transcription
    (Regenerate). Resolve read the track once, so the track, the task and the
    review switch stay as they were for this run. */
-const TRANSCRIBE_KEYS = ["lang", "punct", "diarize", "ref_script", "ref_text", "script_mode"];
+const TRANSCRIBE_KEYS = ["lang", "model", "punct", "diarize", "ref_script", "ref_text", "script_mode"];
 const SPLIT_KEYS = ["max_chars", "max_lines", "max_secs", "cps", "min_secs", "words_per"];
 const pick = (keys) => Object.fromEntries(keys.map((k) => [k, String(V[k] ?? "").trim()]));
 // The script the worker would use: the file in Browse mode, the text in Paste
@@ -112,7 +112,7 @@ const scriptOf = (v) => {
 const Back = {
   active: false, ran: {}, split: {},
   changed() {
-    return ["lang", "punct", "diarize"].some((k) => String(V[k] ?? "").trim() !== this.ran[k])
+    return ["lang", "model", "punct", "diarize"].some((k) => String(V[k] ?? "").trim() !== this.ran[k])
       || scriptOf(V) !== scriptOf(this.ran);
   },
 };
@@ -140,7 +140,7 @@ function renderBack() {
   if (!Back.active) return;
   const changed = Back.changed();
   $("pageLead").textContent = changed
-    ? "Language, punctuation, speakers or script changed. Regenerate to transcribe again."
+    ? "Language, model, punctuation, speakers or script changed. Regenerate to transcribe again."
     : "Your transcript is kept. Change the timing and continue, or regenerate it. The track stays the same for this run.";
   $("goText").textContent = changed ? "Regenerate captions" : "Continue to review";
   $("altBtn").innerHTML = changed ? UI.icon("undo") + "Keep transcript" : UI.icon("refresh") + "Regenerate";
@@ -197,7 +197,7 @@ function renderSummary() {
   if (V.task === "Sync Existing") {
     const srt = String(V.sync_srt || "").trim();
     bits.push(srt ? `Re-time ${base(srt)} against ${V.chosen}` : `Choose the SRT to re-time against ${V.chosen}`);
-  } else bits.push(`${V.chosen} · ${V.lang} → a subtitle track`);
+  } else bits.push(`${V.chosen} · ${V.lang} · ${V.model || "Scribe v2"} → a subtitle track`);
   if (scriptOf(V)) bits.push(V.script_mode === "paste" ? "pasted script" : "script " + base(String(V.ref_script).trim()));
   bits.push(Number(V.review) ? "review first" : "applied straight away");
   $("summary").textContent = bits.join("  ·  ");
@@ -213,6 +213,7 @@ const Dropdown = {
   icons: {
     trackSel: '<path d="M3 12h2m3-5v10m4-13v16m4-11v6m4-3h1"/>',
     langSel: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    modelSel: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   },
   all: [], close: null,
 
@@ -575,7 +576,8 @@ window.addEventListener("pywebviewready", async () => {
   buildNumbers();
   fillSelect($("trackSel"), init.items.length ? init.items : [""], V.chosen);
   fillSelect($("langSel"), init.languages, V.lang);
-  ["trackSel", "langSel"].forEach((id) => Dropdown.enhance($(id)));
+  fillSelect($("modelSel"), init.models || ["Scribe v2"], V.model || "Scribe v2");
+  ["trackSel", "langSel", "modelSel"].forEach((id) => Dropdown.enhance($(id)));
   UI.hydrateIcons();
   bindControls();
   wireActions();

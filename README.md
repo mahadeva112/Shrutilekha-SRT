@@ -11,7 +11,8 @@ single script, so code-switched English is transliterated into that script
 instead of splitting the line across two fonts.
 
 Transcription uses the [ElevenLabs Scribe](https://elevenlabs.io) API. Cue
-splitting, timing, styling and placement all run locally.
+splitting, timing, styling and placement all run locally. The studio's **Model**
+dropdown picks Scribe v2 (the default) or Scribe v3.
 
 ![The Srutilekha main window](docs/main-window.png)
 
