@@ -24,8 +24,8 @@ from app_runtime import data_dir, frozen, user_dir
 # colour, outline, shadow, position) is left out: Resolve's scripting API cannot
 # style subtitle cues, so the page no longer offers it and an older preset's
 # style fields are ignored on load.
-PRESET_KEYS = ("min_secs", "cps", "lang", "punct", "diarize", "words_per",
-               "review")
+PRESET_KEYS = ("min_secs", "cps", "lang", "model", "punct", "diarize",
+               "words_per", "review")
 SETTINGS_KEYS = ("max_chars", "max_lines", "max_secs")
 SETTINGS_DEFAULTS = ("15", "1", "2")
 PASTED_SCRIPT = "pasted_script.txt"   # under data_dir()/scripts
@@ -82,11 +82,16 @@ def initial_values(prompt, ctx):
     lang = d.get("lang", ctx["languages"][0])
     if lang not in ctx["languages"]:
         lang = ctx["languages"][0]
+    import web_run
+    model = d.get("model", web_run.DEFAULT_MODEL)
+    if model not in dict(web_run.MODELS):
+        model = web_run.DEFAULT_MODEL
     style = str(d.get("font_style", "Auto"))
     values = {
         "task": "Generate",
         "chosen": items[0] if items else "",
         "lang": lang,
+        "model": model,
         "min_secs": str(d.get("min_secs", "0.4")),
         "cps": str(d.get("cps", "25")),
         "text_size": str(d.get("text_size", "55")),
@@ -155,6 +160,7 @@ class StudioApi(web_ui.BaseApi):
 
     # ── page state ────────────────────────────────────────────────────────
     def initial(self):
+        import web_run
         ctx, prompt = self._ctx, self._prompt
         res = timeline_res(prompt)
         return {
@@ -163,6 +169,7 @@ class StudioApi(web_ui.BaseApi):
             "needsKey": bool(ctx.get("frozen")),
             "items": prompt.get("items", []) or [],
             "languages": list(ctx["languages"]),
+            "models": [label for label, _id in web_run.MODELS],
             "frames": ctx["frames"],
             "fonts": list(ctx["caption_fonts"][:1]) + sorted(set(ctx.get("families") or ctx["caption_fonts"][1:])),
             "fontStyles": list(ctx["font_styles"]),

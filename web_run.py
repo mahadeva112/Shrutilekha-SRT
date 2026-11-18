@@ -32,6 +32,15 @@ ARGS_TIMEOUT = 600.0
 RESULT_TIMEOUT = 600.0
 CREATE_NO_WINDOW = 0x08000000
 
+# The Scribe models the studio offers, label -> ElevenLabs model_id. The first
+# is the default for a new form and for any label this build does not know.
+MODELS = (("Scribe v2", "scribe_v2"), ("Scribe v3", "scribe_v3"))
+DEFAULT_MODEL = MODELS[0][0]
+
+
+def model_id(label):
+    return dict(MODELS).get(_s(label).strip(), MODELS[0][1])
+
 
 def _s(value):
     return "" if value is None else str(value)
@@ -51,6 +60,7 @@ def build_selection(action, values, prompt, ctx, timeline_res):
         "lang": lang,
         "lang_code": ctx["language_codes"].get(lang, "auto"),
         "diarize": int(values.get("diarize") or 0),
+        "model": model_id(values.get("model")),
         "min_secs": _s(values.get("min_secs")).strip() or "0",
         "cps": _s(values.get("cps")).strip() or "0",
         "text_size": _s(values.get("text_size")).strip() or "55",
@@ -81,19 +91,19 @@ def build_selection(action, values, prompt, ctx, timeline_res):
 # key each one comes from. transcribe.py reads them in this order.
 ARG_LINES = (("max_chars", 2), ("max_lines", 3), ("max_secs", 4), ("punct", 6),
              ("lang_code", 7), ("diarize", 8), ("cps", 9), ("min_secs", 10),
-             ("words_per", 11), ("ref_script", 12))
+             ("words_per", 11), ("ref_script", 12), ("model", 13))
 
 
 def write_args(path, sel):
     """Put a new selection's worker settings into an existing args file.
 
     Audio path, SRT path and clip ranges (lines 0, 1, 5) are Resolve's and are
-    kept. Written atomically, like the selection file."""
+    kept. An older args file without the model line gets one. Written atomically, like the selection file."""
     with open(path, encoding="utf-8") as f:
         lines = [ln.rstrip("\r\n") for ln in f]
     if not lines or lines[0] == "SYNC" or len(lines) < 2:
         raise OSError("not a generate args file")
-    lines += [""] * (13 - len(lines))
+    lines += [""] * (max(i for _k, i in ARG_LINES) + 1 - len(lines))
     chars, nlines, secs = (sel["settings"].split(",") + ["", "", ""])[:3]
     values = dict(sel, max_chars=chars, max_lines=nlines, max_secs=secs)
     for key, i in ARG_LINES:

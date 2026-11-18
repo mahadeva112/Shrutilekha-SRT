@@ -1,6 +1,6 @@
 """Called by audio_to_srt.py: transcribes audio and writes an SRT file.
 
-Usage: python3 transcribe.py <audio_path> <srt_output_path> <max_chars> <max_lines> <max_secs>
+Usage: python3 transcribe.py <audio_path> <srt_output_path> <max_chars> <max_lines> <max_secs> [... model_id]
 """
 
 import array
@@ -72,6 +72,24 @@ PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ELEVENLABS_LANGUAGE env var (ISO 639-1 "hi" or 639-3 "hin"); resolved at call
 # time so a value set in .env (loaded in main) is honored.
 HINDI_LANG_CODE = "hin"
+
+# ElevenLabs Scribe model used for every upload. Scribe v2 stays the default;
+# Scribe v3 is the opt-in alternative the studio offers. The id is part of
+# every transcript-cache key, so a v2 transcript is never reused for a v3 run
+# (or the other way round). Set once per run by main()/main_sync() from the
+# args file; anything unrecognised falls back to the default.
+DEFAULT_MODEL_ID = "scribe_v2"
+MODEL_IDS = ("scribe_v2", "scribe_v3")
+MODEL_ID = DEFAULT_MODEL_ID
+
+
+def set_model(model_id):
+    """Use ``model_id`` for this run's Scribe calls and cache keys, or the
+    default when it is empty or not one Srutilekha knows."""
+    global MODEL_ID
+    model_id = (model_id or "").strip()
+    MODEL_ID = model_id if model_id in MODEL_IDS else DEFAULT_MODEL_ID
+    return MODEL_ID
 
 
 # "auto" means don't pin a language: Scribe detects whatever is spoken and may
@@ -2348,7 +2366,7 @@ def _transcribe_upload(path, lang_code, diarize, client):
             kwargs["language_code"] = lang_code
         result = client.speech_to_text.convert(
             file=(os.path.basename(path), fh, mime),
-            model_id="scribe_v2",
+            model_id=MODEL_ID,
             timestamps_granularity="word",
             tag_audio_events=False,
             **kwargs
@@ -2362,7 +2380,7 @@ def fetch_words(path, lang_code, diarize, client):
     """Return the raw word list for ``path``: a transcript-cache hit skips the
     paid Scribe call entirely, otherwise call the API and store the result
     for next time. Shared by main()'s generate path and the SRT-sync path."""
-    key = _cache_key(path, "scribe_v2", lang_code, diarize)
+    key = _cache_key(path, MODEL_ID, lang_code, diarize)
     cached = _cache_load(key)
     if cached is not None:
         print("Cache hit: %s (%d words, no API call)"
@@ -2588,7 +2606,7 @@ def fetch_words_ranged(path, windows, lang_code, diarize, client):
         return fetch_words(path, lang_code, diarize, client)
 
     # An earlier untrimmed run already paid for every window.
-    full = _cache_load(_cache_key(path, "scribe_v2", lang_code, diarize))
+    full = _cache_load(_cache_key(path, MODEL_ID, lang_code, diarize))
     if full is not None:
         print("Cache hit: %s (%d words, no API call)"
               % (os.path.basename(path), len(full)))
@@ -2602,8 +2620,8 @@ def fetch_words_ranged(path, windows, lang_code, diarize, client):
 
     out = []
     for ws, we in windows:
-        key = _slice_cache_key(path, "scribe_v2", lang_code, diarize, ws, we)
-        cached = _cached_window_words(path, "scribe_v2", lang_code, diarize,
+        key = _slice_cache_key(path, MODEL_ID, lang_code, diarize, ws, we)
+        cached = _cached_window_words(path, MODEL_ID, lang_code, diarize,
                                       ws, we)
         if cached is not None:
             print("Cache hit: %s [%.1fs-%.1fs] (%d words, no API call)"
@@ -2644,7 +2662,7 @@ def fetch_words_ranged(path, windows, lang_code, diarize, client):
                          getattr(w, "speaker_id", None))
                    for w in words]
         _cache_store(key, shifted)
-        _window_index_add(path, "scribe_v2", lang_code, diarize, ws, we)
+        _window_index_add(path, MODEL_ID, lang_code, diarize, ws, we)
         out.extend(shifted)
 
     if not out:
@@ -3035,7 +3053,7 @@ def resplit(audio_path, srt_output, ranges_path, *, max_chars, max_lines,
         # them, or a sliced run would never be re-splittable for free.
         windows = _source_windows(ranges, None if legacy_single else sp,
                                   diarize)
-        cached = _cached_words_for_windows(sp, windows, "scribe_v2",
+        cached = _cached_words_for_windows(sp, windows, MODEL_ID,
                                            resolved_lang, diarize)
         if cached is None:
             return None  # cache miss → caller must transcribe
@@ -3070,7 +3088,7 @@ def resplit(audio_path, srt_output, ranges_path, *, max_chars, max_lines,
 def main_sync(args):
     """Entry point for action="sync": re-time an existing SRT to match the
     audio, keeping its text unchanged. args = [audio_path, srt_input_path,
-    srt_output_path, lang_code, diarize]."""
+    srt_output_path, lang_code, diarize, model_id]."""
     if len(args) < 3:
         print("ERROR: sync args file must contain audio_path, srt_input_path, srt_output_path")
         sys.exit(1)
@@ -3079,6 +3097,7 @@ def main_sync(args):
     srt_output_path = args[2]
     lang_code = args[3] if len(args) > 3 and args[3] else HINDI_LANG_CODE
     diarize = (args[4] if len(args) > 4 and args[4] else "0") == "1"
+    set_model(args[5] if len(args) > 5 else "")
 
     _progress(15, "Loading configuration...")
     load_dotenv()
@@ -3148,6 +3167,7 @@ def main():
         min_dur = float(args[10]) if len(args) > 10 and args[10] else 0.4
         max_words = int(args[11]) if len(args) > 11 and args[11] else 0
         ref_script = args[12] if len(args) > 12 and args[12] else None
+        set_model(args[13] if len(args) > 13 else "")
     elif len(sys.argv) < 3:
         print("Usage: transcribe.py <audio_path> <srt_output_path> [max_chars] [max_lines] [max_secs]")
         print("   or: transcribe.py --args-file <path>")
@@ -3166,6 +3186,7 @@ def main():
         min_dur = float(sys.argv[11]) if len(sys.argv) > 11 else 0.4
         max_words = int(sys.argv[12]) if len(sys.argv) > 12 else 0
         ref_script = sys.argv[13] if len(sys.argv) > 13 else None
+        set_model(sys.argv[14] if len(sys.argv) > 14 else "")
 
     _progress(15, "Loading configuration...")
     load_dotenv()
@@ -3192,8 +3213,8 @@ def main():
     resolved_lang = (os.environ.get("ELEVENLABS_LANGUAGE", "").strip()
                      or lang_code or HINDI_LANG_CODE)
     script = script_for_lang(resolved_lang)
-    print("Language: %s (script=%s, diarize=%s, cps=%g, min_dur=%g)"
-          % (resolved_lang, script, diarize, cps, min_dur))
+    print("Language: %s (script=%s, diarize=%s, cps=%g, min_dur=%g, model=%s)"
+          % (resolved_lang, script, diarize, cps, min_dur, MODEL_ID))
 
     def _normalize_words(raw_words):
         return normalize_words(raw_words, script, diarize)
