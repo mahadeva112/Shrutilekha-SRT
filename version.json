@@ -1,10 +1,8 @@
 {
-  "version": "2.0.8",
+  "version": "2.0.9",
   "notes": [
-    "Every Srutilekha window now uses the same modern look; the old classic windows are gone.",
-    "Setup adds the Microsoft WebView2 runtime if your PC does not have it.",
-    "The Audio & language panel is tidier and shows the full audio track name.",
-    "Shortening a trim reuses the earlier transcript instead of uploading the audio again."
+    "The caption studio has a new Model choice: Scribe v2 (the default) or ElevenLabs' newer Scribe v3.",
+    "Scribe v2 and Scribe v3 transcripts are cached separately, so switching models never reuses the other one's transcript."
   ],
   "mandatory": false,
   "min_version": ""

@@ -1,3 +1,10 @@
+v2.0.9: choose Scribe v2 or Scribe v3.
+
+- The caption studio's Audio & language panel has a new **Model** dropdown next to Language: **Scribe v2** (the default) or **Scribe v3**, ElevenLabs' newer speech-to-text model (released 9 November 2026). Every run starts on Scribe v2; pick Scribe v3 for a run, or save it in a preset.
+- The chosen model is used for Generate, Sync Existing and Regenerate from review. Changing it after review counts as a transcription change, so the button becomes Regenerate.
+- Transcripts are cached per model, so a Scribe v2 transcript is never reused for a Scribe v3 run, or the other way round.
+- 137 tests pass. The new dropdown was checked in a browser mock of the caption studio. Scribe v3 has not yet been checked in a live Resolve session.
+
 v2.0.8: one interface, WebView2 everywhere; a tidier caption studio; fewer re-uploads.
 
 - The classic Tkinter windows are gone. Every Srutilekha window (home, caption studio, review, and the notices Resolve opens) is the WebView2 one, so there is no second, older-looking app any more. `SRUTILEKHA_CLASSIC_UI` no longer does anything.
