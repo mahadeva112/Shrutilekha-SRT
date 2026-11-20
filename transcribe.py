@@ -1687,14 +1687,57 @@ def build_cues(words, max_chars, max_lines, max_secs, include_punct="1",
             for i, s, e, t, ws in cues]
 
 
-def to_srt(cues):
+_FONT_TAG_RE = re.compile(r"</?font\b[^>]*>", re.I)
+_HEX_COLOR_RE = re.compile(r"#[0-9A-Fa-f]{6}")
+
+
+def strip_font_tags(text):
+    """Cue text without SRT <font ...> tags."""
+    return _FONT_TAG_RE.sub("", text or "")
+
+
+def color_cue_text(text, color):
+    """Wrap each line of a cue in an SRT <font color> tag.
+
+    Resolve's scripting API refuses every subtitle style write, but its SRT
+    import shows these colours (checked live on Resolve 21.2.0.6 Free,
+    2026-11-20). Each line is tagged on its own so a two-line cue does not
+    depend on a tag spanning a line break. White, or anything that is not a
+    #rrggbb colour, stays untagged so the track's Track Style colour applies."""
+    c = (color or "").strip()
+    if not _HEX_COLOR_RE.fullmatch(c) or c.upper() == "#FFFFFF":
+        return text
+    return "\n".join('<font color="%s">%s</font>' % (c, line) if line.strip() else line
+                     for line in text.split("\n"))
+
+
+def _speaker_order(cues):
+    """Raw diarization id -> 1-based speaker index, in first-appearance order.
+    The .cap sidecar's SPK lines use the same numbering."""
+    seen = {}
+    for cue in cues:
+        spk = _cue_speaker(cue[4] if len(cue) > 4 else [])
+        if spk is not None and spk not in seen:
+            seen[spk] = len(seen) + 1
+    return seen
+
+
+def to_srt(cues, speaker_colors=None):
+    """The SRT Resolve imports. With speaker_colors and two or more speakers,
+    each cue is coloured by its speaker, numbered as in the .cap sidecar."""
     # Dummy entry at t=0 forces Resolve to anchor the subtitle clip at the
     # timeline start frame. Without it, Resolve places the clip at the first
     # real cue's time and uses clip-relative offsets, shifting every subtitle
     # forward by first_cue_time (typically ~0.1-0.5s).
+    order = _speaker_order(cues) if speaker_colors else {}
+    if len(order) < 2:
+        order = {}
     parts = ["1\n00:00:00,000 --> 00:00:00,001\n \n"]
     for cue in cues:
         i, s, e, t = cue[0], cue[1], cue[2], cue[3]
+        idx = order.get(_cue_speaker(cue[4] if len(cue) > 4 else [])) if order else None
+        if idx:
+            t = color_cue_text(t, speaker_colors[(idx - 1) % len(speaker_colors)])
         parts.append("%d\n%s --> %s\n%s\n" % (i + 1, fmt_ts(s), fmt_ts(e), t))
     return "\n".join(parts)
 
@@ -1722,13 +1765,8 @@ def to_caption_sidecar(cues, fps, speaker_colors):
     Segment text is the words joined by single spaces."""
     # Map raw diarization ids (e.g. "speaker_0") → 1-based speaker index in
     # first-appearance order, and assign each a colour from the palette.
-    order = []
-    seen = {}
-    for cue in cues:
-        spk = _cue_speaker(cue[4] if len(cue) > 4 else [])
-        if spk is not None and spk not in seen:
-            seen[spk] = len(order) + 1
-            order.append(spk)
+    seen = _speaker_order(cues)
+    order = sorted(seen, key=seen.get)
 
     lines = ["FPS %g" % fps]
     for idx, spk in enumerate(order, start=1):
@@ -2707,7 +2745,9 @@ def parse_srt(path):
         m = _SRT_TIME_RE.search(lines[li])
         if not m:
             continue
-        text = "\n".join(lines[li + 1:]).strip()
+        # Colour tags (this app's own, or any SRT's) are formatting, not words:
+        # sync and reference scripts match on the text alone.
+        text = strip_font_tags("\n".join(lines[li + 1:])).strip()
         if text:
             cues.append((_parse_srt_ts(m.group(1)), _parse_srt_ts(m.group(2)), text))
     return cues
@@ -3075,11 +3115,12 @@ def resplit(audio_path, srt_output, ranges_path, *, max_chars, max_lines,
                                 resolved_lang, audio_path)
     fps = ranges[0]["fps"] if ranges else 24.0
     if write and cues:
+        speaker_colors = load_speaker_colors()
         with open(srt_output, "w", encoding="utf-8") as f:
-            f.write(to_srt(cues))
+            f.write(to_srt(cues, speaker_colors))
         try:
             with open(srt_output + ".cap", "w", encoding="utf-8") as f:
-                f.write(to_caption_sidecar(cues, fps, load_speaker_colors()))
+                f.write(to_caption_sidecar(cues, fps, speaker_colors))
         except Exception as e:
             print("WARNING: could not write caption sidecar: %s" % e)
     return cues, fps
@@ -3278,15 +3319,16 @@ def main():
         sys.exit(1)
 
     _progress(95, "Finalizing...")
+    speaker_colors = load_speaker_colors()
     with open(srt_output, "w", encoding="utf-8") as f:
-        f.write(to_srt(cues))
+        f.write(to_srt(cues, speaker_colors))
 
     # Caption sidecar (per-word timing + per-speaker colour) next to the SRT.
-    # The Resolve-side importer reads it for the per-speaker colouring.
-    # Best-effort: a failure here must never break the core SRT output.
+    # The review editor reads it; the colours Resolve shows come from the
+    # <font color> tags to_srt() wrote. Best-effort: a failure here must never
+    # break the core SRT output.
     try:
         fps = ranges[0]["fps"] if ranges else 24.0
-        speaker_colors = load_speaker_colors()
         with open(srt_output + ".cap", "w", encoding="utf-8") as f:
             f.write(to_caption_sidecar(cues, fps, speaker_colors))
     except Exception as e:

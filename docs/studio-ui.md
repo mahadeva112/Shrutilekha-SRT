@@ -37,6 +37,8 @@ scripting API cannot style subtitle cues (TimelineItem.SetProperty only takes
 transform and composite keys), so font, size, colour, outline, shadow and
 position never reached Resolve; set them in Resolve under Inspector > Track >
 Track Style. The real cues are previewed in the review editor after Generate.
+Per-speaker colour is the exception: it travels in the SRT as `<font color>`
+tags, which Resolve's SRT import shows (`transcribe.color_cue_text`).
 
 The setup form has no tabs or scrolling canvas. All three settings panels stay
 visible. In Audio & language the heading, both dropdowns and a one-line

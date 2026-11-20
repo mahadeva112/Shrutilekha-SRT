@@ -287,7 +287,16 @@ const Review = {
   paintPreview() {
     const row = this.rows[this.sel];
     fitFrame($("miniViewport"), $("miniFrame"), 16, 16);
-    paintCaption($("miniFrame"), $("miniCap"), row ? row.ta.value.split(/\s+/).join(" ").trim() : "");
+    paintCaption($("miniFrame"), $("miniCap"), row ? row.ta.value.split(/\s+/).join(" ").trim() : "",
+                 row ? this.speakerColor(row) : "");
+  },
+
+  speakerColor(row) {
+    // The colour Resolve will show: the <font color> tag write_srt_cap puts in
+    // the SRT. Only with two or more speakers, and white stays untagged.
+    const spks = new Set(this.rows.map((r) => r.seg.spk).filter(Boolean));
+    const c = spks.size >= 2 ? this.colors[String(row.seg.spk || 0)] || "" : "";
+    return /^#[0-9a-f]{6}$/i.test(c) && c.toLowerCase() !== "#ffffff" ? c : "";
   },
 
   /* ── apply ──────────────────────────────────────────────── */

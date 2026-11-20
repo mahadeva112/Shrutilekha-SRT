@@ -43,8 +43,12 @@ dropdown picks Scribe v2 (the default) or Scribe v3.
   phrase-completing word (है, ছিল, ஆகும், ఉంది, ಇದೆ, ഉണ്ട്, છે, ਹੈ, ଅଛି, or a
   standalone postposition). Max characters, lines, duration, word count and
   reading speed (cps) are all enforced.
-- **Dedicated subtitle track.** Cues are imported onto a new subtitle track with
-  per-speaker colouring. Existing subtitle tracks are never modified.
+- **Dedicated subtitle track.** Cues are imported onto a new subtitle track.
+  Existing subtitle tracks are never modified.
+- **Per-speaker colour.** With *Separate speakers* on, a cue never mixes two
+  voices, and when two or more speakers are found each cue is coloured by its
+  speaker through SRT `<font color>` tags. The first speaker is white by
+  default and stays untagged, so the Track Style colour applies to it.
 - **Cached re-splitting.** Scribe results are cached per (audio, model,
   language, diarize). Changing split settings re-runs only local cue building —
   no second API call.
@@ -112,21 +116,33 @@ outline, shadow or position, so the form does not offer them. Style the
 subtitle track in Resolve under **Inspector → Track → Track Style**; it applies
 to every cue on the track.
 
+Resolve 21.2 refuses every subtitle style write (checked on 21.2.0.6 Free).
+The importer still sends the per-script font, size, outline, shadow and
+position, and the done screen reports that Resolve did not accept them; the
+text and timings are imported regardless.
+
+Per-speaker colour does reach Resolve, through the SRT itself: Resolve's SRT
+import shows `<font color>` tags (checked live on 21.2.0.6 Free). The colours
+come from `speaker_colors.json` in the data folder (a JSON array of `#rrggbb`
+strings) or the built-in palette. Sync Existing drops any colour tags from
+the SRT it re-times.
+
+Subtitle Regions and several visible subtitle tracks are not an option:
+Resolve shows only one subtitle track at a time, has no scripting call for
+regions, and its WebVTT and TTML import drop regions and overlapping cues.
+
 ### Frame and placement
 
 The run picks **Reel** (9:16) or **HD** (16:9) from the timeline's actual
-shape. Caption size is a share of frame *height* and all positions are
-frame-relative, so the default placement differs:
+shape. The review editor's preview places captions by frame height:
 
 | Frame | Height above bottom | Rationale |
 | --- | --- | --- |
 | HD | `0.10` | Broadcast lower third, inside the title-safe margin |
 | Reel | `0.28` | Clears the caption, handle and action-button overlays used by Instagram, TikTok and Shorts |
 
-The chosen fraction is converted against timeline height and sent as
-`srt_posy`. If
-Resolve reports no resolution, `srt_posy` is omitted and the script's built-in
-`posY` (620) applies.
+This position is sent to Resolve as `srt_posy`, but Resolve does not apply it
+to subtitle cues. Set the position in Track Style to match the preview.
 
 ## Updating
 
