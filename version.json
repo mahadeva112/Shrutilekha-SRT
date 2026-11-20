@@ -1,8 +1,8 @@
 {
-  "version": "2.0.9",
+  "version": "2.0.10",
   "notes": [
-    "The caption studio has a new Model choice: Scribe v2 (the default) or ElevenLabs' newer Scribe v3.",
-    "Scribe v2 and Scribe v3 transcripts are cached separately, so switching models never reuses the other one's transcript."
+    "With Separate speakers on, each speaker's captions now get their own colour in Resolve when two or more people speak.",
+    "The review preview shows each cue in its speaker's colour, and the done screen says which caption styles to set in Track Style."
   ],
   "mandatory": false,
   "min_version": ""

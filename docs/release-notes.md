@@ -1,3 +1,13 @@
+v2.0.10: a colour for each speaker.
+
+- With **Separate speakers** on and two or more people speaking, each speaker's captions now get their own colour in Resolve. Resolve does not let scripts colour subtitle cues, but it does read colour tags in an SRT, so Srutilekha writes `<font color>` tags into the SRT it imports. This was checked live on Resolve 21.2.0.6 Free. The first speaker stays white and untagged, so the track's Track Style colour applies to them. With one speaker, nothing changes.
+- Review **Apply** writes the same colours. If your edits leave only one speaker, no colours are written.
+- The review editor's preview shows the selected cue in its speaker's colour.
+- The done screen no longer says Resolve "did not accept" the caption styling on every run. It now says which styles to set in Inspector > Track > Track Style (font, size, outline, shadow, position), and that text, timing and speaker colours were imported.
+- Sync Existing and reference scripts ignore colour tags in an SRT they read. Sync Existing writes its re-timed SRT without them.
+- Subtitle Regions and one track per speaker were tried and dropped: Resolve shows only one subtitle track at a time and has no scripting call for regions.
+- 143 tests: the new colour and review tests pass. 2 fail on the build PC without this change too: `pystray` is not installed, and the WebView2 check fails there. One timing test in `test_web_run` sometimes fails when the PC is busy. Not yet checked with a real transcription in Resolve.
+
 v2.0.9: choose Scribe v2 or Scribe v3.
 
 - The caption studio's Audio & language panel has a new **Model** dropdown next to Language: **Scribe v2** (the default) or **Scribe v3**, ElevenLabs' newer speech-to-text model (released 9 November 2026). Every run starts on Scribe v2; pick Scribe v3 for a run, or save it in a preset.
