@@ -179,15 +179,16 @@ function fitFrame(box, f, padW, padH) {
   f.classList.toggle("hd", !portrait);
 }
 
-function paintCaption(f, cap, text) {
-  // The cue at the frame's default caption height, in plain white.
+function paintCaption(f, cap, text, color) {
+  // The cue at the frame's default caption height, in its speaker's colour
+  // when it has one, else plain white.
   cap.textContent = text;
   cap.style.bottom = frame().srt_posy * 100 + "%";
   const fh = parseFloat(f.style.height) || 300, fw = parseFloat(f.style.width) || 170;
   const tlH = (init.timelineRes && init.timelineRes[1]) || 1080;
   // Enlarged for legibility, as the Tk illustration was.
   cap.style.fontSize = Math.max(10, Math.min(fw * 0.085, fh * (55 / tlH) * 1.6)) + "px";
-  cap.style.color = "#fff";
+  cap.style.color = color || "#fff";
   cap.style.textShadow = "0 2px 6px #000c";
 }
 

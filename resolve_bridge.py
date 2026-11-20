@@ -312,7 +312,12 @@ def _run_workflow():
     original_report = audio_to_srt.Run.report
     def report(run, text):
         if client.rejected_style_properties:
-            text += '\n\nResolve did not accept some caption styling properties. Text and timing were imported; review the style in Resolve.'
+            # Resolve 21.2 refuses every subtitle style write on every run, so
+            # say what to do rather than sound like something went wrong.
+            # Speaker colours travel in the SRT and are not among these writes.
+            text += ('\n\nResolve does not let scripts set caption font, size, outline, shadow '
+                     'or position. Set them in Inspector > Track > Track Style. '
+                     'Text, timing and any speaker colours were imported.')
         return original_report(run, text)
     audio_to_srt.Run.report = report
     original_launch = audio_to_srt.Run.launch_loader
