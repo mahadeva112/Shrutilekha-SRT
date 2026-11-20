@@ -98,10 +98,16 @@ def spk_colors(header):
 
 
 def write_srt_cap(srt_path, cap_path, header, segs):
-    """App._write_srt_cap."""
+    """App._write_srt_cap, plus per-speaker <font color> tags in the SRT when
+    two or more speakers remain (transcribe.color_cue_text)."""
+    import transcribe as T
+    colors = spk_colors(header)
+    if len({seg["spk"] for seg in segs if seg["spk"]}) < 2:
+        colors = {}
     srt = ["1\n00:00:00,000 --> 00:00:00,001\n \n"]
     for i, seg in enumerate(segs, start=1):
-        srt.append("%d\n%s --> %s\n%s\n" % (i + 1, fmt_ts(seg["s"]), fmt_ts(seg["e"]), seg["text"]))
+        text = T.color_cue_text(seg["text"], colors.get(seg["spk"]))
+        srt.append("%d\n%s --> %s\n%s\n" % (i + 1, fmt_ts(seg["s"]), fmt_ts(seg["e"]), text))
     with open(srt_path, "w", encoding="utf-8") as f:
         f.write("\n".join(srt))
     cap = list(header)

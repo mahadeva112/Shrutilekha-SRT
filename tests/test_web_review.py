@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import re
 import runpy
 import tempfile
 import unittest
@@ -81,8 +82,21 @@ class ReviewParityTest(unittest.TestCase):
         out = self.dir / "web"
         out.mkdir()
         web_review.write_srt_cap(str(out / "a.srt"), str(out / "a.cap"), self.header, live)
-        self.assertEqual((out / "a.srt").read_bytes(), GOLDEN["written_srt"].encode("utf-8"))
+        srt = (out / "a.srt").read_bytes().decode("utf-8")
+        # Since the per-speaker colour tags, the SRT is the Tk editor's plus a
+        # <font color> per cue from its speaker's SPK colour; nothing else moves.
+        self.assertEqual(re.sub(r"</?font[^>]*>", "", srt), GOLDEN["written_srt"])
+        self.assertIn('<font color="#7fb3ff">আমি আজ বাড়ি যাব।</font>', srt)
+        self.assertIn('<font color="#ffb37f">তুমি কখন আসবে</font>', srt)
+        self.assertIn('<font color="#7fb3ff">ঠিক আছে।</font>', srt)
         self.assertEqual((out / "a.cap").read_bytes(), GOLDEN["written_cap"].encode("utf-8"))
+
+    def test_one_speaker_left_writes_no_colour(self):
+        live = [seg for seg in self.live() if seg["spk"] == 1]
+        out = self.dir / "web"
+        out.mkdir()
+        web_review.write_srt_cap(str(out / "a.srt"), str(out / "a.cap"), self.header, live)
+        self.assertNotIn("<font", (out / "a.srt").read_text(encoding="utf-8"))
 
     def test_two_line_cues_keep_their_wrap_through_review(self):
         srt = self.dir / "out.srt"
@@ -97,7 +111,11 @@ class ReviewParityTest(unittest.TestCase):
         out = self.dir / "web"
         out.mkdir()
         web_review.write_srt_cap(str(out / "a.srt"), str(out / "a.cap"), header, live)
-        self.assertIn("আমি আজ\nবাড়ি যাব।", (out / "a.srt").read_text(encoding="utf-8"))
+        self.assertIn('<font color="#7fb3ff">আমি আজ</font>\n<font color="#7fb3ff">বাড়ি যাব।</font>',
+                      (out / "a.srt").read_text(encoding="utf-8"))
+        # Reading the tagged SRT back gives the plain wrapped text again.
+        _, again = web_review.parse_cap(str(out / "a.cap"), str(out / "a.srt"))
+        self.assertEqual(again[0]["text"], "আমি আজ\nবাড়ি যাব।")
         # A wrap is not an edit: the real word timings survive.
         self.assertIn("WRD 0.450 0.900 আজ", (out / "a.cap").read_text(encoding="utf-8"))
 
