@@ -1,3 +1,9 @@
+v2.0.11: one input per task in Script & files.
+
+- **Generate** shows only the reference script (Browse file / Paste text). **Sync existing SRT** shows only the SRT to re-time. Before, both rows were always on screen and the SRT row sat greyed out in Generate.
+- The note under the panel and the summary in the footer follow the task. Sync no longer names a script, since Sync never reads one.
+- The test suite passes. The change was checked in a browser mock of the caption studio, not yet in a live Resolve session.
+
 v2.0.10: a colour for each speaker.
 
 - With **Separate speakers** on and two or more people speaking, each speaker's captions now get their own colour in Resolve. Resolve does not let scripts colour subtitle cues, but it does read colour tags in an SRT, so Srutilekha writes `<font color>` tags into the SRT it imports. This was checked live on Resolve 21.2.0.6 Free. The first speaker stays white and untagged, so the track's Track Style colour applies to them. With one speaker, nothing changes.
