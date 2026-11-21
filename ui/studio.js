@@ -77,6 +77,9 @@ function render() {
   const sync = V.task === "Sync Existing";
   document.querySelectorAll("#taskSeg button").forEach((b) => b.classList.toggle("active", b.dataset.task === V.task));
   document.querySelectorAll(".segments, .mini-seg").forEach(moveThumb);
+  // Each task shows only its own input: Generate takes a reference script,
+  // Sync takes the SRT to re-time (the sync worker never reads a script).
+  $("syncField").hidden = !sync;
   $("syncField").querySelectorAll("input, button").forEach((el) => el.disabled = !sync);
   renderScript();
   $("goText").textContent = sync ? "Sync timing" : "Generate captions";
@@ -118,12 +121,16 @@ const Back = {
 };
 
 function renderScript() {
-  const paste = V.script_mode === "paste";
+  const paste = V.script_mode === "paste", sync = V.task === "Sync Existing";
+  $("scriptField").hidden = sync;
+  $("scriptNoteText").textContent = sync
+    ? "Sync keeps every word of this SRT and rebuilds only its timings from the audio."
+    : "A script keeps names, spellings and punctuation exact. Accepts .docx, .txt or .srt.";
   document.querySelectorAll("#scriptSeg button").forEach((b) => b.classList.toggle("active", b.dataset.mode === (paste ? "paste" : "file")));
   moveThumb($("scriptSeg"));
   $("scriptFile").hidden = paste;
   $("scriptPaste").hidden = !paste;
-  $("scriptNote").hidden = paste;
+  $("scriptNote").hidden = paste && !sync;
   $("scriptField").classList.toggle("pasting", paste);
   const text = String(V.ref_text || "").trim();
   const words = text ? text.split(/\s+/).length : 0;
@@ -199,7 +206,7 @@ function renderSummary() {
     const srt = String(V.sync_srt || "").trim();
     bits.push(srt ? `Re-time ${base(srt)} against ${V.chosen}` : `Choose the SRT to re-time against ${V.chosen}`);
   } else bits.push(`${V.chosen} · ${V.lang} · ${V.model || "Scribe v2"} → a subtitle track`);
-  if (scriptOf(V)) bits.push(V.script_mode === "paste" ? "pasted script" : "script " + base(String(V.ref_script).trim()));
+  if (V.task !== "Sync Existing" && scriptOf(V)) bits.push(V.script_mode === "paste" ? "pasted script" : "script " + base(String(V.ref_script).trim()));
   bits.push(Number(V.review) ? "review first" : "applied straight away");
   $("summary").textContent = bits.join("  ·  ");
 }

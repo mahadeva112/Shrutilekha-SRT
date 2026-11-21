@@ -23,8 +23,8 @@ keep the same JSON format.
 | Review before import | Audio & language panel |
 | Max characters, lines, min/max duration, CPS, max words | Timing & readability panel |
 | Numeric range feedback and reading comfort | Timing fields and compact comfort strip |
-| Reference script: Browse a file or Paste the text | Script & files panel; pasted text is saved to `scripts/pasted_script.txt` in the data folder and passed to the worker as the script path |
-| Existing SRT path and Browse | Always-visible row; enabled in Sync mode |
+| Reference script: Browse a file or Paste the text | Script & files panel, Generate only (Sync never reads a script); pasted text is saved to `scripts/pasted_script.txt` in the data folder and passed to the worker as the script path |
+| Existing SRT path and Browse | Script & files panel, Sync only; the panel shows one input per task |
 | Save/load/remove named presets | Not in the Studio form since v2.0.0; the classic Tkinter form keeps them. The `list/load/save/remove_preset` API and JSON format are retained, caption style fields no longer saved |
 | Cue preview at the timeline's frame | Review editor, after Generate |
 | Caption editing, local re-split, recipes, filters, merge/split and apply | Existing review editor retained |
