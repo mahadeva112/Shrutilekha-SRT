@@ -1,3 +1,8 @@
+v2.0.12: Devanagari sample caption on the home screen.
+
+- The animated sample caption on the home screen now reads "हर शब्द सही जगह पर" (Hindi, Devanagari script) instead of the Bengali "সব কথা ঠিক জায়গায়".
+- The caption uses the Vesper Libre Bold font, shipped inside the app (`ui/fonts/`, SIL Open Font License, see `ui/fonts/OFL.txt`), so it looks the same on every PC. Nirmala UI is the fallback. Nothing else changed.
+
 v2.0.11: one input per task in Script & files.
 
 - **Generate** shows only the reference script (Browse file / Paste text). **Sync existing SRT** shows only the SRT to re-time. Before, both rows were always on screen and the SRT row sat greyed out in Generate.

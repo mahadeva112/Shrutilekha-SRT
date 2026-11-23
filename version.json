@@ -1,7 +1,7 @@
 {
-  "version": "2.0.11",
+  "version": "2.0.12",
   "notes": [
-    "The caption studio's Script & files panel now shows only what the task needs: the reference script for Generate, the existing SRT for Sync."
+    "The home screen's sample caption is now in Hindi (Devanagari script), set in the bundled Vesper Libre font."
   ],
   "mandatory": false,
   "min_version": ""
